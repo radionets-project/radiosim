@@ -1,2 +1,2 @@
 # radiosim
-Simulation of radio skies to simulate astrophysical data sets.
+Simulation of radio skies to create astrophysical data sets.
