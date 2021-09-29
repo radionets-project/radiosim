@@ -80,7 +80,9 @@ def create_jet(image, bboxes=False):
         jet_comp_norm = jet_comp / jet_img.max()
         jets.append(jet_img_norm)
         jet_comps.append(jet_comp_norm)
-        source_list = np.array([amp / jet_img.max(), x + rand_center, y + rand_center, sx, sy]).T
+        source_list = np.array(
+            [amp / jet_img.max(), x + rand_center, y + rand_center, sx, sy]
+        ).T
         source_lists.append(source_list)
     return (
         np.array(jets),
