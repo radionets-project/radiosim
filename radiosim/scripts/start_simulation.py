@@ -1,6 +1,6 @@
 import toml
 import click
-from radiosim.utils import read_config
+from radiosim.utils import read_config, check_outpath
 from radiosim.simulations import simulate_sky_distributions
 
 
@@ -22,8 +22,15 @@ def main(configuration_path, mode):
     sim_conf = read_config(config)
     print(sim_conf, "\n")
 
+    outpath = config["paths"]["outpath"]
+    sim_sources = check_outpath(
+        outpath,
+        quiet=config["mode"]["quiet"],
+    )
+
     if mode == "simulate":
-        simulate_sky_distributions(sim_conf)
+        if sim_sources:
+            simulate_sky_distributions(sim_conf)
 
     # if mode == "overview":
     #     create_simulation_overview(sim_conf)
