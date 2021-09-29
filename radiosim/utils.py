@@ -86,8 +86,7 @@ def check_outpath(outpath, quiet=False):
 
 def read_config(config):
     sim_conf = {}
-    sim_conf["outpath"] = config["paths"]["data_path"]
-    sim_conf["data_format"] = config["paths"]["data_format"]
+    sim_conf["outpath"] = config["paths"]["outpath"]
     if config["source_types"]["jets"]:
         click.echo("Adding jet sources to sky distributions! \n")
         sim_conf["num_jet_components"] = config["source_types"]["num_jet_components"]
