@@ -12,7 +12,9 @@ setup(
     install_requires=[
         "numpy",
         "matplotlib",
-        "h5py"
+        "h5py",
+        "toml",
+        "click",
     ],
     setup_requires=["pytest-runner"],
     tests_require=["pytest"],
