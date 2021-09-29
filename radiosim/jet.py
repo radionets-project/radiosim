@@ -10,6 +10,7 @@ def create_jet(image, bboxes=False):
 
     jets = []
     jet_comps = []
+    source_lists = []
     for img in image:
         img_size = img.shape[-1]
         center = img_size // 2
@@ -79,4 +80,10 @@ def create_jet(image, bboxes=False):
         jet_comp_norm = jet_comp / jet_img.max()
         jets.append(jet_img_norm)
         jet_comps.append(jet_comp_norm)
-    return np.array(jets), np.array(jet_comps, dtype=object)
+        source_list = [amp / jet_img.max(), x + rand_center, y + rand_center, sx, sy]
+        source_lists.append(source_list)
+    return (
+        np.array(jets),
+        np.array(jet_comps, dtype=object),
+        np.array(source_lists, dtype=object),
+    )
