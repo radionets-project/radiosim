@@ -1,4 +1,3 @@
-import numpy as np
 from tqdm import tqdm
 from radiosim.utils import (
     create_grid,
@@ -27,10 +26,10 @@ def create_sky_distribution(
 ):
     for i in tqdm(range(num_bundles)):
         grid = create_grid(img_size, bundle_size)
-        jet = create_jet(grid)
+        jet, jet_comps = create_jet(grid)
 
         jet_bundle = jet.copy()
-        comp_bundle = np.ones(jet.shape)
+        comp_bundle = jet_comps.copy()
 
         source_list = None
 

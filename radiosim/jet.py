@@ -9,6 +9,7 @@ def create_jet(image, bboxes=False):
         image = image[None]
 
     jets = []
+    jet_comps = []
     for img in image:
         img_size = img.shape[-1]
         center = img_size // 2
@@ -67,11 +68,15 @@ def create_jet(image, bboxes=False):
         rand_center = np.random.normal(center, 1)
 
         jet_img = img[0]
+        jet_comp = []
         for i in range(comps):
             g = gauss(
                 img_size, x[i] + rand_center, y[i] + rand_center, sx[i], sy[i], amp[i]
             )
+            jet_comp += [g]
             jet_img += g
         jet_img_norm = jet_img / jet_img.max()
+        jet_comp_norm = jet_comp / jet_img.max()
         jets.append(jet_img_norm)
-    return np.array(jets)
+        jet_comps.append(jet_comp_norm)
+    return np.array(jets), np.array(jet_comps, dtype=object)
