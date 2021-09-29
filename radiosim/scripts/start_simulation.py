@@ -1,6 +1,7 @@
-import numpy as np
 import toml
 import click
+from radiosim.utils import read_config
+from radiosim.simulations import simulate_sky_distributions
 
 
 @click.command()
@@ -19,11 +20,13 @@ import click
 def main(configuration_path, mode):
     config = toml.load(configuration_path)
     sim_conf = read_config(config)
+    print(sim_conf, "\n")
 
-if mode == "simulate":
+    if mode == "simulate":
+        simulate_sky_distributions(sim_conf)
 
-
-if mode == "overview":
+    # if mode == "overview":
+    #     create_simulation_overview(sim_conf)
 
 
 if __name__ == "__main__":
