@@ -20,11 +20,11 @@ setup(
     setup_requires=["pytest-runner"],
     tests_require=["pytest"],
     zip_safe=False,
-    # entry_points={
-    #     "console_scripts": [
-    #         "radiosim = radiosim.scripts.start_simulation:main",
-    #     ],
-    # },
+    entry_points={
+        "console_scripts": [
+            "radiosim = radiosim.scripts.start_simulation:main",
+        ],
+    },
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Science/Research",
