@@ -9,8 +9,8 @@ def simulate_sky_distributions(sim_conf):
             img_size=sim_conf["img_size"],
             bundle_size=sim_conf["bundle_size"],
             num_bundles=sim_conf["bundles_" + str(opt)],
-            path=sim_conf["outpath"],
-            option=opt,
+            # path=sim_conf["outpath"],
+            # option=opt,
         )
 
 
