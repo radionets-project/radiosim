@@ -28,8 +28,6 @@ def create_sky_distribution(
         grid = create_grid(img_size, bundle_size)
         jet, jet_comps, source_list = create_jet(grid)
 
-        print(source_list)
-
         jet_bundle = jet.copy()
         comp_bundle = jet_comps.copy()
 
