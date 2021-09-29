@@ -31,7 +31,7 @@ def create_grid(pixel, bundle_size):
 
 
 def get_exp(size=1):
-    num = np.ceil(size / 2)
+    num = np.ceil(size / 2).astype(int)
     exp = np.random.exponential(scale=0.08, size=(num,))
     exp_inv = 1 - np.random.exponential(scale=0.08, size=(num,))
     vals = np.hstack([exp, exp_inv])
