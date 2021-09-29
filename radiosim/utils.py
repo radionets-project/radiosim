@@ -1,5 +1,6 @@
 import os
 import sys
+import h5py
 import click
 import numpy as np
 from pathlib import Path
@@ -167,3 +168,17 @@ def adjust_outpath(path, option, form="h5"):
         counter += 1
     out = filename.format(counter)
     return out
+
+
+def save_sky_distribution_bundle(
+    path, x, y, z=None, name_x="sky", name_y="comp", name_z="list"
+):
+    """
+    write fft_pairs created in second analysis step to h5 file
+    """
+    with h5py.File(path, "w") as hf:
+        [hf.create_dataset(name_x + str(i), data=x[i]) for i in range(len(x))]
+        [hf.create_dataset(name_y + str(i), data=y[i]) for i in range(len(y))]
+        if z is not None:
+            [hf.create_dataset(name_z + str(i), data=z[i]) for i in range(len(z))]
+        hf.close()
