@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="radiosim",
-    version="0.0.1",
+    version="0.0.2",
     description="Simulation of radio skies to create astrophysical data sets",
     url="https://github.com/Kevin2/radionets",
     author="Kevin Schmidt, Felix Geyer, Paul-Simon Blomenkamp, Stefan Fröse",
@@ -15,6 +15,7 @@ setup(
         "h5py",
         "toml",
         "click",
+        "tqdm",
     ],
     setup_requires=["pytest-runner"],
     tests_require=["pytest"],
