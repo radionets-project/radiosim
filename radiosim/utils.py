@@ -1,7 +1,8 @@
-import numpy as np
-import click
-from pathlib import Path
+import os
 import sys
+import click
+import numpy as np
+from pathlib import Path
 
 
 def create_grid(pixel, bundle_size):
@@ -40,7 +41,7 @@ def get_exp(size=1):
 
 def check_outpath(outpath, quiet=False):
     """
-    Check if outpath exists. Check for existing fft_files and sampled-files.
+    Check if outpath exists. Check for existing source_bundle files.
     Ask to overwrite or reuse existing files.
     Parameters
     ----------
@@ -102,3 +103,67 @@ def read_config(config):
     sim_conf["noise"] = config["image_options"]["noise"]
     sim_conf["noise_level"] = config["image_options"]["noise_level"]
     return sim_conf
+
+
+def get_noise(image, scale, mean=0, std=1):
+    """
+    Calculate random noise values for all image pixels.
+    Parameters
+    ----------
+    image: 2darray
+        2d image
+    scale: float
+        scaling factor to increase noise
+    mean: float
+        mean of noise values
+    std: float
+        standard deviation of noise values
+    Returns
+    -------
+    out: ndarray
+        array with noise values in image shape
+    """
+    return np.random.normal(mean, std, size=image.shape) * scale
+
+
+def add_noise(bundle, noise_level):
+    """
+    Used for adding noise and plotting the original and noised picture,
+    if asked. Using 0.05 * max(image) as scaling factor.
+    Parameters
+    ----------
+    bundle: path
+        path to hdf5 bundle file
+    noise_level: int
+        noise level in percent
+    Returns
+    -------
+    bundle_noised hdf5_file
+        bundle with noised images
+    """
+    bundle_noised = np.array(
+        [img + get_noise(img, (img.max() * noise_level / 100)) for img in bundle]
+    )
+    return bundle_noised
+
+
+def adjust_outpath(path, option, form="h5"):
+    """
+    Add number to out path when filename already exists.
+    Parameters
+    ----------
+    path: str
+        path to save directory
+    option: str
+        additional keyword to add to path
+    Returns
+    -------
+    out: str
+        adjusted path
+    """
+    counter = 0
+    filename = str(path) + (option + "{}." + form)
+    while os.path.isfile(filename.format(counter)):
+        counter += 1
+    out = filename.format(counter)
+    return out
