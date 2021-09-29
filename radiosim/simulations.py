@@ -1,5 +1,11 @@
+import numpy as np
 from tqdm import tqdm
-from radiosim.utils import create_grid
+from radiosim.utils import (
+    create_grid,
+    add_noise,
+    adjust_outpath,
+    save_sky_distribution_bundle,
+)
 from radiosim.jet import create_jet
 
 
@@ -9,23 +15,27 @@ def simulate_sky_distributions(sim_conf):
             img_size=sim_conf["img_size"],
             bundle_size=sim_conf["bundle_size"],
             num_bundles=sim_conf["bundles_" + str(opt)],
-            # path=sim_conf["outpath"],
-            # option=opt,
+            noise=sim_conf["noise"],
+            noise_level=sim_conf["noise_level"],
+            outpath=sim_conf["outpath"],
+            option=opt,
         )
 
 
-def create_sky_distribution(num_bundles, img_size, bundle_size):
+def create_sky_distribution(
+    num_bundles, img_size, bundle_size, noise, noise_level, outpath, option
+):
     for i in tqdm(range(num_bundles)):
         grid = create_grid(img_size, bundle_size)
         jet = create_jet(grid)
-        print(jet.shape)
 
-        # images = bundle.copy()
+        jet_bundle = jet.copy()
+        comp_bundle = np.ones(jet.shape)
 
-        # if noise:
-        #     images = add_noise(images, noise_level)
+        source_list = None
 
-        # bundle_fft = np.array([np.fft.fftshift(np.fft.fft2(img)) for img in images])
-        # bundle_fft = add_white_noise(bundle_fft)
-        # path = adjust_outpath(data_path, "/fft_" + option)
-        # save_fft_pair(path, bundle_fft, bundle, list_sources)
+        if noise:
+            jet_bundle = add_noise(jet_bundle, noise_level)
+
+        path = adjust_outpath(outpath, "/source_bundle_" + option)
+        save_sky_distribution_bundle(path, jet_bundle, comp_bundle, source_list)
