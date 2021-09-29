@@ -82,3 +82,24 @@ def check_outpath(outpath, quiet=False):
         Path(path).mkdir(parents=True, exist_ok=False)
         sim_sources = True
     return sim_sources
+
+
+def read_config(config):
+    sim_conf = {}
+    sim_conf["outpath"] = config["paths"]["data_path"]
+    sim_conf["data_format"] = config["paths"]["data_format"]
+    if config["source_types"]["jets"]:
+        click.echo("Adding jet sources to sky distributions! \n")
+        sim_conf["num_jet_components"] = config["source_types"]["num_jet_components"]
+
+    if config["source_types"]["pointlike_gaussians"]:
+        click.echo("Adding poinhtlike Gaussians to sky distributions! \n")
+
+    sim_conf["bundles_train"] = config["image_options"]["bundles_train"]
+    sim_conf["bundles_valid"] = config["image_options"]["bundles_valid"]
+    sim_conf["bundles_test"] = config["image_options"]["bundles_test"]
+    sim_conf["bundle_size"] = config["image_options"]["bundle_size"]
+    sim_conf["img_size"] = config["image_options"]["img_size"]
+    sim_conf["noise"] = config["image_options"]["noise"]
+    sim_conf["noise_level"] = config["image_options"]["noise_level"]
+    return sim_conf
