@@ -26,12 +26,12 @@ def create_sky_distribution(
 ):
     for i in tqdm(range(num_bundles)):
         grid = create_grid(img_size, bundle_size)
-        jet, jet_comps = create_jet(grid)
+        jet, jet_comps, source_list = create_jet(grid)
+
+        print(source_list)
 
         jet_bundle = jet.copy()
         comp_bundle = jet_comps.copy()
-
-        source_list = None
 
         if noise:
             jet_bundle = add_noise(jet_bundle, noise_level)
