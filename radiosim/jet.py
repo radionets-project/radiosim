@@ -4,7 +4,7 @@ from radiosim.utils import get_exp
 from radiosim.gauss import gauss
 
 
-def create_jet(image, bboxes=False):
+def create_jet(image, num_comps):
     if len(image.shape) == 3:
         image = image[None]
 
@@ -14,7 +14,7 @@ def create_jet(image, bboxes=False):
     for img in image:
         img_size = img.shape[-1]
         center = img_size // 2
-        comps = np.random.randint(3, 6)
+        comps = np.random.randint(num_comps[0], num_comps[1])
 
         coord = []
         x = np.zeros(comps)

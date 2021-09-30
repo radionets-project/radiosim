@@ -16,17 +16,25 @@ def simulate_sky_distributions(sim_conf):
             num_bundles=sim_conf["bundles_" + str(opt)],
             noise=sim_conf["noise"],
             noise_level=sim_conf["noise_level"],
+            num_jet_comps=sim_conf["num_jet_components"],
             outpath=sim_conf["outpath"],
             option=opt,
         )
 
 
 def create_sky_distribution(
-    num_bundles, img_size, bundle_size, noise, noise_level, outpath, option
+    num_bundles,
+    img_size,
+    bundle_size,
+    noise,
+    noise_level,
+    num_jet_comps,
+    outpath,
+    option,
 ):
     for i in tqdm(range(num_bundles)):
         grid = create_grid(img_size, bundle_size)
-        jet, jet_comps, source_list = create_jet(grid)
+        jet, jet_comps, source_list = create_jet(grid, num_jet_comps)
 
         jet_bundle = jet.copy()
         comp_bundle = jet_comps.copy()
