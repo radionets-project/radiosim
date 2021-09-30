@@ -10,7 +10,7 @@ outpath = "./build/example_data/"
 
 [source_types]
 jets = true
-num_jet_components = [4, 10]
+num_jet_components = [3, 6]
 pointlike_gaussians = false
 
 [image_options]
