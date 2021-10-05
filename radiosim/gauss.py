@@ -36,6 +36,8 @@ def create_gauss(img, num_sources, img_size=63, sym=True):
             point_s += [g]
         else:
             idx.append(n)
+    img_norm = img / img.max()
+    point_s_norm = point_s / img.max()
     amp = np.delete(amp, idx)
     mx = np.delete(mx, idx)
     my = np.delete(my, idx)
@@ -43,11 +45,11 @@ def create_gauss(img, num_sources, img_size=63, sym=True):
     sy = np.delete(sy, idx)
     point_list = np.array(
         [
-            amp,
+            amp / img.max(),
             mx,
             my,
             np.sqrt(sx),
             np.sqrt(sy),
         ],
     ).T
-    return img, point_s, point_list
+    return img_norm, point_s_norm, point_list
