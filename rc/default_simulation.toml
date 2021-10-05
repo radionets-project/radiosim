@@ -11,7 +11,7 @@ outpath = "./build/example_data/"
 [source_types]
 jets = true
 num_jet_components = [3, 6]
-pointlike_gaussians = false
+pointlike_gaussians = true
 num_pointlike_gaussians = [2, 5]
 
 [image_options]

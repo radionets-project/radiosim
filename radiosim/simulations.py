@@ -6,6 +6,7 @@ from radiosim.utils import (
     save_sky_distribution_bundle,
 )
 from radiosim.jet import create_jet
+from radiosim.point import create_point_source_img
 
 
 def simulate_sky_distributions(sim_conf):
@@ -17,6 +18,7 @@ def simulate_sky_distributions(sim_conf):
             noise=sim_conf["noise"],
             noise_level=sim_conf["noise_level"],
             num_jet_comps=sim_conf["num_jet_components"],
+            num_point_gauss=sim_conf["num_point_gauss"],
             outpath=sim_conf["outpath"],
             option=opt,
         )
@@ -29,18 +31,24 @@ def create_sky_distribution(
     noise,
     noise_level,
     num_jet_comps,
+    num_point_gauss,
     outpath,
     option,
 ):
     for i in tqdm(range(num_bundles)):
         grid = create_grid(img_size, bundle_size)
-        jet, jet_comps, source_list = create_jet(grid, num_jet_comps)
+        if num_jet_comps:
+            grid, jet_comps, jet_list = create_jet(grid, num_jet_comps)
+        if num_point_gauss:
+            grid, points, point_list = create_point_source_img(grid, num_point_gauss)
 
-        jet_bundle = jet.copy()
+        source_bundle = grid.copy()
+        print(jet_list.shape)
+        print(point_list.shape)
         comp_bundle = jet_comps.copy()
 
         if noise:
-            jet_bundle = add_noise(jet_bundle, noise_level)
+            source_bundle = add_noise(source_bundle, noise_level)
 
         path = adjust_outpath(outpath, "/source_bundle_" + option)
-        save_sky_distribution_bundle(path, jet_bundle, comp_bundle, source_list)
+        save_sky_distribution_bundle(path, source_bundle, comp_bundle, None)
