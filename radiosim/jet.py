@@ -14,21 +14,21 @@ def create_jet(image, num_comps):
     for img in image:
         img_size = img.shape[-1]
         center = img_size // 2
-        comps = np.random.randint(num_comps[0], num_comps[1])
+        comps = np.random.randint(num_comps[0], num_comps[1] + 1)
 
         coord = []
-        x = np.zeros(comps)
-        y = np.zeros(comps)
-        z = np.zeros(comps)
-        amp = np.zeros(comps)
-        sx = np.zeros(comps)
-        sy = np.zeros(comps)
+        x = np.zeros(num_comps[1])
+        y = np.zeros(num_comps[1])
+        z = np.zeros(num_comps[1])
+        amp = np.zeros(num_comps[1])
+        sx = np.zeros(num_comps[1])
+        sy = np.zeros(num_comps[1])
         base_amp = np.random.randint(50, 100)
 
         Ry = R.from_euler("y", np.random.uniform(0, 90), degrees=True).as_matrix()
         Rz = R.from_euler("z", np.random.uniform(0, 90), degrees=True).as_matrix()
-        x_curve = np.zeros(comps)
-        y_curve = np.zeros(comps)
+        x_curve = np.zeros(num_comps[1])
+        y_curve = np.zeros(num_comps[1])
         for i in range(comps):
             coord.append(
                 np.array(
@@ -70,12 +70,20 @@ def create_jet(image, num_comps):
 
         jet_img = img[0]
         jet_comp = []
-        for i in range(comps):
-            g = gauss(
-                img_size, x[i] + rand_center, y[i] + rand_center, sx[i], sy[i], amp[i]
-            )
-            jet_comp += [g]
-            jet_img += g
+        for i in range(2 * num_comps[1] - 1):
+            if amp[i] == 0:
+                jet_comp += [np.zeros((img_size, img_size))]
+            else:
+                g = gauss(
+                    img_size,
+                    x[i] + rand_center,
+                    y[i] + rand_center,
+                    sx[i],
+                    sy[i],
+                    amp[i],
+                )
+                jet_comp += [g]
+                jet_img += g
         jet_img_norm = jet_img / jet_img.max()
         jet_comp_norm = jet_comp / jet_img.max()
         jets.append(jet_img_norm)
@@ -86,6 +94,6 @@ def create_jet(image, num_comps):
         source_lists.append(source_list)
     return (
         np.array(jets),
-        np.array(jet_comps, dtype=object),
-        np.array(source_lists, dtype=object),
+        np.array(jet_comps),
+        np.array(source_lists),
     )
