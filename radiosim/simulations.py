@@ -1,3 +1,4 @@
+import numpy as np
 from tqdm import tqdm
 from radiosim.utils import (
     create_grid,
@@ -43,12 +44,20 @@ def create_sky_distribution(
             grid, points, point_list = create_point_source_img(grid, num_point_gauss)
 
         source_bundle = grid.copy()
-        print(jet_list.shape)
-        print(point_list.shape)
-        comp_bundle = jet_comps.copy()
+        if num_jet_comps and num_jet_comps:
+            print(points)
+            comp_bundle = np.concatenate([jet_comps, points], dtype=object)
+            list_bundle = np.concatenate([jet_list, point_list], dtype=object)
+        if num_jet_comps:
+            comp_bundle = jet_comps
+            list_bundle = jet_list
+        if num_point_gauss:
+            comp_bundle = points
+            list_bundle = point_list
 
+        # print(comp_bundle)
         if noise:
             source_bundle = add_noise(source_bundle, noise_level)
 
         path = adjust_outpath(outpath, "/source_bundle_" + option)
-        save_sky_distribution_bundle(path, source_bundle, comp_bundle, None)
+        save_sky_distribution_bundle(path, source_bundle, comp_bundle, list_bundle)

@@ -8,7 +8,7 @@ def gauss(img_size, mx, my, sx, sy, amp=0.01):
     return g
 
 
-def create_gauss(img, num_sources, img_size=63, source_list=True, sym=True):
+def create_gauss(img, num_sources, img_size=63, sym=True):
     mx = np.random.randint(1, img_size, size=(num_sources))
     my = np.random.randint(1, img_size, size=(num_sources))
     rng = np.random.default_rng()
@@ -28,18 +28,26 @@ def create_gauss(img, num_sources, img_size=63, source_list=True, sym=True):
         )
 
     idx = []
+    point_s = []
     for n in range(num_sources):
         if img[mx[n], my[n]] <= 5e-10:
             g = gauss(img_size, mx[n], my[n], sx[n], sy[n], amp[n])
             img += g
+            point_s += [g]
         else:
             idx.append(n)
+    amp = np.delete(amp, idx)
     mx = np.delete(mx, idx)
     my = np.delete(my, idx)
     sx = np.delete(sx, idx)
     sy = np.delete(sy, idx)
-
-    if source_list:
-        return img, [mx, my], [sx, sy]
-    else:
-        return img
+    point_list = np.array(
+        [
+            amp,
+            mx,
+            my,
+            np.sqrt(sx),
+            np.sqrt(sy),
+        ],
+    ).T
+    return img, point_s, point_list
