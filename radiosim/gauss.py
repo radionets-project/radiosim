@@ -6,3 +6,40 @@ def gauss(img_size, mx, my, sx, sy, amp=0.01):
     y = x.T
     g = amp * np.exp(-((y - my) ** 2) / sy).dot(np.exp(-((x - mx) ** 2) / sx))
     return g
+
+
+def create_gauss(img, num_sources, img_size=63, source_list=True, sym=True):
+    mx = np.random.randint(1, img_size, size=(num_sources))
+    my = np.random.randint(1, img_size, size=(num_sources))
+    rng = np.random.default_rng()
+    amp = rng.uniform(1, 10, num_sources)
+    sx = np.random.randint(
+        round(1 / 8 * (img_size ** 2) / 720),
+        1 / 2 * (img_size ** 2) / 360,
+        size=(num_sources),
+    )
+    if sym:
+        sy = sx
+    else:
+        sy = np.random.randint(
+            round(1 / 8 * (img_size ** 2) / 720),
+            1 / 2 * (img_size ** 2) / 360,
+            size=(num_sources),
+        )
+
+    idx = []
+    for n in range(num_sources):
+        if img[mx[n], my[n]] <= 5e-10:
+            g = gauss(img_size, mx[n], my[n], sx[n], sy[n], amp[n])
+            img += g
+        else:
+            idx.append(n)
+    mx = np.delete(mx, idx)
+    my = np.delete(my, idx)
+    sx = np.delete(sx, idx)
+    sy = np.delete(sy, idx)
+
+    if source_list:
+        return img, [mx, my], [sx, sy]
+    else:
+        return img
