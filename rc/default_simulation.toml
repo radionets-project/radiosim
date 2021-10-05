@@ -19,5 +19,5 @@ bundles_valid = 0
 bundles_test = 0
 bundle_size = 10
 img_size = 256
-noise = true
+noise = false
 noise_level = 5
