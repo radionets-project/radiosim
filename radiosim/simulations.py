@@ -45,17 +45,32 @@ def create_sky_distribution(
 
         source_bundle = grid.copy()
         if num_jet_comps and num_jet_comps:
-            print(points)
-            comp_bundle = np.concatenate([jet_comps, points], dtype=object)
-            list_bundle = np.concatenate([jet_list, point_list], dtype=object)
-        if num_jet_comps:
+            comp_bundle = np.array(
+                [
+                    np.append(jet_comps[i], points[i], axis=0)
+                    if points[i].size > 0
+                    else jet_comps[i]
+                    for i in range(jet_comps.shape[0])
+                ],
+            )
+            list_bundle = np.array(
+                [
+                    np.append(jet_list[i], point_list[i], axis=0)
+                    if point_list[i].size > 0
+                    else jet_list[i]
+                    for i in range(jet_list.shape[0])
+                ],
+                dtype=object,
+            )
+        if num_jet_comps and not num_point_gauss:
+            print("not point")
             comp_bundle = jet_comps
             list_bundle = jet_list
-        if num_point_gauss:
+        if num_point_gauss and not num_jet_comps:
+            print("not jet")
             comp_bundle = points
             list_bundle = point_list
 
-        # print(comp_bundle)
         if noise:
             source_bundle = add_noise(source_bundle, noise_level)
 

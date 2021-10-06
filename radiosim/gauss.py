@@ -12,7 +12,7 @@ def create_gauss(img, num_sources, img_size=63, sym=True):
     mx = np.random.randint(1, img_size, size=(num_sources))
     my = np.random.randint(1, img_size, size=(num_sources))
     rng = np.random.default_rng()
-    amp = rng.uniform(50, 70, num_sources)
+    amp = rng.uniform(1e-2, 1, num_sources)
     sx = np.random.randint(
         round(1 / 8 * (img_size ** 2) / 720),
         1 / 2 * (img_size ** 2) / 360,
