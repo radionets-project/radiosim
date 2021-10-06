@@ -1,0 +1,23 @@
+# This is a TOML document.
+
+title = "Simulation configuration"
+
+[mode]
+quiet = true
+
+[paths]
+outpath = "./build/example_data/"
+
+[source_types]
+jets = true
+num_jet_components = [3, 6]
+pointlike_gaussians = false
+
+[image_options]
+bundles_train = 5
+bundles_valid = 0
+bundles_test = 0
+bundle_size = 10
+img_size = 256
+noise = false
+noise_level = 5

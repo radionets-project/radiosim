@@ -1,0 +1,8 @@
+.vscode
+*.egg-info
+.eggs
+
+*__pycache__
+*build
+
+.flake8
