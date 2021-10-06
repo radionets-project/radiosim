@@ -93,7 +93,7 @@ def create_jet(image, num_comps):
         ).T
         source_lists.append(source_list)
     return (
-        np.array(jets),
+        np.array(jets)[:, None, :, :],
         np.array(jet_comps),
         np.array(source_lists),
     )
