@@ -59,7 +59,7 @@ def check_outpath(outpath, quiet=False):
     path = Path(outpath)
     exists = path.exists()
     if exists is True:
-        source = {p for p in path.rglob("*source_bundle*.h5") if p.is_file()}
+        source = {p for p in path.rglob("*samp*.h5") if p.is_file()}
         if source:
             click.echo("Found existing source simulations!")
             if quiet:
@@ -163,7 +163,7 @@ def adjust_outpath(path, option, form="h5"):
         adjusted path
     """
     counter = 0
-    filename = str(path) + (option + "{}." + form)
+    filename = str(path) + (option + "_{}." + form)
     while os.path.isfile(filename.format(counter)):
         counter += 1
     out = filename.format(counter)

@@ -42,5 +42,5 @@ def create_sky_distribution(
         if noise:
             jet_bundle = add_noise(jet_bundle, noise_level)
 
-        path = adjust_outpath(outpath, "/source_bundle_" + option)
+        path = adjust_outpath(outpath, "/samp_" + option)
         save_sky_distribution_bundle(path, jet_bundle, comp_bundle, source_list)
