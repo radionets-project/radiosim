@@ -87,7 +87,7 @@ def create_jet(image, num_comps):
                 y + rand_center,
                 np.sqrt(sx),
                 np.sqrt(sy),
-                np.zeros(len(comps)),
+                np.zeros(comps),
             ]
         ).T
         source_lists.append(source_list)
