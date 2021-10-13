@@ -50,6 +50,7 @@ def create_gauss(img, num_sources, img_size=63, sym=True):
             my,
             np.sqrt(sx),
             np.sqrt(sy),
+            np.ones(len(mx)),
         ],
     ).T
     return img_norm, point_s_norm, point_list
