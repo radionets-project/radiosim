@@ -2,6 +2,7 @@ import toml
 import click
 from radiosim.utils import read_config, check_outpath
 from radiosim.simulations import simulate_sky_distributions
+from radiosim.plotting import create_simulation_overview
 
 
 @click.command()
@@ -32,8 +33,10 @@ def main(configuration_path, mode):
         if sim_sources:
             simulate_sky_distributions(sim_conf)
 
-    # if mode == "overview":
-    #     create_simulation_overview(sim_conf)
+    if mode == "overview":
+        if sim_sources:
+            simulate_sky_distributions(sim_conf)
+        create_simulation_overview(sim_conf)
 
 
 if __name__ == "__main__":
