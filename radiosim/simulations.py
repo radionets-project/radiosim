@@ -63,11 +63,9 @@ def create_sky_distribution(
                 dtype=object,
             )
         if num_jet_comps and not num_point_gauss:
-            print("not point")
             comp_bundle = jet_comps
             list_bundle = jet_list
         if num_point_gauss and not num_jet_comps:
-            print("not jet")
             comp_bundle = points
             list_bundle = point_list
 
