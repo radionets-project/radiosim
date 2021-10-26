@@ -44,7 +44,7 @@ def create_sky_distribution(
             grid, points, point_list = create_point_source_img(grid, num_point_gauss)
 
         source_bundle = grid.copy()
-        if num_jet_comps and num_jet_comps:
+        if num_jet_comps and num_point_gauss:
             comp_bundle = np.array(
                 [
                     np.append(jet_comps[i], points[i], axis=0)
