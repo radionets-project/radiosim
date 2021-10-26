@@ -16,26 +16,28 @@ def plot_distribution(img):
 def plot_positions(source_list):
     jet_l = source_list[source_list[:, -1] == 0, :]
     point_l = source_list[source_list[:, -1] == 1, :]
-    plt.plot(
-        jet_l[:, 1],
-        jet_l[:, 2],
-        linestyle="none",
-        marker="x",
-        markersize=4,
-        markeredgewidth=1.3,
-        label="jet component",
-    )
-    plt.plot(
-        point_l[:, 1],
-        point_l[:, 2],
-        linestyle="none",
-        color="#FFD358",
-        marker="x",
-        markersize=4,
-        markeredgewidth=1.3,
-        markeredgecolor="#FF9119",
-        label="point source",
-    )
+    if jet_l.size > 0:
+        plt.plot(
+            jet_l[:, 1],
+            jet_l[:, 2],
+            linestyle="none",
+            marker="x",
+            markersize=4,
+            markeredgewidth=1.3,
+            label="jet component",
+        )
+    if point_l.size > 0:
+        plt.plot(
+            point_l[:, 1],
+            point_l[:, 2],
+            linestyle="none",
+            color="#FFD358",
+            marker="x",
+            markersize=4,
+            markeredgewidth=1.3,
+            markeredgecolor="#FF9119",
+            label="point source",
+        )
 
 
 def plot_legend():
