@@ -21,9 +21,11 @@ def plot_positions(source_list):
             jet_l[:, 1],
             jet_l[:, 2],
             linestyle="none",
-            marker="x",
-            markersize=4,
-            markeredgewidth=1.3,
+            color="#5AC8F2",
+            marker="X",
+            markersize=3.5,
+            markeredgewidth=0.3,
+            markeredgecolor="#F3FBFE",
             label="jet component",
         )
     if point_l.size > 0:
@@ -31,11 +33,11 @@ def plot_positions(source_list):
             point_l[:, 1],
             point_l[:, 2],
             linestyle="none",
-            color="#FFD358",
-            marker="x",
-            markersize=4,
-            markeredgewidth=1.3,
-            markeredgecolor="#FF9119",
+            color="#FFAF58",
+            marker="X",
+            markersize=3.5,
+            markeredgewidth=0.3,
+            markeredgecolor="#FFF9F3",
             label="point source",
         )
 
