@@ -4,6 +4,7 @@ import h5py
 import click
 import numpy as np
 from pathlib import Path
+from scipy.ndimage import zoom
 
 
 def create_grid(pixel, bundle_size):
@@ -89,6 +90,7 @@ def check_outpath(outpath, quiet=False):
 def read_config(config):
     sim_conf = {}
     sim_conf["outpath"] = config["paths"]["outpath"]
+    sim_conf["training_type"] = config["mode"]["training_type"]
     if config["source_types"]["jets"]:
         click.echo("Adding jet sources to sky distributions! \n")
         sim_conf["num_jet_components"] = config["source_types"]["num_jet_components"]
@@ -123,8 +125,23 @@ def get_noise(image, scale, mean=0, std=1):
     -------
     out: ndarray
         array with noise values in image shape
-    """
-    return np.random.normal(mean, std, size=image.shape) * scale
+    """    
+    def advanced_noise(image, scale, strength, scaling, mean=0, std=1):
+        size_ratio = image.shape[-1] / scaling
+        size_int = np.int(size_ratio)
+        size_rescale = size_ratio / size_int * scaling
+        size_noise = (1, size_int, size_int)
+        max_noise = np.random.uniform(0, scale * strength)
+        noise = np.random.normal(mean, std, size=size_noise) * max_noise
+        noise = zoom(noise, (1, size_rescale, size_rescale))
+        return noise
+    
+    strengths = [0.2, 0.3, 0.5]  # should add up to 1
+    noise = np.zeros(shape=image.shape)
+    noise += np.random.normal(mean, std, size=image.shape) * scale * strengths[0]
+    noise += advanced_noise(image, scale, strengths[1], 4)
+    noise += advanced_noise(image, scale, strengths[2], 16)
+    return noise
 
 
 def add_noise(bundle, noise_level):
@@ -171,14 +188,20 @@ def adjust_outpath(path, option, form="h5"):
 
 
 def save_sky_distribution_bundle(
-    path, x, y, z=None, name_x="x", name_y="y", name_z="list"
+    path, train_type, x, y, z=None, name_x="x", name_y="y", name_z="list"
 ):
     """
     write fft_pairs created in second analysis step to h5 file
     """
     with h5py.File(path, "w") as hf:
         hf.create_dataset(name_x, data=x)
-        hf.create_dataset(name_y, data=y)
-        if z is not None:
+        if train_type == 'gauss':
+            hf.create_dataset(name_y, data=y)
+            if z is not None:
+                hf.create_dataset(name_z, data=z)
+        elif train_type == 'list':
+            hf.create_dataset(name_y, data=z)
+        elif train_type == 'counts':
+            hf.create_dataset(name_y, data=y)
             hf.create_dataset(name_z, data=z)
         hf.close()

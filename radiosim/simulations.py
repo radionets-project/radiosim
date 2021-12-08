@@ -11,6 +11,7 @@ from radiosim.jet import create_jet
 def simulate_sky_distributions(sim_conf):
     for opt in ["train", "valid", "test"]:
         create_sky_distribution(
+            train_type=sim_conf["training_type"],
             img_size=sim_conf["img_size"],
             bundle_size=sim_conf["bundle_size"],
             num_bundles=sim_conf["bundles_" + str(opt)],
@@ -23,6 +24,7 @@ def simulate_sky_distributions(sim_conf):
 
 
 def create_sky_distribution(
+    train_type,
     num_bundles,
     img_size,
     bundle_size,
@@ -34,13 +36,15 @@ def create_sky_distribution(
 ):
     for i in tqdm(range(num_bundles)):
         grid = create_grid(img_size, bundle_size)
-        jet, jet_comps, source_list = create_jet(grid, num_jet_comps)
+        jet, jet_comps, source_list = create_jet(grid, num_jet_comps, train_type)
 
         jet_bundle = jet.copy()
         comp_bundle = jet_comps.copy()
-
         if noise:
             jet_bundle = add_noise(jet_bundle, noise_level)
+            for img in jet_bundle:
+                img -= img.min()
+                img /= img.max()
 
         path = adjust_outpath(outpath, "/samp_" + option)
-        save_sky_distribution_bundle(path, jet_bundle, comp_bundle, source_list)
+        save_sky_distribution_bundle(path, train_type, jet_bundle, comp_bundle, source_list)

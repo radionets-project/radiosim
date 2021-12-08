@@ -3,21 +3,22 @@
 title = "Simulation configuration"
 
 [mode]
+training_type = 'list'  # gauss or list or counts
 quiet = true
 
 [paths]
-outpath = "./build/example_data/"
+outpath = "/net/big-tank/POOL/users/apoggenpohl/radionets/data/radiosim_list"
 
 [source_types]
 jets = true
-num_jet_components = [3, 6]
+num_jet_components = [5, 5]
 pointlike_gaussians = false
 
 [image_options]
-bundles_train = 5
-bundles_valid = 0
-bundles_test = 0
-bundle_size = 10
+bundles_train = 50
+bundles_valid = 10
+bundles_test = 10
+bundle_size = 20
 img_size = 256
 noise = true
-noise_level = 5
+noise_level = 3
