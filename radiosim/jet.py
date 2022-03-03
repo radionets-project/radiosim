@@ -2,9 +2,10 @@ import numpy as np
 from scipy.spatial.transform import Rotation as R
 from radiosim.utils import get_exp
 from radiosim.gauss import gauss
+from radiosim.flux_scaling import get_start_amp
 
 
-def create_jet(image, num_comps):
+def create_jet(image, num_comps, scaling=False, scale_type=None):
     if len(image.shape) == 3:
         image = image[None]
 
@@ -77,16 +78,18 @@ def create_jet(image, num_comps):
             jet_comp += [g]
             jet_img += g
         jet_img_norm = jet_img / jet_img.max()
-        # amp_start = (np.random.randint(0, 100) * np.random.random()) / 10
-        # while amp_start == 0:
-        #     amp_start = (np.random.randint(0, 100) * np.random.random()) / 10
-        # jet_img_norm *= amp_start
         jet_comp_norm = jet_comp / jet_img.max()
+        amp_norm = amp / jet_img.max()
+        if scaling:
+            amp_start = get_start_amp(scale_type)
+            jet_img_norm *= amp_start
+            jet_comp_norm *= amp_start
+            amp_norm *= amp_start
         jets.append(jet_img_norm)
         jet_comps.append(jet_comp_norm)
         source_list = np.array(
             [
-                amp / jet_img.max(),
+                amp_norm,
                 x + rand_center,
                 y + rand_center,
                 np.sqrt(sx),
