@@ -22,6 +22,8 @@ def simulate_sky_distributions(sim_conf):
             num_point_gauss=sim_conf["num_point_gauss"],
             outpath=sim_conf["outpath"],
             option=opt,
+            scaling=sim_conf["scaling"],
+            scaling_type=sim_conf["scaling_type"],
         )
 
 
@@ -35,11 +37,15 @@ def create_sky_distribution(
     num_point_gauss,
     outpath,
     option,
+    scaling=False,
+    scaling_type=None,
 ):
     for i in tqdm(range(num_bundles)):
         grid = create_grid(img_size, bundle_size)
         if num_jet_comps:
-            grid, jet_comps, jet_list = create_jet(grid, num_jet_comps)
+            grid, jet_comps, jet_list = create_jet(
+                grid, num_jet_comps, scaling, scaling_type
+            )
         if num_point_gauss:
             grid, points, point_list = create_point_source_img(grid, num_point_gauss)
 

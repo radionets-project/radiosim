@@ -5,7 +5,7 @@ from radiosim.gauss import gauss
 from radiosim.flux_scaling import get_start_amp
 
 
-def create_jet(image, num_comps, scaling=False, scale_type=None):
+def create_jet(image, num_comps, scaling=False, scaling_type=None):
     if len(image.shape) == 3:
         image = image[None]
 
@@ -81,7 +81,7 @@ def create_jet(image, num_comps, scaling=False, scale_type=None):
         jet_comp_norm = jet_comp / jet_img.max()
         amp_norm = amp / jet_img.max()
         if scaling:
-            amp_start = get_start_amp(scale_type)
+            amp_start = get_start_amp(scaling_type)
             jet_img_norm *= amp_start
             jet_comp_norm *= amp_start
             amp_norm *= amp_start
