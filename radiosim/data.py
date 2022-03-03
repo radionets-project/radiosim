@@ -20,7 +20,7 @@ class radiosim_data:
         self.num_skysims = self.num_skysims_per_file * len(self.bundles)
 
     def __call__(self):
-        return print("This is the h5 radisiom data set class.")
+        return print("This is the h5 radiosim data set class.")
 
     def __len__(self):
         """
