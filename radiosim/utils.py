@@ -108,6 +108,8 @@ def read_config(config):
     sim_conf["img_size"] = config["image_options"]["img_size"]
     sim_conf["noise"] = config["image_options"]["noise"]
     sim_conf["noise_level"] = config["image_options"]["noise_level"]
+    sim_conf["scaling"] = config["flux_scaling"]["use_scaling"]
+    sim_conf["scaling_type"] = config["flux_scaling"]["type"]
     return sim_conf
 
 

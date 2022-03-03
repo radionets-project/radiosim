@@ -14,6 +14,10 @@ num_jet_components = [3, 6]
 pointlike_gaussians = true
 num_pointlike_gaussians = [2, 5]
 
+[flux_scaling]
+use_scaling = true
+type = mojave
+
 [image_options]
 bundles_train = 5
 bundles_valid = 0
