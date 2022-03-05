@@ -96,7 +96,7 @@ def read_config(config):
         sim_conf["num_jet_components"] = None
 
     if config["source_types"]["pointlike_gaussians"]:
-        click.echo("Adding poinhtlike Gaussians to sky distributions! \n")
+        click.echo("Adding pointlike Gaussians to sky distributions! \n")
         sim_conf["num_point_gauss"] = config["source_types"]["num_pointlike_gaussians"]
     else:
         sim_conf["num_point_gauss"] = None
