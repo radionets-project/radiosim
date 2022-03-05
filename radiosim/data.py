@@ -63,11 +63,13 @@ class radiosim_data:
     def get_skysims(self, bundle):
         f = h5py.File(bundle)
         skysims = [np.array(f[key]) for key in list(f.keys()) if re.findall("sky", key)]
+        f.close()
         return skysims
 
     def get_comps(self, bundle):
         f = h5py.File(bundle)
         comps = [np.array(f[key]) for key in list(f.keys()) if re.findall("comp", key)]
+        f.close()
         return comps
 
     def get_comp_lists(self, bundle):
@@ -75,4 +77,5 @@ class radiosim_data:
         comp_lists = [
             np.array(f[key]) for key in list(f.keys()) if re.findall("list", key)
         ]
+        f.close()
         return comp_lists
