@@ -58,7 +58,7 @@ class radiosim_data:
         return np.array([skysim, comps, comp_list], dtype="object")
 
     def get_bundles(self, path):
-        return np.array([x for x in path.iterdir()])
+        return np.sort(np.array([x for x in path.iterdir()]))
 
     def get_skysims(self, bundle):
         f = h5py.File(bundle)
