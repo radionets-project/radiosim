@@ -10,7 +10,7 @@ from radiosim.jet import create_jet
 from radiosim.point import create_point_source_img
 
 
-def simulate_sky_distributions(sim_conf):
+def simulate_sky_distributions(sim_conf, slurm=False, job_id=None):
     for opt in ["train", "valid", "test"]:
         create_sky_distribution(
             img_size=sim_conf["img_size"],
@@ -24,6 +24,8 @@ def simulate_sky_distributions(sim_conf):
             option=opt,
             scaling=sim_conf["scaling"],
             scaling_type=sim_conf["scaling_type"],
+            slurm=slurm,
+            job_id=job_id,
         )
 
 
@@ -39,8 +41,10 @@ def create_sky_distribution(
     option,
     scaling=False,
     scaling_type=None,
+    slurm=False,
+    job_id=None,
 ):
-    for i in tqdm(range(num_bundles)):
+    if slurm:
         grid = create_grid(img_size, bundle_size)
         if num_jet_comps:
             grid, jet_comps, jet_list = create_jet(
@@ -78,5 +82,46 @@ def create_sky_distribution(
         if noise:
             source_bundle = add_noise(source_bundle, noise_level)
 
-        path = adjust_outpath(outpath, "/source_bundle_" + option)
+        path = str(outpath) + "/source_bundle" + str(job_id) + ".h5"
         save_sky_distribution_bundle(path, source_bundle, comp_bundle, list_bundle)
+    else:
+        for i in tqdm(range(num_bundles)):
+            grid = create_grid(img_size, bundle_size)
+            if num_jet_comps:
+                grid, jet_comps, jet_list = create_jet(
+                    grid, num_jet_comps, scaling, scaling_type
+                )
+            if num_point_gauss:
+                grid, points, point_list = create_point_source_img(grid, num_point_gauss)
+
+            source_bundle = grid.copy()
+            if num_jet_comps and num_point_gauss:
+                comp_bundle = np.array(
+                    [
+                        np.append(jet_comps[i], points[i], axis=0)
+                        if points[i].size > 0
+                        else jet_comps[i]
+                        for i in range(jet_comps.shape[0])
+                    ],
+                )
+                list_bundle = np.array(
+                    [
+                        np.append(jet_list[i], point_list[i], axis=0)
+                        if point_list[i].size > 0
+                        else jet_list[i]
+                        for i in range(jet_list.shape[0])
+                    ],
+                    dtype=object,
+                )
+            if num_jet_comps and not num_point_gauss:
+                comp_bundle = jet_comps
+                list_bundle = jet_list
+            if num_point_gauss and not num_jet_comps:
+                comp_bundle = points
+                list_bundle = point_list
+
+            if noise:
+                source_bundle = add_noise(source_bundle, noise_level)
+
+            path = adjust_outpath(outpath, "/source_bundle_" + option)
+            save_sky_distribution_bundle(path, source_bundle, comp_bundle, list_bundle)
