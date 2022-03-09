@@ -71,7 +71,7 @@ def create_jet(image, num_comps, train_type):
         jet_img = img[0]
         jet_comp = []
         for i in range(2 * num_comps[1] - 1):
-            comp_dropout = np.random.uniform() < 0.3
+            comp_dropout = np.random.uniform() < 0.2
             if comp_dropout and i != 0:
                 # amp[i] = x[i] = y[i] = sx[i] = sy[i] = 0
                 amp[i] = 0
@@ -96,6 +96,8 @@ def create_jet(image, num_comps, train_type):
         for i in range(num_comps[1] - 1):
             jet_comp_norm[i+1] += jet_comp_norm[num_comps[1]]
             jet_comp_norm = np.delete(jet_comp_norm, num_comps[1], axis=0)
+        
+        # 1 - normalised gives the background strength
         jet_comp_norm = np.concatenate((jet_comp_norm, (1 - jet_img_norm)[None, :, :]))
         jets.append(jet_img_norm)
         jet_comps.append(jet_comp_norm)
@@ -119,6 +121,7 @@ def create_jet(image, num_comps, train_type):
 
         if train_type == 'list':
             source_list = source_list[source_list[:, 0].argsort()]
+            # source_list = source_list
         elif train_type == 'counts':
             jet_counts.append(np.sum(amp > 0.05) / (2 * num_comps[1] - 1))
         source_lists.append(source_list)
