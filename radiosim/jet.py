@@ -53,10 +53,10 @@ def create_jet(image, num_comps, train_type):
             x[i], y[i], z[i] = coord[i] @ Ry @ Rz
             amp[i] = np.exp(-i * np.random.normal(1.3, 0.4))
             #amp[i] = base_amp / (0.5 * i ** (np.random.normal(1, 0.2)) + 1)  # 1.09
-            sx[i] = np.random.uniform((img_size ** 2) / 1500, (img_size ** 2) / 500) * (
+            sx[i] = np.random.uniform((img_size ** 2) / 2500, (img_size ** 2) / 500) * (
                 0.5 * i + 1
             )
-            sy[i] = np.random.uniform((img_size ** 2) / 1500, (img_size ** 2) / 500) * (
+            sy[i] = np.random.uniform((img_size ** 2) / 2500, (img_size ** 2) / 500) * (
                 0.5 * i + 1
             )
 

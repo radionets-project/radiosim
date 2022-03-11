@@ -3,11 +3,11 @@
 title = "Simulation configuration"
 
 [mode]
-training_type = 'gauss'  # gauss or list or counts
+training_type = 'clean'  # gauss or list or counts
 quiet = true
 
 [paths]
-outpath = "/net/big-tank/POOL/users/apoggenpohl/radionets/data/radiosim_seg"
+outpath = "/net/big-tank/POOL/projects/radio/simulations/2022-03-11_n10000_size256"
 
 [source_types]
 jets = true
@@ -15,10 +15,10 @@ num_jet_components = [5, 5]
 pointlike_gaussians = false
 
 [image_options]
-bundles_train = 500
-bundles_valid = 10
-bundles_test = 10
-bundle_size = 20
+bundles_train = 200
+bundles_valid = 20
+bundles_test = 20
+bundle_size = 50
 img_size = 256
 noise = true
-noise_level = 3
+noise_level = 5
