@@ -93,6 +93,7 @@ def create_jet(image, num_comps, train_type):
                     jet_img += g
         jet_img_norm = jet_img / jet_img.max()
         jet_comp_norm = jet_comp / jet_img.max()
+        # sum over the 'symmetric' components
         for i in range(num_comps[1] - 1):
             jet_comp_norm[i+1] += jet_comp_norm[num_comps[1]]
             jet_comp_norm = np.delete(jet_comp_norm, num_comps[1], axis=0)
@@ -100,7 +101,12 @@ def create_jet(image, num_comps, train_type):
         # 1 - normalised gives the background strength
         jet_comp_norm = np.concatenate((jet_comp_norm, (1 - jet_img_norm)[None, :, :]))
         jets.append(jet_img_norm)
-        jet_comps.append(jet_comp_norm)
+        if train_type == 'clean':
+            jet_sum = np.sum(jet_comp_norm[0:-1], axis=0, keepdims=True)
+            #print(np.concatenate((jet_sum, jet_comp_norm[-1:None]), axis=0).shape)
+            jet_comps.append(np.concatenate((jet_sum, jet_comp_norm[-1:None]), axis=0))
+        else:
+            jet_comps.append(jet_comp_norm)
         
         # scale the parameters between 0 and 1
         # amp /= jet_img.max()
@@ -118,7 +124,7 @@ def create_jet(image, num_comps, train_type):
                 sy
             ]
         ).T
-
+        
         if train_type == 'list':
             source_list = source_list[source_list[:, 0].argsort()]
             # source_list = source_list

@@ -195,10 +195,10 @@ def save_sky_distribution_bundle(
     """
     with h5py.File(path, "w") as hf:
         hf.create_dataset(name_x, data=x)
-        if train_type == 'gauss':
+        if train_type in ['gauss', 'clean']:
             hf.create_dataset(name_y, data=y)
             if z is not None:
-                hf.create_dataset(name_z, data=z)
+                hf.create_dataset(name_z, data=z)     
         elif train_type == 'list':
             hf.create_dataset(name_y, data=z)
         elif train_type == 'counts':

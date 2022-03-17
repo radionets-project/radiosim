@@ -7,7 +7,7 @@ training_type = 'clean'  # gauss or list or counts
 quiet = true
 
 [paths]
-outpath = "/net/big-tank/POOL/projects/radio/simulations/2022-03-11_n10000_size256"
+outpath = "/net/big-tank/POOL/projects/radio/simulations/jet_components/2022-03-11_n10000_size256"
 
 [source_types]
 jets = true
