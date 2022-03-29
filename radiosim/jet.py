@@ -34,7 +34,7 @@ def create_jet(image, num_comps, scaling=False, scaling_type=None):
             coord.append(
                 np.array(
                     [
-                        1 * i * 64 * 0.04 + np.random.uniform(-0.01 * 64, 0.01 * 64),
+                        1 * i * 100 * 0.04 + np.random.uniform(-0.01 * 64, 0.01 * 64),
                         0,
                         0,
                     ]
@@ -50,13 +50,13 @@ def create_jet(image, num_comps, scaling=False, scaling_type=None):
                 curve = np.array([x_curve[i], y_curve[i], 0])
                 coord[i] += curve
             x[i], y[i], z[i] = coord[i] @ Ry @ Rz
-            amp[i] = base_amp / (5 * i ** (np.random.normal(1, 0.2)) + 1)  # 1.09
-            sx[i] = np.random.uniform((64 ** 2) / 4096, (64 ** 2) / 2048) * (
-                0.15 * i + 1
-            )
-            sy[i] = np.random.uniform((64 ** 2) / 4096, (64 ** 2) / 2048) * (
-                0.15 * i + 1
-            )
+            amp[i] = base_amp / (1.2 * i ** (np.random.normal(1, 0.2)) + 1)  # 1.09
+            sx[i] = np.random.uniform(
+                ((img_size / 2) ** 2) / 4096, ((img_size / 2) ** 2) / 2048
+            ) * (0.2 * i ** 2 + 1)
+            sy[i] = np.random.uniform(
+                ((img_size / 2) ** 2) / 4096, ((img_size / 2) ** 2) / 2048
+            ) * (0.2 * i ** 2 + 1)
 
         alpha = get_exp()
         comps += comps - 1
