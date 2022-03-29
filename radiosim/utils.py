@@ -4,6 +4,8 @@ import h5py
 import click
 import numpy as np
 from pathlib import Path
+from scipy import signal
+from astropy.convolution import Gaussian2DKernel
 
 
 def create_grid(pixel, bundle_size):
@@ -113,7 +115,7 @@ def read_config(config):
     return sim_conf
 
 
-def get_noise(image, scale, mean=0, std=1):
+def get_noise(image, scale, mean=0, std=0.001):
     """
     Calculate random noise values for all image pixels.
     Parameters
@@ -131,7 +133,9 @@ def get_noise(image, scale, mean=0, std=1):
     out: ndarray
         array with noise values in image shape
     """
-    return np.random.normal(mean, std, size=image.shape) * scale
+    noise = np.random.normal(mean, std, size=image.shape) * scale
+    g_kernel = Gaussian2DKernel(1.5)
+    return signal.convolve(noise, g_kernel, mode="same")
 
 
 def add_noise(bundle, noise_level):
