@@ -7,18 +7,18 @@ training_type = 'clean'  # gauss or list or counts
 quiet = true
 
 [paths]
-outpath = "/net/big-tank/POOL/projects/radio/simulations/jet_components/2022-03-11_n10000_size256"
+outpath = "/net/big-tank/POOL/projects/radio/simulations/jet_components/testing"
 
 [source_types]
 jets = true
-num_jet_components = [5, 5]
+num_jet_components = [3, 6]
 pointlike_gaussians = false
 
 [image_options]
-bundles_train = 200
-bundles_valid = 20
-bundles_test = 20
-bundle_size = 50
+bundles_train = 1
+bundles_valid = 1
+bundles_test = 1
+bundle_size = 100
 img_size = 256
 noise = true
 noise_level = 5

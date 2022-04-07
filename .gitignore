@@ -1,3 +1,7 @@
+# Jupyter Notebooks
+.ipynb_checkpoints
+*.ipynb
+
 .vscode
 *.egg-info
 .eggs

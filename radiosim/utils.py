@@ -34,6 +34,20 @@ def create_grid(pixel, bundle_size):
 
 
 def get_exp(size=1):
+    """
+    Returns random numbers between 0 and 1. The probability distribution looks like an 'U'.
+    Used for the parameter 'alpha' to change the amplitude of the counter jet.
+
+    Parameters
+    ----------
+    size: int
+        quantity of random numbers to be returned
+
+    Returns
+    -------
+    vals: ndarray
+        array of random numbers
+    """
     num = np.ceil(size / 2).astype(int)
     exp = np.random.exponential(scale=0.08, size=(num,))
     exp_inv = 1 - np.random.exponential(scale=0.08, size=(num,))
@@ -45,6 +59,7 @@ def check_outpath(outpath, quiet=False):
     """
     Check if outpath exists. Check for existing source_bundle files.
     Ask to overwrite or reuse existing files.
+
     Parameters
     ----------
     outpath : str
@@ -111,6 +126,7 @@ def read_config(config):
 def get_noise(image, scale, mean=0, std=1):
     """
     Calculate random noise values for all image pixels.
+
     Parameters
     ----------
     image: 2darray
@@ -121,11 +137,12 @@ def get_noise(image, scale, mean=0, std=1):
         mean of noise values
     std: float
         standard deviation of noise values
+
     Returns
     -------
     out: ndarray
         array with noise values in image shape
-    """    
+    """
     def advanced_noise(image, scale, strength, scaling, mean=0, std=1):
         size_ratio = image.shape[-1] / scaling
         size_int = np.int(size_ratio)
@@ -140,7 +157,7 @@ def get_noise(image, scale, mean=0, std=1):
     noise = np.zeros(shape=image.shape)
     noise += np.random.normal(mean, std, size=image.shape) * scale * strengths[0]
     noise += advanced_noise(image, scale, strengths[1], 4)
-    noise += advanced_noise(image, scale, strengths[2], 16)
+    noise += advanced_noise(image, scale, strengths[2], 32)
     return noise
 
 
@@ -148,12 +165,14 @@ def add_noise(bundle, noise_level):
     """
     Used for adding noise and plotting the original and noised picture,
     if asked. Using 0.05 * max(image) as scaling factor.
+
     Parameters
     ----------
     bundle: path
         path to hdf5 bundle file
     noise_level: int
         noise level in percent
+
     Returns
     -------
     bundle_noised hdf5_file
@@ -168,12 +187,14 @@ def add_noise(bundle, noise_level):
 def adjust_outpath(path, option, form="h5"):
     """
     Add number to out path when filename already exists.
+
     Parameters
     ----------
     path: str
         path to save directory
     option: str
         additional keyword to add to path
+
     Returns
     -------
     out: str
@@ -205,3 +226,49 @@ def save_sky_distribution_bundle(
             hf.create_dataset(name_y, data=y)
             hf.create_dataset(name_z, data=z)
         hf.close()
+
+
+def cart2pol(x: float, y: float):
+    """
+    Transforms cartesian to polar coordinates.
+
+    Parameters
+    ----------
+    x: float
+        x-coordinate
+    y: float
+        y-coordinate
+
+    Returns
+    -------
+    r: float
+        radius, euclidean distance between (0,0) and (x,y)
+    phi: float
+        angle in degree
+    """
+    r = np.sqrt(x**2 + y**2)
+    phi = np.arctan2(y, x) * 180 / np.pi
+    return (r, phi)
+
+
+def pol2cart(r: float, phi: float):
+    """
+    Transforms polar to cartesian coordinates.
+
+     Parameters
+    ----------
+    r: float
+        radius, euclidean distance between (0,0) and (x,y)
+    phi: float
+        angle in degree
+
+    Returns
+    -------
+    x: float
+        x-coordinate
+    y: float
+        y-coordinate
+    """
+    x = r * np.cos(phi / 180 * np.pi)
+    y = r * np.sin(phi / 180 * np.pi)
+    return (x, y)

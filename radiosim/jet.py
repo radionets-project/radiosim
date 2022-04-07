@@ -1,98 +1,102 @@
 import numpy as np
-from scipy.spatial.transform import Rotation as R
-from radiosim.utils import get_exp
-from radiosim.gauss import gauss
-
+from radiosim.utils import get_exp, pol2cart
+from radiosim.gauss import twodgaussian
+import time
 
 def create_jet(image, num_comps, train_type):
+    start_time = time.time()
     if len(image.shape) == 3:
         image = image[None]
 
+    img_size = image.shape[-1]
     jets = []
     jet_comps = []
     source_lists = []
-    jet_counts = []
+
     for img in image:
-        img_size = img.shape[-1]
         center = img_size // 2
         comps = np.random.randint(num_comps[0], num_comps[1] + 1)
 
-        coord = []
+        height = np.zeros(num_comps[1])
+        amp = np.zeros(num_comps[1])
         x = np.zeros(num_comps[1])
         y = np.zeros(num_comps[1])
-        z = np.zeros(num_comps[1])
-        amp = np.zeros(num_comps[1])
         sx = np.zeros(num_comps[1])
         sy = np.zeros(num_comps[1])
-        #base_amp = np.random.randint(50, 100)
+        rotation = np.zeros(num_comps[1])
 
-        Ry = R.from_euler("y", np.random.uniform(0, 90), degrees=True).as_matrix()
-        Rz = R.from_euler("z", np.random.uniform(0, 90), degrees=True).as_matrix()
-        x_curve = np.zeros(num_comps[1])
-        y_curve = np.zeros(num_comps[1])
+        jet_angle = np.random.uniform(0, 360)
+
         for i in range(comps):
-            coord.append(
-                np.array(
-                    [
-                        2 * i * img_size * 0.04
-                        + np.random.uniform(-0.01 * img_size, 0.01 * img_size),
-                        0,
-                        0,
-                    ]
-                )
-            )
-            if i != 0:
-                x_curve[i] = np.random.uniform(
-                    x_curve[i - 1] + 0.03 * img_size, x_curve[i - 1] + 0.045 * img_size
-                )
-                y_curve[i] = np.random.uniform(
-                    y_curve[i - 1] + 0.03 * img_size, y_curve[i - 1] + 0.045 * img_size
-                )
-                curve = np.array([x_curve[i], y_curve[i], 0])
-                coord[i] += curve
-            x[i], y[i], z[i] = coord[i] @ Ry @ Rz
-            amp[i] = np.exp(-i * np.random.normal(1.3, 0.4))
-            #amp[i] = base_amp / (0.5 * i ** (np.random.normal(1, 0.2)) + 1)  # 1.09
-            sx[i] = np.random.uniform((img_size ** 2) / 2500, (img_size ** 2) / 500) * (
-                0.5 * i + 1
-            )
-            sy[i] = np.random.uniform((img_size ** 2) / 2500, (img_size ** 2) / 500) * (
-                0.5 * i + 1
-            )
+            # without background height for now, empirical
+            # height[i] = 0
 
-        alpha = get_exp()
-        # comps += comps - 1
-        amp = np.append(amp, amp[1:] * alpha)
-        x = np.append(x, -x[1:]) + np.random.normal(center, 1)
-        y = np.append(y, -y[1:]) + np.random.normal(center, 1)
+            # amplitude decreases for more distant components, empirical
+            amp[i] = np.exp(-np.sqrt(i) * np.random.normal(1.3, 0.4))
+
+            # distance between components, r_factor to fill the corners, empirical
+            r_factor =  np.abs(np.sin(jet_angle)) + np.abs(np.cos(jet_angle))
+            r = r_factor * i * np.random.uniform(
+                center / comps * 0.8,
+                center / comps * 0.9,
+                )
+
+            # curving the jet, empirical
+            jet_angle += np.random.normal(0, 5)
+            
+            # get the cartesian coordinates
+            x[i], y[i] = np.array(pol2cart(r, jet_angle)) + center
+
+            # width of gaussian, empirical
+            sx[i], sy[i] = r_factor * np.sqrt(i + 1) * np.random.uniform(
+                img_size / (8 * comps),
+                img_size / (6 * comps),
+                size=2,
+                )
+
+            # rotation, random or align with the jet angle, empirical
+            rotation[i] = np.random.uniform(0, 360)
+            # rotation[i] = jet_angle + np.random.normal(0, 20)
+
+        '''
+        print('Amplitude:', amp)
+        print('X:', x)
+        print('Y:', y)
+        print('SX:', sx)
+        print('SY:', sy)
+        print('Rotation:', rotation)
+        print('')
+        '''
+
+        # mirror the data for the counter jet
+        height = np.append(height, height[1:])
+        amp = np.append(amp, amp[1:] * get_exp())
+        x = np.append(x, img_size - x[1:])
+        y = np.append(y, img_size - y[1:])
         sx = np.append(sx, sx[1:])
         sy = np.append(sy, sy[1:])
+        rotation = np.append(rotation, rotation[1:])
 
+        # creation of the image
         jet_img = img[0]
         jet_comp = []
         for i in range(2 * num_comps[1] - 1):
-            comp_dropout = np.random.uniform() < 0.2
-            if comp_dropout and i != 0:
-                # amp[i] = x[i] = y[i] = sx[i] = sy[i] = 0
-                amp[i] = 0
+            if amp[i] == 0:
                 jet_comp += [np.zeros((img_size, img_size))]
             else:
-                if amp[i] == 0:
-                    jet_comp += [np.zeros((img_size, img_size))]
-                    # x[i] = y[i] = sx[i] = sy[i] = 0
-                else:
-                    g = gauss(
-                        img_size,
-                        x[i],
-                        y[i],
-                        sx[i],
-                        sy[i],
-                        amp[i],
-                    )
-                    jet_comp += [g]
-                    jet_img += g
-        jet_img_norm = jet_img / jet_img.max()
-        jet_comp_norm = jet_comp / jet_img.max()
+                g = twodgaussian(
+                    [height[i], amp[i], x[i], y[i], sx[i], sy[i], rotation[i]],
+                    (img_size, img_size)
+                )
+                jet_comp += [g]
+                jet_img += g
+
+        # normalisation
+        jet_max = jet_img.max()
+        jet_img_norm = jet_img / jet_max
+        jet_comp_norm = jet_comp / jet_max
+        amp /= jet_max
+
         # sum over the 'symmetric' components
         for i in range(num_comps[1] - 1):
             jet_comp_norm[i+1] += jet_comp_norm[num_comps[1]]
@@ -109,7 +113,6 @@ def create_jet(image, num_comps, train_type):
             jet_comps.append(jet_comp_norm)
         
         # scale the parameters between 0 and 1
-        # amp /= jet_img.max()
         x /= img_size
         y /= img_size
         sx /= img_size**2 / 500 * (0.5 * (num_comps[1] - 1) + 1)
@@ -127,13 +130,8 @@ def create_jet(image, num_comps, train_type):
         
         if train_type == 'list':
             source_list = source_list[source_list[:, 0].argsort()]
-            # source_list = source_list
-        elif train_type == 'counts':
-            jet_counts.append(np.sum(amp > 0.05) / (2 * num_comps[1] - 1))
         source_lists.append(source_list)
-    
-    if train_type == 'counts':
-        jet_comps = jet_counts
+    print("--- %.5s seconds for create_jet ---" % (time.time() - start_time))
     return (
         np.array(jets)[:, None, :, :],
         np.array(jet_comps),
