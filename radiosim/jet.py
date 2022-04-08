@@ -3,20 +3,37 @@ from radiosim.utils import get_exp, pol2cart
 from radiosim.gauss import twodgaussian
 
 
-def create_jet(image, num_comps, train_type):
-    if len(image.shape) == 3:
-        image = image[None]
+def create_jet(grid, num_comps, train_type):
+    """
+    Creates the clean jets with all its components written in a list. Dependend on the
+    'train_type' the components will be seperated or summed up.
+    
+    Parameters
+    ----------
+    grid: 4darray
+        input grid of shape [n, 1, img_size, img_size]
+    num_comps: list
+        list of two number: min number of components and max number of components 
+    train_type: str
+        determines the purpose of the simulations. Can be 'gauss', 'list' or 'clean'
 
-    img_size = image.shape[-1]
+    Returns
+    -------
+    rotgauss: 2darray
+        gaussian distribution in two dimensions
+    """
+    if len(grid.shape) == 3:
+        grid = grid[None]
+
+    img_size = grid.shape[-1]
     jets = []
     jet_comps = []
     source_lists = []
 
-    for img in image:
+    for img in grid:
         center = img_size // 2
         comps = np.random.randint(num_comps[0], num_comps[1] + 1)
 
-        height = np.zeros(num_comps[1])
         amp = np.zeros(num_comps[1])
         x = np.zeros(num_comps[1])
         y = np.zeros(num_comps[1])
@@ -27,9 +44,6 @@ def create_jet(image, num_comps, train_type):
         jet_angle = np.random.uniform(0, 360)
 
         for i in range(comps):
-            # without background height for now, empirical
-            # height[i] = 0
-
             # amplitude decreases for more distant components, empirical
             amp[i] = np.exp(-np.sqrt(i) * np.random.normal(1.3, 0.4))
 
@@ -58,7 +72,6 @@ def create_jet(image, num_comps, train_type):
             # rotation[i] = jet_angle + np.random.normal(0, 20)
 
         # mirror the data for the counter jet
-        height = np.append(height, height[1:])
         amp = np.append(amp, amp[1:] * get_exp())
         x = np.append(x, img_size - x[1:])
         y = np.append(y, img_size - y[1:])
@@ -74,7 +87,7 @@ def create_jet(image, num_comps, train_type):
                 jet_comp += [np.zeros((img_size, img_size))]
             else:
                 g = twodgaussian(
-                    [height[i], amp[i], x[i], y[i], sx[i], sy[i], rotation[i]],
+                    [amp[i], x[i], y[i], sx[i], sy[i], rotation[i]],
                     (img_size, img_size)
                 )
                 jet_comp += [g]
@@ -102,7 +115,6 @@ def create_jet(image, num_comps, train_type):
         
         if train_type == 'list':
             # scale the parameters between 0 and 1
-            # height /= height.max()
             x /= img_size
             y /= img_size
             sx /= np.sqrt(2 * (num_comps[0])) * img_size / (6 * num_comps[0])
@@ -111,7 +123,6 @@ def create_jet(image, num_comps, train_type):
         
         source_list = np.array(
             [
-                height,
                 amp,
                 x,
                 y,
