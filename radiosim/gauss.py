@@ -28,7 +28,7 @@ def twodgaussian(params: list, shape: tuple):
     """
     amplitude = params[0]
     center_y, center_x = params[1], params[2]
-    width_x, width_y = params[3], params[4]
+    width_y, width_x = params[3], params[4]
     rot = params[5]
     rot = np.pi/180 * rot
     rcen_x = center_x * np.cos(rot) - center_y * np.sin(rot)
