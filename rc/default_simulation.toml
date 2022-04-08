@@ -3,7 +3,7 @@
 title = "Simulation configuration"
 
 [mode]
-training_type = 'clean'  # gauss or list or counts
+training_type = 'clean'  # gauss or list or clean
 quiet = true
 
 [paths]
@@ -21,4 +21,4 @@ bundles_test = 1
 bundle_size = 100
 img_size = 256
 noise = true
-noise_level = 5
+noise_level = 15    # in percent

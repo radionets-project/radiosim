@@ -2,9 +2,9 @@ import os
 import sys
 import h5py
 import click
+import torch
 import numpy as np
 from pathlib import Path
-from scipy.ndimage import zoom
 
 
 def create_grid(pixel, bundle_size):
@@ -123,65 +123,56 @@ def read_config(config):
     return sim_conf
 
 
-def get_noise(image, scale, mean=0, std=1):
+def add_noise(image, noise_level):
     """
-    Calculate random noise values for all image pixels.
+    Used for adding noise.
 
     Parameters
     ----------
-    image: 2darray
-        2d image
-    scale: float
-        scaling factor to increase noise
-    mean: float
-        mean of noise values
-    std: float
-        standard deviation of noise values
-
-    Returns
-    -------
-    out: ndarray
-        array with noise values in image shape
-    """
-    def advanced_noise(image, scale, strength, scaling, mean=0, std=1):
-        size_ratio = image.shape[-1] / scaling
-        size_int = np.int(size_ratio)
-        size_rescale = size_ratio / size_int * scaling
-        size_noise = (1, size_int, size_int)
-        max_noise = np.random.uniform(0, scale * strength)
-        noise = np.random.normal(mean, std, size=size_noise) * max_noise
-        noise = zoom(noise, (1, size_rescale, size_rescale))
-        return noise
-    
-    strengths = [0.2, 0.3, 0.5]  # should add up to 1
-    noise = np.zeros(shape=image.shape)
-    noise += np.random.normal(mean, std, size=image.shape) * scale * strengths[0]
-    noise += advanced_noise(image, scale, strengths[1], 4)
-    noise += advanced_noise(image, scale, strengths[2], 32)
-    return noise
-
-
-def add_noise(bundle, noise_level):
-    """
-    Used for adding noise and plotting the original and noised picture,
-    if asked. Using 0.05 * max(image) as scaling factor.
-
-    Parameters
-    ----------
-    bundle: path
-        path to hdf5 bundle file
+    image: 4darray
+        bundle of images of shape [n, 1, size, size]
     noise_level: int
         noise level in percent
 
     Returns
     -------
-    bundle_noised hdf5_file
-        bundle with noised images
+    image_noised 4darray
+        bundle of noised images
     """
-    bundle_noised = np.array(
-        [img + get_noise(img, (img.max() * noise_level / 100)) for img in bundle]
-    )
-    return bundle_noised
+    img_shape = image.shape
+
+    def advanced_noise(scaling, mean=0, std=1):
+        size_ratio = img_shape[-1] / scaling
+        size_int = np.int(size_ratio)
+        size_rescale = size_ratio / size_int * scaling
+        size_noise = (img_shape[0], 1, size_int, size_int)
+        max_noise = np.random.uniform(0, 1, img_shape[0])
+        noise = np.random.normal(
+            loc=mean,
+            scale=std,
+            size=size_noise
+            ) * max_noise[:, None, None, None]
+        noise = torch.nn.functional.interpolate(
+            torch.tensor(noise),
+            scale_factor=size_rescale,
+            mode='bicubic',
+            align_corners=True
+            ).cpu().detach().numpy()
+        return noise
+    
+    strengths = [0.2, 0.3, 0.5]  # have to add up to 1
+    noise_small = np.random.normal(loc=0, scale=1, size=img_shape)
+    noise_small /= noise_small.max() / strengths[0]
+    noise_medium = advanced_noise(4)
+    noise_medium /= noise_medium.max() / strengths[1]
+    noise_large = advanced_noise(32)
+    noise_large /= noise_large.max() / strengths[2]
+
+    noise = noise_small + noise_medium + noise_large
+    noise /= noise.max() / (noise_level / 100)
+    image_noised = image + noise
+
+    return image_noised
 
 
 def adjust_outpath(path, option, form="h5"):

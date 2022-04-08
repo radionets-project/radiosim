@@ -1,10 +1,9 @@
 import numpy as np
 from radiosim.utils import get_exp, pol2cart
 from radiosim.gauss import twodgaussian
-import time
+
 
 def create_jet(image, num_comps, train_type):
-    start_time = time.time()
     if len(image.shape) == 3:
         image = image[None]
 
@@ -58,16 +57,6 @@ def create_jet(image, num_comps, train_type):
             rotation[i] = np.random.uniform(0, 360)
             # rotation[i] = jet_angle + np.random.normal(0, 20)
 
-        '''
-        print('Amplitude:', amp)
-        print('X:', x)
-        print('Y:', y)
-        print('SX:', sx)
-        print('SY:', sy)
-        print('Rotation:', rotation)
-        print('')
-        '''
-
         # mirror the data for the counter jet
         height = np.append(height, height[1:])
         amp = np.append(amp, amp[1:] * get_exp())
@@ -93,45 +82,50 @@ def create_jet(image, num_comps, train_type):
 
         # normalisation
         jet_max = jet_img.max()
-        jet_img_norm = jet_img / jet_max
-        jet_comp_norm = jet_comp / jet_max
+        jet_img /= jet_max
+        jet_comp /= jet_max
         amp /= jet_max
 
         # sum over the 'symmetric' components
         for i in range(num_comps[1] - 1):
-            jet_comp_norm[i+1] += jet_comp_norm[num_comps[1]]
-            jet_comp_norm = np.delete(jet_comp_norm, num_comps[1], axis=0)
+            jet_comp[i+1] += jet_comp[num_comps[1]]
+            jet_comp = np.delete(jet_comp, num_comps[1], axis=0)
         
-        # 1 - normalised gives the background strength
-        jet_comp_norm = np.concatenate((jet_comp_norm, (1 - jet_img_norm)[None, :, :]))
-        jets.append(jet_img_norm)
+        # '1 - normalised' gives the background strength
+        jet_comp = np.concatenate((jet_comp, (1 - jet_img)[None, :, :]))
+        jets.append(jet_img)
         if train_type == 'clean':
-            jet_sum = np.sum(jet_comp_norm[0:-1], axis=0, keepdims=True)
-            #print(np.concatenate((jet_sum, jet_comp_norm[-1:None]), axis=0).shape)
-            jet_comps.append(np.concatenate((jet_sum, jet_comp_norm[-1:None]), axis=0))
+            jet_sum = np.sum(jet_comp[0:-1], axis=0, keepdims=True)
+            jet_comps.append(np.concatenate((jet_sum, jet_comp[-1:None]), axis=0))
         else:
-            jet_comps.append(jet_comp_norm)
+            jet_comps.append(jet_comp)
         
-        # scale the parameters between 0 and 1
-        x /= img_size
-        y /= img_size
-        sx /= img_size**2 / 500 * (0.5 * (num_comps[1] - 1) + 1)
-        sy /= img_size**2 / 500 * (0.5 * (num_comps[1] - 1) + 1)
+        if train_type == 'list':
+            # scale the parameters between 0 and 1
+            # height /= height.max()
+            x /= img_size
+            y /= img_size
+            sx /= np.sqrt(2 * (num_comps[0])) * img_size / (6 * num_comps[0])
+            sy /= np.sqrt(2 * (num_comps[0])) * img_size / (6 * num_comps[0])
+            rotation /= 360
         
         source_list = np.array(
             [
+                height,
                 amp,
                 x,
                 y,
                 sx,
-                sy
+                sy,
+                rotation,
             ]
         ).T
         
         if train_type == 'list':
             source_list = source_list[source_list[:, 0].argsort()]
+
         source_lists.append(source_list)
-    print("--- %.5s seconds for create_jet ---" % (time.time() - start_time))
+
     return (
         np.array(jets)[:, None, :, :],
         np.array(jet_comps),
