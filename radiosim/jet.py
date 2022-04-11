@@ -19,8 +19,15 @@ def create_jet(grid, num_comps, train_type):
 
     Returns
     -------
-    rotgauss: 2darray
-        gaussian distribution in two dimensions
+    jets: ndarray
+        image of the full jet, sum over all components, shape: [n, 1, img_size, img_size]
+    jet_comps: ndarray
+        images of each component and background, shape: [n, c*2, img_size, img_size]
+        with c being the max number of components. A jet without counter jet has c 
+        components. A jet with counter jet has c*2-1 components, since the center
+        appears only once. Adding one channel for the backgound gives c*2 channels.
+    source_lists: ndarray
+        array which stores all (six) properties of each component, shape: [n, c*2-1, 6]
     """
     if len(grid.shape) == 3:
         grid = grid[None]

@@ -15,6 +15,8 @@ def create_grid(pixel, bundle_size):
     ----------
     pixel: int
         number of pixel in x and y
+    bundle_size: int
+        number of images in each bundle
 
     Returns
     -------
@@ -103,6 +105,18 @@ def check_outpath(outpath, quiet=False):
 
 
 def read_config(config):
+    """
+    Unpacking of the config file to print the config parameters
+
+    Parameters
+    ----------
+    config: toml-file
+        toml configuration file with all parameters
+    Returns
+    -------
+    sim_comf: dictionary
+        unpacked configurations
+    """
     sim_conf = {}
     sim_conf["outpath"] = config["paths"]["outpath"]
     sim_conf["training_type"] = config["mode"]["training_type"]
@@ -136,7 +150,7 @@ def add_noise(image, noise_level):
 
     Returns
     -------
-    image_noised 4darray
+    image_noised: 4darray
         bundle of noised images
     """
     img_shape = image.shape
@@ -185,6 +199,8 @@ def adjust_outpath(path, option, form="h5"):
         path to save directory
     option: str
         additional keyword to add to path
+    form: str
+        file extension
 
     Returns
     -------
@@ -203,7 +219,26 @@ def save_sky_distribution_bundle(
     path, train_type, x, y, z=None, name_x="x", name_y="y", name_z="list"
 ):
     """
-    write fft_pairs created in second analysis step to h5 file
+    Write images created in analysis to h5 file.
+
+    Parameters
+    ----------
+    path: str
+        path to save file
+    train_type: str
+        determines the purpose of the simulations. Can be 'gauss', 'list' or 'clean'
+    x: ndarray
+        image of the full jet, sum over all components
+    y: ndarray
+        images of each component and background
+    z: ndarray
+        array which stores all (six) properties of each component
+    name_x: str
+        name of the x-data
+    name_y: str
+        name of the y-data
+    name_z: str
+        name of the z-data
     """
     with h5py.File(path, "w") as hf:
         hf.create_dataset(name_x, data=x)
@@ -213,9 +248,6 @@ def save_sky_distribution_bundle(
                 hf.create_dataset(name_z, data=z)     
         elif train_type == 'list':
             hf.create_dataset(name_y, data=z)
-        elif train_type == 'counts':
-            hf.create_dataset(name_y, data=y)
-            hf.create_dataset(name_z, data=z)
         hf.close()
 
 
