@@ -5,6 +5,8 @@ import click
 import torch
 import numpy as np
 from pathlib import Path
+from scipy import signal
+from astropy.convolution import Gaussian2DKernel
 
 
 def create_grid(pixel, bundle_size):
@@ -153,12 +155,15 @@ def add_noise(image, noise_level):
     image_noised: 4darray
         bundle of noised images
     """
-    img_shape = image.shape
-
-    def advanced_noise(scaling, mean=0, std=1):
-        size_ratio = img_shape[-1] / scaling
+    def noise_big(kernel, mean=0, std=1):
+        """
+        Pro: Faster for big kernel (scaling ~> 8)
+        Con: Slower for small kernel (scaling ~< 8)
+             Noise is created along the grid which is less random
+        """
+        size_ratio = img_shape[-1] / kernel
         size_int = np.int(size_ratio)
-        size_rescale = size_ratio / size_int * scaling
+        size_rescale = size_ratio / size_int * kernel
         size_noise = (img_shape[0], 1, size_int, size_int)
         max_noise = np.random.uniform(0, 1, img_shape[0])
         noise = np.random.normal(
@@ -173,17 +178,40 @@ def add_noise(image, noise_level):
             align_corners=True
             ).cpu().detach().numpy()
         return noise
-    
-    strengths = [0.2, 0.3, 0.5]  # have to add up to 1
-    noise_small = np.random.normal(loc=0, scale=1, size=img_shape)
-    noise_small /= noise_small.max() / strengths[0]
-    noise_medium = advanced_noise(4)
-    noise_medium /= noise_medium.max() / strengths[1]
-    noise_large = advanced_noise(32)
-    noise_large /= noise_large.max() / strengths[2]
 
-    noise = noise_small + noise_medium + noise_large
-    noise /= noise.max() / (noise_level / 100)
+
+    def noise_small(kernel, mean=0, std=1):
+        """
+        Pro: Faster for small kernel (scaling ~< 8)
+             Noise is created more randomly distributed
+        Con: Slower for big kernel (scaling ~> 8)
+        """
+        max_noise = np.random.uniform(0, 1, img_shape[0])
+        noise = np.random.normal(mean, std, size=img_shape) * max_noise[:, None, None, None]
+        g_kernel = Gaussian2DKernel(kernel / 2).array[None, None, :]
+        return signal.convolve(noise, g_kernel, mode="same")
+
+
+    def call_noise(kernels, strengths):
+        noise_out = np.zeros(shape=img_shape)
+        for kernel, strength in zip(kernels, strengths):
+            if kernel == 1:
+                noise = np.random.normal(size=img_shape)
+            elif kernel < 8:
+                noise = noise_small(kernel)
+            else:
+                noise = noise_big(kernel)
+            noise /= np.abs(noise).max() / strength
+            noise_out += noise
+        return noise_out
+
+
+    img_shape = image.shape
+    kernels = [1, 64, 32]        # should be same shape as strengths
+    strengths = [0.2, 0.3, 0.5] # have to add up to 1
+
+    noise = call_noise(kernels, strengths)
+    noise /= np.abs(noise.max()) / (noise_level / 100)
     image_noised = image + noise
 
     return image_noised
@@ -267,10 +295,10 @@ def cart2pol(x: float, y: float):
     r: float
         radius, euclidean distance between (0,0) and (x,y)
     phi: float
-        angle in degree
+        angle in radian
     """
     r = np.sqrt(x**2 + y**2)
-    phi = np.arctan2(y, x) * 180 / np.pi
+    phi = np.arctan2(y, x)
     return (r, phi)
 
 
@@ -283,7 +311,7 @@ def pol2cart(r: float, phi: float):
     r: float
         radius, euclidean distance between (0,0) and (x,y)
     phi: float
-        angle in degree
+        angle in radian
 
     Returns
     -------
@@ -292,6 +320,6 @@ def pol2cart(r: float, phi: float):
     y: float
         y-coordinate
     """
-    x = r * np.cos(phi / 180 * np.pi)
-    y = r * np.sin(phi / 180 * np.pi)
+    x = r * np.cos(phi)
+    y = r * np.sin(phi)
     return (x, y)
