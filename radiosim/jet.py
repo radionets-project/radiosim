@@ -1,19 +1,19 @@
 import numpy as np
 from radiosim.utils import get_exp, pol2cart
-from radiosim.gauss import twodgaussian, gauss
+from radiosim.gauss import twodgaussian
 
 
 def create_jet(grid, num_comps, train_type):
     """
     Creates the clean jets with all its components written in a list. Dependend on the
     'train_type' the components will be seperated or summed up.
-    
+
     Parameters
     ----------
     grid: 4darray
         input grid of shape [n, 1, img_size, img_size]
     num_comps: list
-        list of two number: min number of components and max number of components 
+        list of two number: min number of components and max number of components
     train_type: str
         determines the purpose of the simulations. Can be 'gauss', 'list' or 'clean'
 
@@ -23,7 +23,7 @@ def create_jet(grid, num_comps, train_type):
         image of the full jet, sum over all components, shape: [n, 1, img_size, img_size]
     jet_comps: ndarray
         images of each component and background, shape: [n, c*2, img_size, img_size]
-        with c being the max number of components. A jet without counter jet has c 
+        with c being the max number of components. A jet without counter jet has c
         components. A jet with counter jet has c*2-1 components, since the center
         appears only once. Adding one channel for the backgound gives c*2 channels.
     source_lists: ndarray
@@ -65,19 +65,21 @@ def create_jet(grid, num_comps, train_type):
                 r_factor = 1 / jet_angle_cos
             else:
                 r_factor = np.sqrt(2)
-            #print(i, comps)
+            # print(i, comps)
             r = i / (comps - 1) * img_size / 2 * r_factor * np.random.uniform(0.8, 0.9)
-            #print(jet_angle, r_factor, r)
+            # print(jet_angle, r_factor, r)
 
             # get the cartesian coordinates
             x[i], y[i] = np.array(pol2cart(r, jet_angle)) + center
 
             # width of gaussian, empirical
-            sx[i], sy[i] = r_factor * np.sqrt(i + 1) * np.random.uniform(
-                img_size / (7 * comps),
-                img_size / (5 * comps),
-                size=2,
+            sx[i], sy[i] = (
+                r_factor
+                * np.sqrt(i + 1)
+                * np.random.uniform(
+                    img_size / (7 * comps), img_size / (5 * comps), size=2,
                 )
+            )
 
             # rotation, random or align with the jet angle, empirical
             rotation[i] = np.random.uniform(0, np.pi)
@@ -99,8 +101,7 @@ def create_jet(grid, num_comps, train_type):
                 jet_comp += [np.zeros((img_size, img_size))]
             else:
                 g = twodgaussian(
-                    [amp[i], x[i], y[i], sx[i], sy[i], rotation[i]],
-                    img_size,
+                    [amp[i], x[i], y[i], sx[i], sy[i], rotation[i]], img_size,
                 )
                 jet_comp += [g]
                 jet_img += g
@@ -113,38 +114,29 @@ def create_jet(grid, num_comps, train_type):
 
         # sum over the 'symmetric' components
         for i in range(num_comps[1] - 1):
-            jet_comp[i+1] += jet_comp[num_comps[1]]
+            jet_comp[i + 1] += jet_comp[num_comps[1]]
             jet_comp = np.delete(jet_comp, num_comps[1], axis=0)
-        
+
         # '1 - normalised' gives the background strength
         jet_comp = np.concatenate((jet_comp, (1 - jet_img)[None, :, :]))
         jets.append(jet_img)
-        if train_type == 'clean':
+        if train_type == "clean":
             jet_sum = np.sum(jet_comp[0:-1], axis=0, keepdims=True)
             jet_comps.append(np.concatenate((jet_sum, jet_comp[-1:None]), axis=0))
         else:
             jet_comps.append(jet_comp)
-        
-        if train_type == 'list':
+
+        if train_type == "list":
             # scale the parameters between 0 and 1
             x /= img_size
             y /= img_size
             sx /= np.sqrt(2 * (num_comps[0])) * img_size / (5 * num_comps[0])
             sy /= np.sqrt(2 * (num_comps[0])) * img_size / (5 * num_comps[0])
             rotation /= 2 * np.pi
-        
-        source_list = np.array(
-            [
-                amp,
-                x,
-                y,
-                sx,
-                sy,
-                rotation,
-            ]
-        ).T
-        
-        if train_type == 'list':
+
+        source_list = np.array([amp, x, y, sx, sy, rotation]).T
+
+        if train_type == "list":
             source_list = source_list[source_list[:, 0].argsort()]
 
         source_lists.append(source_list)
