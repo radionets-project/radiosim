@@ -65,9 +65,7 @@ def create_jet(grid, num_comps, train_type):
                 r_factor = 1 / jet_angle_cos
             else:
                 r_factor = np.sqrt(2)
-            # print(i, comps)
             r = i / (comps - 1) * img_size / 2 * r_factor * np.random.uniform(0.8, 0.9)
-            # print(jet_angle, r_factor, r)
 
             # get the cartesian coordinates
             x[i], y[i] = np.array(pol2cart(r, jet_angle)) + center
