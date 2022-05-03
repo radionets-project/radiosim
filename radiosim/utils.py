@@ -155,6 +155,7 @@ def add_noise(image, noise_level):
     image_noised: 4darray
         bundle of noised images
     """
+
     def noise_big(kernel, mean=0, std=1):
         """
         Pro: Faster for big kernel (scaling ~> 8)
@@ -166,19 +167,22 @@ def add_noise(image, noise_level):
         size_rescale = size_ratio / size_int * kernel
         size_noise = (img_shape[0], 1, size_int, size_int)
         max_noise = np.random.uniform(0, 1, img_shape[0])
-        noise = np.random.normal(
-            loc=mean,
-            scale=std,
-            size=size_noise
-            ) * max_noise[:, None, None, None]
-        noise = torch.nn.functional.interpolate(
-            torch.tensor(noise),
-            scale_factor=size_rescale,
-            mode='bicubic',
-            align_corners=True
-            ).cpu().detach().numpy()
+        noise = (
+            np.random.normal(loc=mean, scale=std, size=size_noise)
+            * max_noise[:, None, None, None]
+        )
+        noise = (
+            torch.nn.functional.interpolate(
+                torch.tensor(noise),
+                scale_factor=size_rescale,
+                mode="bicubic",
+                align_corners=True,
+            )
+            .cpu()
+            .detach()
+            .numpy()
+        )
         return noise
-
 
     def noise_small(kernel, mean=0, std=1):
         """
@@ -187,10 +191,11 @@ def add_noise(image, noise_level):
         Con: Slower for big kernel (scaling ~> 8)
         """
         max_noise = np.random.uniform(0, 1, img_shape[0])
-        noise = np.random.normal(mean, std, size=img_shape) * max_noise[:, None, None, None]
+        noise = (
+            np.random.normal(mean, std, size=img_shape) * max_noise[:, None, None, None]
+        )
         g_kernel = Gaussian2DKernel(kernel / 2).array[None, None, :]
         return signal.convolve(noise, g_kernel, mode="same")
-
 
     def call_noise(kernels, strengths):
         noise_out = np.zeros(shape=img_shape)
@@ -205,10 +210,9 @@ def add_noise(image, noise_level):
             noise_out += noise
         return noise_out
 
-
     img_shape = image.shape
-    kernels = [1, 64, 32]        # should be same shape as strengths
-    strengths = [0.2, 0.3, 0.5] # have to add up to 1
+    kernels = [1, 64, 32]  # should be same shape as strengths
+    strengths = [0.2, 0.3, 0.5]  # have to add up to 1
 
     noise = call_noise(kernels, strengths)
     noise /= np.abs(noise.max()) / (noise_level / 100)
@@ -270,11 +274,11 @@ def save_sky_distribution_bundle(
     """
     with h5py.File(path, "w") as hf:
         hf.create_dataset(name_x, data=x)
-        if train_type in ['gauss', 'clean']:
+        if train_type in ["gauss", "clean"]:
             hf.create_dataset(name_y, data=y)
             if z is not None:
-                hf.create_dataset(name_z, data=z)     
-        elif train_type == 'list':
+                hf.create_dataset(name_z, data=z)
+        elif train_type == "list":
             hf.create_dataset(name_y, data=z)
         hf.close()
 
@@ -297,7 +301,7 @@ def cart2pol(x: float, y: float):
     phi: float
         angle in radian
     """
-    r = np.sqrt(x**2 + y**2)
+    r = np.sqrt(x ** 2 + y ** 2)
     phi = np.arctan2(y, x)
     return (r, phi)
 

@@ -75,7 +75,9 @@ def create_jet(grid, num_comps, train_type):
                 r_factor
                 * np.sqrt(i + 1)
                 * np.random.uniform(
-                    img_size / (7 * comps), img_size / (5 * comps), size=2,
+                    img_size / (7 * comps),
+                    img_size / (5 * comps),
+                    size=2,
                 )
             )
 
@@ -99,7 +101,8 @@ def create_jet(grid, num_comps, train_type):
                 jet_comp += [np.zeros((img_size, img_size))]
             else:
                 g = twodgaussian(
-                    [amp[i], x[i], y[i], sx[i], sy[i], rotation[i]], img_size,
+                    [amp[i], x[i], y[i], sx[i], sy[i], rotation[i]],
+                    img_size,
                 )
                 jet_comp += [g]
                 jet_img += g

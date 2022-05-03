@@ -17,24 +17,24 @@ def gauss(params: list, size: int):
         (rot (rotation) in radian)
     shape: int
         length of the image
-    
+
     Returns
     -------
     gaussian_scaled: 2darray
         gaussian distribution in two dimensions
     """
     gaussian_2D_kernel = Gaussian2DKernel(
-        x_stddev = params[3],
-        y_stddev = params[4],
-        theta = params[5],
-        x_size = size * 2,
-        y_size = size * 2,
-        )
+        x_stddev=params[3],
+        y_stddev=params[4],
+        theta=params[5],
+        x_size=size * 2,
+        y_size=size * 2,
+    )
     gaussian_cutout = Cutout2D(
-        data = gaussian_2D_kernel,
-        position = (size * 1.5 - params[1], size * 1.5 - params[2]),
-        size = (size, size),
-        ).data
+        data=gaussian_2D_kernel,
+        position=(size * 1.5 - params[1], size * 1.5 - params[2]),
+        size=(size, size),
+    ).data
     gaussian_scaled = gaussian_cutout / gaussian_cutout.max() * params[0]
     return gaussian_scaled
 
@@ -58,12 +58,12 @@ def twodgaussian(params: list, size: int):
         (rot (rotation) in degrees)
     size: int
         length of the image
-    
+
     Returns
     -------
     rotgauss: 2darray
         gaussian distribution in two dimensions
-    
+
     Short version of 'twodgaussian':
     https://github.com/keflavich/gaussfitter/blob/0891cd3605ab5ba000c2d5e1300dd21c15eee1fd/gaussfitter/gaussfitter.py#L75
     """
@@ -71,14 +71,16 @@ def twodgaussian(params: list, size: int):
     center_y, center_x = params[1], params[2]
     width_y, width_x = params[3], params[4]
     rot = params[5]
-    rot = np.pi/180 * rot
+    rot = np.pi / 180 * rot
     rcen_x = center_x * np.cos(rot) - center_y * np.sin(rot)
     rcen_y = center_x * np.sin(rot) + center_y * np.cos(rot)
 
     def rotgauss(x, y):
         xp = x * np.cos(rot) - y * np.sin(rot)
         yp = x * np.sin(rot) + y * np.cos(rot)
-        g = amplitude*np.exp(-(((rcen_x-xp)/width_x)**2 +
-                                      ((rcen_y-yp)/width_y)**2)/2.)
+        g = amplitude * np.exp(
+            -(((rcen_x - xp) / width_x) ** 2 + ((rcen_y - yp) / width_y) ** 2) / 2.0
+        )
         return g
+
     return rotgauss(*np.indices((size, size)))

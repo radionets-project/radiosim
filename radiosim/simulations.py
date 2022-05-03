@@ -47,4 +47,6 @@ def create_sky_distribution(
                 img /= img.max()
 
         path = adjust_outpath(outpath, "/samp_" + option)
-        save_sky_distribution_bundle(path, train_type, jet_bundle, comp_bundle, source_list)
+        save_sky_distribution_bundle(
+            path, train_type, jet_bundle, comp_bundle, source_list
+        )
