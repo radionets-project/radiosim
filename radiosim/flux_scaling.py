@@ -4,7 +4,7 @@ from scipy import stats
 def get_start_amp(scale_type):
     if scale_type == "mojave":
         amp_start = draw_from_mojave_dist()
-    return amp_start
+    return amp_start / 1e3
 
 
 def draw_from_mojave_dist():
