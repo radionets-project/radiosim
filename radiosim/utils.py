@@ -173,7 +173,7 @@ def add_noise(image, noise_level):
         )
         noise = (
             torch.nn.functional.interpolate(
-                torch.tensor(noise).cpu(),
+                torch.tensor(noise),
                 scale_factor=size_rescale,
                 mode="bicubic",
                 align_corners=True,
