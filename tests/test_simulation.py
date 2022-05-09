@@ -13,9 +13,11 @@ def test_simulation():
         Pipeline of simulation runs without error
     """
     from radiosim.scripts.start_simulation import main
+    import traceback
 
     runner = CliRunner()
     result = runner.invoke(main, "./tests/simulate.toml")
+    print(traceback.print_exception(*result.exc_info))
     assert result.exit_code == 0
 
 
