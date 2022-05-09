@@ -1,6 +1,8 @@
 import os
+import re
 import sys
 import h5py
+import toml
 import click
 import torch
 import numpy as np
@@ -29,11 +31,7 @@ def create_grid(pixel, bundle_size):
     y = np.linspace(0, pixel - 1, num=pixel)
     X, Y = np.meshgrid(x, y)
     grid = np.array([np.zeros(X.shape) + 1e-10, X, Y])
-    grid = np.repeat(
-        grid[None, :, :, :],
-        bundle_size,
-        axis=0,
-    )
+    grid = np.repeat(grid[None, :, :, :], bundle_size, axis=0,)
     return grid
 
 
@@ -124,7 +122,9 @@ def read_config(config):
     sim_conf["training_type"] = config["mode"]["training_type"]
     if config["source_types"]["jets"]:
         click.echo("Adding jet sources to sky distributions! \n")
-        sim_conf["num_jet_components"] = config["source_types"]["num_jet_components"]
+        sim_conf["num_jet_components"] = config["source_types"][
+            "num_jet_components"
+        ]
 
     if config["source_types"]["pointlike_gaussians"]:
         click.echo("Adding poinhtlike Gaussians to sky distributions! \n")
@@ -192,7 +192,8 @@ def add_noise(image, noise_level):
         """
         max_noise = np.random.uniform(0, 1, img_shape[0])
         noise = (
-            np.random.normal(mean, std, size=img_shape) * max_noise[:, None, None, None]
+            np.random.normal(mean, std, size=img_shape)
+            * max_noise[:, None, None, None]
         )
         g_kernel = Gaussian2DKernel(kernel / 2).array[None, None, :]
         return signal.convolve(noise, g_kernel, mode="same")
@@ -215,7 +216,7 @@ def add_noise(image, noise_level):
     strengths = [0.2, 0.3, 0.5]  # have to add up to 1
 
     noise = call_noise(kernels, strengths)
-    noise /= np.abs(noise.max()) / (noise_level / 100)
+    noise /= np.abs(noise).max() / (noise_level / 100)
     image_noised = image + noise
 
     return image_noised
@@ -327,3 +328,19 @@ def pol2cart(r: float, phi: float):
     x = r * np.cos(phi)
     y = r * np.sin(phi)
     return (x, y)
+
+
+def load_data(conf_path, data_type="train", key="x"):
+    config = toml.load(conf_path)
+    path = Path(config["paths"]["outpath"])
+    bundle_paths = np.array([x for x in path.iterdir()])
+    paths = [
+        path
+        for path in bundle_paths
+        if re.findall("samp_" + data_type, path.name)
+    ]
+    data = []
+    for path_test in paths:
+        df = h5py.File(path_test, "r")
+        data.extend(df[key])
+    return data
