@@ -27,6 +27,6 @@ jobs:
       
       - name: tests
         run: |
-          $CONDA/bin/pytest --cov radiosim --cov-report=xml
+          $CONDA/bin/pytest
 
       - uses: codecov/codecov-action@v1
