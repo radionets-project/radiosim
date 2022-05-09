@@ -1,12 +1,6 @@
 from click.testing import CliRunner
 
 
-def test_import():
-    from radiosim.utils import load_data
-
-    assert 1 == 1
-
-
 def test_simulation():
     """
     Testing:
