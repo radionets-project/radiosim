@@ -5,7 +5,7 @@
         - pytorch
     dependencies:
       - python>=3.6
-      - pytorch
+      - pytorch>=1.11.0
       - pip
       - pip:
         - -e .
