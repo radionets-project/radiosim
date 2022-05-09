@@ -6,7 +6,7 @@ import shutil
 def test_suite_cleanup_thing():
     yield
 
-    build = "radiosim/tests/build/"
+    build = "./tests/build/"
     print("Cleaning up tests.")
 
     shutil.rmtree(build)

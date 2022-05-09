@@ -163,7 +163,7 @@ def add_noise(image, noise_level):
              Noise is created along the grid which is less random
         """
         size_ratio = img_shape[-1] / kernel
-        size_int = np.int(size_ratio)
+        size_int = int(size_ratio)
         size_rescale = size_ratio / size_int * kernel
         size_noise = (img_shape[0], 1, size_int, size_int)
         max_noise = np.random.uniform(0, 1, img_shape[0])

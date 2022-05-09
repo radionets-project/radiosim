@@ -7,7 +7,7 @@ training_type = 'clean'  # gauss or list or clean
 quiet = true
 
 [paths]
-outpath = "radiosim/tests/build/data/"
+outpath = "./tests/build/data/"
 
 [source_types]
 jets = true
