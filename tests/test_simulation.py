@@ -9,7 +9,7 @@ def test_simulation():
     from radiosim.scripts.start_simulation import main
 
     runner = CliRunner()
-    result = runner.invoke(main, "radiosim/tests/simulate.toml")
+    result = runner.invoke(main, "./tests/simulate.toml")
     assert result.exit_code == 0
 
 
@@ -23,8 +23,8 @@ def test_image():
     import numpy as np
     from radiosim.utils import load_data
 
-    config = toml.load("radiosim/tests/simulate.toml")
-    image = load_data("radiosim/tests/simulate.toml")
+    config = toml.load("./tests/simulate.toml")
+    image = load_data("./tests/simulate.toml")
 
     img_size = config["image_options"]["img_size"]
     bundle_size = config["image_options"]["bundle_size"]
@@ -44,8 +44,8 @@ def test_noise():
     from radiosim.utils import load_data
     from radiosim.utils import add_noise
 
-    config = toml.load("radiosim/tests/simulate.toml")
-    image = load_data("radiosim/tests/simulate.toml")
+    config = toml.load("./tests/simulate.toml")
+    image = load_data("./tests/simulate.toml")
 
     image_shape = np.shape(image)
     noise_level = config["image_options"]["noise_level"]
