@@ -4,7 +4,6 @@ import sys
 import h5py
 import toml
 import click
-import torch
 import numpy as np
 from pathlib import Path
 from scipy import signal
@@ -156,39 +155,9 @@ def add_noise(image, noise_level):
         bundle of noised images
     """
 
-    def noise_big(kernel, mean=0, std=1):
-        """
-        Pro: Faster for big kernel (scaling ~> 8)
-        Con: Slower for small kernel (scaling ~< 8)
-             Noise is created along the grid which is less random
-        """
-        size_ratio = img_shape[-1] / kernel
-        size_int = int(size_ratio)
-        size_rescale = size_ratio / size_int * kernel
-        size_noise = (img_shape[0], 1, size_int, size_int)
-        max_noise = np.random.uniform(0, 1, img_shape[0])
-        noise = (
-            np.random.normal(loc=mean, scale=std, size=size_noise)
-            * max_noise[:, None, None, None]
-        )
-        noise = (
-            torch.nn.functional.interpolate(
-                torch.tensor(noise),
-                scale_factor=size_rescale,
-                mode="bicubic",
-                align_corners=True,
-            )
-            .cpu()
-            .detach()
-            .numpy()
-        )
-        return noise
-
     def noise_small(kernel, mean=0, std=1):
         """
-        Pro: Faster for small kernel (scaling ~< 8)
-             Noise is created more randomly distributed
-        Con: Slower for big kernel (scaling ~> 8)
+        Create the noise of different kernel sizes
         """
         max_noise = np.random.uniform(0, 1, img_shape[0])
         noise = (
@@ -199,20 +168,21 @@ def add_noise(image, noise_level):
         return signal.convolve(noise, g_kernel, mode="same")
 
     def call_noise(kernels, strengths):
+        """
+        Loop through lists and normalize
+        """
         noise_out = np.zeros(shape=img_shape)
         for kernel, strength in zip(kernels, strengths):
             if kernel == 1:
                 noise = np.random.normal(size=img_shape)
-            elif kernel < 8:
-                noise = noise_small(kernel)
             else:
-                noise = noise_big(kernel)
+                noise = noise_small(kernel)
             noise /= np.abs(noise).max() / strength
             noise_out += noise
         return noise_out
 
     img_shape = image.shape
-    kernels = [1, 64, 32]  # should be same shape as strengths
+    kernels = [1, img_shape[-1] / 32, img_shape[-1] / 8]
     strengths = [0.2, 0.3, 0.5]  # have to add up to 1
 
     noise = call_noise(kernels, strengths)
