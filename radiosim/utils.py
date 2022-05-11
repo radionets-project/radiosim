@@ -30,11 +30,7 @@ def create_grid(pixel, bundle_size):
     y = np.linspace(0, pixel - 1, num=pixel)
     X, Y = np.meshgrid(x, y)
     grid = np.array([np.zeros(X.shape) + 1e-10, X, Y])
-    grid = np.repeat(
-        grid[None, :, :, :],
-        bundle_size,
-        axis=0,
-    )
+    grid = np.repeat(grid[None, :, :, :], bundle_size, axis=0,)
     return grid
 
 
@@ -125,7 +121,9 @@ def read_config(config):
     sim_conf["training_type"] = config["mode"]["training_type"]
     if config["source_types"]["jets"]:
         click.echo("Adding jet sources to sky distributions! \n")
-        sim_conf["num_jet_components"] = config["source_types"]["num_jet_components"]
+        sim_conf["num_jet_components"] = config["source_types"][
+            "num_jet_components"
+        ]
 
     if config["source_types"]["pointlike_gaussians"]:
         click.echo("Adding poinhtlike Gaussians to sky distributions! \n")
@@ -149,7 +147,7 @@ def add_noise(image, noise_level):
     image: 4darray
         bundle of images of shape [n, 1, size, size]
     noise_level: int
-        noise level in percent
+        maximum intensity of noise in percent
 
     Returns
     -------
@@ -163,7 +161,8 @@ def add_noise(image, noise_level):
         """
         max_noise = np.random.uniform(0, 1, img_shape[0])
         noise = (
-            np.random.normal(mean, std, size=img_shape) * max_noise[:, None, None, None]
+            np.random.normal(mean, std, size=img_shape)
+            * max_noise[:, None, None, None]
         )
         g_kernel = Gaussian2DKernel(kernel / 2).array[None, None, :]
         return signal.convolve(noise, g_kernel, mode="same")
@@ -306,7 +305,9 @@ def load_data(conf_path, data_type="train", key="x"):
     path = Path(config["paths"]["outpath"])
     bundle_paths = np.array([x for x in path.iterdir()])
     paths = [
-        path for path in bundle_paths if re.findall("samp_" + data_type, path.name)
+        path
+        for path in bundle_paths
+        if re.findall("samp_" + data_type, path.name)
     ]
     data = []
     for path_test in paths:

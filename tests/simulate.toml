@@ -21,4 +21,4 @@ bundles_test = 1
 bundle_size = 5
 img_size = 256
 noise = true
-noise_level = 15    # in percent
+noise_level = 15    # maximum intensity of noise in percent

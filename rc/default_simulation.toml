@@ -7,7 +7,7 @@ training_type = 'clean'  # gauss or list or clean
 quiet = true
 
 [paths]
-outpath = "/net/big-tank/POOL/projects/radio/simulations/jet_components/testing"
+outpath = "./build/example_data/"
 
 [source_types]
 jets = true
@@ -21,4 +21,4 @@ bundles_test = 1
 bundle_size = 100
 img_size = 256
 noise = true
-noise_level = 15    # in percent
+noise_level = 15    # maximum intensity of noise in percent
