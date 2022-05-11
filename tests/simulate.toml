@@ -7,7 +7,7 @@ training_type = 'clean'  # gauss or list or clean
 quiet = true
 
 [paths]
-outpath = "./build/example_data/"
+outpath = "./tests/build/data/"
 
 [source_types]
 jets = true
@@ -18,7 +18,7 @@ pointlike_gaussians = false
 bundles_train = 1
 bundles_valid = 1
 bundles_test = 1
-bundle_size = 100
+bundle_size = 5
 img_size = 256
 noise = true
 noise_level = 15    # maximum intensity of noise in percent

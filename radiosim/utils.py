@@ -1,9 +1,13 @@
 import os
+import re
 import sys
 import h5py
+import toml
 import click
 import numpy as np
 from pathlib import Path
+from scipy import signal
+from astropy.convolution import Gaussian2DKernel
 
 
 def create_grid(pixel, bundle_size):
@@ -14,6 +18,8 @@ def create_grid(pixel, bundle_size):
     ----------
     pixel: int
         number of pixel in x and y
+    bundle_size: int
+        number of images in each bundle
 
     Returns
     -------
@@ -24,15 +30,25 @@ def create_grid(pixel, bundle_size):
     y = np.linspace(0, pixel - 1, num=pixel)
     X, Y = np.meshgrid(x, y)
     grid = np.array([np.zeros(X.shape) + 1e-10, X, Y])
-    grid = np.repeat(
-        grid[None, :, :, :],
-        bundle_size,
-        axis=0,
-    )
+    grid = np.repeat(grid[None, :, :, :], bundle_size, axis=0,)
     return grid
 
 
 def get_exp(size=1):
+    """
+    Returns random numbers between 0 and 1. The probability distribution looks like an 'U'.
+    Used for the parameter 'alpha' to change the amplitude of the counter jet.
+
+    Parameters
+    ----------
+    size: int
+        quantity of random numbers to be returned
+
+    Returns
+    -------
+    vals: ndarray
+        array of random numbers
+    """
     num = np.ceil(size / 2).astype(int)
     exp = np.random.exponential(scale=0.08, size=(num,))
     exp_inv = 1 - np.random.exponential(scale=0.08, size=(num,))
@@ -44,6 +60,7 @@ def check_outpath(outpath, quiet=False):
     """
     Check if outpath exists. Check for existing source_bundle files.
     Ask to overwrite or reuse existing files.
+
     Parameters
     ----------
     outpath : str
@@ -59,7 +76,7 @@ def check_outpath(outpath, quiet=False):
     path = Path(outpath)
     exists = path.exists()
     if exists is True:
-        source = {p for p in path.rglob("*source_bundle*.h5") if p.is_file()}
+        source = {p for p in path.rglob("*samp*.h5") if p.is_file()}
         if source:
             click.echo("Found existing source simulations!")
             if quiet:
@@ -87,11 +104,26 @@ def check_outpath(outpath, quiet=False):
 
 
 def read_config(config):
+    """
+    Unpacking of the config file to print the config parameters
+
+    Parameters
+    ----------
+    config: toml-file
+        toml configuration file with all parameters
+    Returns
+    -------
+    sim_comf: dictionary
+        unpacked configurations
+    """
     sim_conf = {}
     sim_conf["outpath"] = config["paths"]["outpath"]
+    sim_conf["training_type"] = config["mode"]["training_type"]
     if config["source_types"]["jets"]:
         click.echo("Adding jet sources to sky distributions! \n")
-        sim_conf["num_jet_components"] = config["source_types"]["num_jet_components"]
+        sim_conf["num_jet_components"] = config["source_types"][
+            "num_jet_components"
+        ]
 
     if config["source_types"]["pointlike_gaussians"]:
         click.echo("Adding poinhtlike Gaussians to sky distributions! \n")
@@ -106,64 +138,80 @@ def read_config(config):
     return sim_conf
 
 
-def get_noise(image, scale, mean=0, std=1):
+def add_noise(image, noise_level):
     """
-    Calculate random noise values for all image pixels.
+    Used for adding noise.
+
     Parameters
     ----------
-    image: 2darray
-        2d image
-    scale: float
-        scaling factor to increase noise
-    mean: float
-        mean of noise values
-    std: float
-        standard deviation of noise values
-    Returns
-    -------
-    out: ndarray
-        array with noise values in image shape
-    """
-    return np.random.normal(mean, std, size=image.shape) * scale
-
-
-def add_noise(bundle, noise_level):
-    """
-    Used for adding noise and plotting the original and noised picture,
-    if asked. Using 0.05 * max(image) as scaling factor.
-    Parameters
-    ----------
-    bundle: path
-        path to hdf5 bundle file
+    image: 4darray
+        bundle of images of shape [n, 1, size, size]
     noise_level: int
-        noise level in percent
+        maximum intensity of noise in percent
+
     Returns
     -------
-    bundle_noised hdf5_file
-        bundle with noised images
+    image_noised: 4darray
+        bundle of noised images
     """
-    bundle_noised = np.array(
-        [img + get_noise(img, (img.max() * noise_level / 100)) for img in bundle]
-    )
-    return bundle_noised
+
+    def noise_small(kernel, mean=0, std=1):
+        """
+        Create the noise of different kernel sizes
+        """
+        max_noise = np.random.uniform(0, 1, img_shape[0])
+        noise = (
+            np.random.normal(mean, std, size=img_shape)
+            * max_noise[:, None, None, None]
+        )
+        g_kernel = Gaussian2DKernel(kernel / 2).array[None, None, :]
+        return signal.convolve(noise, g_kernel, mode="same")
+
+    def call_noise(kernels, strengths):
+        """
+        Loop through lists and normalize
+        """
+        noise_out = np.zeros(shape=img_shape)
+        for kernel, strength in zip(kernels, strengths):
+            if kernel == 1:
+                noise = np.random.normal(size=img_shape)
+            else:
+                noise = noise_small(kernel)
+            noise /= np.abs(noise).max() / strength
+            noise_out += noise
+        return noise_out
+
+    img_shape = image.shape
+    kernels = [1, img_shape[-1] / 32, img_shape[-1] / 8]
+    strengths = [0.2, 0.3, 0.5]  # have to add up to 1
+
+    noise = call_noise(kernels, strengths)
+    noise /= np.abs(noise).max() / (noise_level / 100)
+    image_noised = image + noise
+
+    return image_noised
 
 
 def adjust_outpath(path, option, form="h5"):
     """
     Add number to out path when filename already exists.
+
     Parameters
     ----------
     path: str
         path to save directory
     option: str
         additional keyword to add to path
+    form: str
+        file extension
+
     Returns
     -------
     out: str
         adjusted path
     """
     counter = 0
-    filename = str(path) + (option + "{}." + form)
+    filename = str(path) + (option + "_{}." + form)
     while os.path.isfile(filename.format(counter)):
         counter += 1
     out = filename.format(counter)
@@ -171,14 +219,98 @@ def adjust_outpath(path, option, form="h5"):
 
 
 def save_sky_distribution_bundle(
-    path, x, y, z=None, name_x="sky", name_y="comp", name_z="list"
+    path, train_type, x, y, z=None, name_x="x", name_y="y", name_z="list"
 ):
     """
-    write fft_pairs created in second analysis step to h5 file
+    Write images created in analysis to h5 file.
+
+    Parameters
+    ----------
+    path: str
+        path to save file
+    train_type: str
+        determines the purpose of the simulations. Can be 'gauss', 'list' or 'clean'
+    x: ndarray
+        image of the full jet, sum over all components
+    y: ndarray
+        images of each component and background
+    z: ndarray
+        array which stores all (six) properties of each component
+    name_x: str
+        name of the x-data
+    name_y: str
+        name of the y-data
+    name_z: str
+        name of the z-data
     """
     with h5py.File(path, "w") as hf:
-        [hf.create_dataset(name_x + str(i), data=x[i]) for i in range(len(x))]
-        [hf.create_dataset(name_y + str(i), data=y[i]) for i in range(len(y))]
-        if z is not None:
-            [hf.create_dataset(name_z + str(i), data=z[i]) for i in range(len(z))]
+        hf.create_dataset(name_x, data=x)
+        if train_type in ["gauss", "clean"]:
+            hf.create_dataset(name_y, data=y)
+            if z is not None:
+                hf.create_dataset(name_z, data=z)
+        elif train_type == "list":
+            hf.create_dataset(name_y, data=z)
         hf.close()
+
+
+def cart2pol(x: float, y: float):
+    """
+    Transforms cartesian to polar coordinates.
+
+    Parameters
+    ----------
+    x: float
+        x-coordinate
+    y: float
+        y-coordinate
+
+    Returns
+    -------
+    r: float
+        radius, euclidean distance between (0,0) and (x,y)
+    phi: float
+        angle in radian
+    """
+    r = np.sqrt(x ** 2 + y ** 2)
+    phi = np.arctan2(y, x)
+    return (r, phi)
+
+
+def pol2cart(r: float, phi: float):
+    """
+    Transforms polar to cartesian coordinates.
+
+     Parameters
+    ----------
+    r: float
+        radius, euclidean distance between (0,0) and (x,y)
+    phi: float
+        angle in radian
+
+    Returns
+    -------
+    x: float
+        x-coordinate
+    y: float
+        y-coordinate
+    """
+    x = r * np.cos(phi)
+    y = r * np.sin(phi)
+    return (x, y)
+
+
+def load_data(conf_path, data_type="train", key="x"):
+    config = toml.load(conf_path)
+    path = Path(config["paths"]["outpath"])
+    bundle_paths = np.array([x for x in path.iterdir()])
+    paths = [
+        path
+        for path in bundle_paths
+        if re.findall("samp_" + data_type, path.name)
+    ]
+    data = []
+    for path_test in paths:
+        df = h5py.File(path_test, "r")
+        data.extend(df[key])
+    return data
