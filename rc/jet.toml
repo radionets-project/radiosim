@@ -1,13 +1,13 @@
 # This is a TOML document.
 
-title = "Iimulation configuration"
+title = "Jet simulation configuration"
 
 [general]
 quiet = true
 mode = "jet"   # jet or survey
 
 [paths]
-outpath = "./build/example_data/"
+outpath = "/net/big-tank/POOL/projects/radio/simulations/jet_components/testing"
 
 [jet]
 training_type = "gauss"  # gauss or list or clean
