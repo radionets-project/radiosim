@@ -11,7 +11,7 @@ def create_jet(grid, num_comps, train_type):
     Parameters
     ----------
     grid: 4darray
-        input grid of shape [n, 1, img_size, img_size]
+        input grid of shape [n, 3, img_size, img_size]
     num_comps: list
         list of two number: min number of components and max number of components
     train_type: str
@@ -33,11 +33,11 @@ def create_jet(grid, num_comps, train_type):
         grid = grid[None]
 
     img_size = grid.shape[-1]
+    center = img_size // 2
     jets = []
     jet_comps = []
     source_lists = []
     for img in grid:
-        center = img_size // 2
         comps = np.random.randint(num_comps[0], num_comps[1] + 1)
 
         amp = np.zeros(num_comps[1])
@@ -75,9 +75,7 @@ def create_jet(grid, num_comps, train_type):
                 r_factor
                 * np.sqrt(i + 1)
                 * np.random.uniform(
-                    img_size / (7 * comps),
-                    img_size / (5 * comps),
-                    size=2,
+                    img_size / (7 * comps), img_size / (5 * comps), size=2,
                 )
             )
 
@@ -101,8 +99,7 @@ def create_jet(grid, num_comps, train_type):
                 jet_comp += [np.zeros((img_size, img_size))]
             else:
                 g = twodgaussian(
-                    [amp[i], x[i], y[i], sx[i], sy[i], rotation[i]],
-                    img_size,
+                    [amp[i], x[i], y[i], sx[i], sy[i], rotation[i]], img_size,
                 )
                 jet_comp += [g]
                 jet_img += g

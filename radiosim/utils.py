@@ -117,17 +117,13 @@ def read_config(config):
         unpacked configurations
     """
     sim_conf = {}
+    sim_conf["mode"] = config["general"]["mode"]
     sim_conf["outpath"] = config["paths"]["outpath"]
-    sim_conf["training_type"] = config["mode"]["training_type"]
-    if config["source_types"]["jets"]:
-        click.echo("Adding jet sources to sky distributions! \n")
-        sim_conf["num_jet_components"] = config["source_types"][
-            "num_jet_components"
-        ]
-
-    if config["source_types"]["pointlike_gaussians"]:
-        click.echo("Adding poinhtlike Gaussians to sky distributions! \n")
-
+    sim_conf["training_type"] = config["jet"]["training_type"]
+    sim_conf["num_jet_components"] = config["jet"]["num_jet_components"]
+    sim_conf["num_sources"] = config["survey"]["num_sources"]
+    sim_conf["class_distribution"] = config["survey"]["class_distribution"]
+    sim_conf["scale_sources"] = config["survey"]["scale_sources"]
     sim_conf["bundles_train"] = config["image_options"]["bundles_train"]
     sim_conf["bundles_valid"] = config["image_options"]["bundles_valid"]
     sim_conf["bundles_test"] = config["image_options"]["bundles_test"]
@@ -161,8 +157,7 @@ def add_noise(image, noise_level):
         """
         max_noise = np.random.uniform(0, 1, img_shape[0])
         noise = (
-            np.random.normal(mean, std, size=img_shape)
-            * max_noise[:, None, None, None]
+            np.random.normal(mean, std, size=img_shape) * max_noise[:, None, None, None]
         )
         g_kernel = Gaussian2DKernel(kernel / 2).array[None, None, :]
         return signal.convolve(noise, g_kernel, mode="same")
@@ -247,8 +242,8 @@ def save_sky_distribution_bundle(
         hf.create_dataset(name_x, data=x)
         if train_type in ["gauss", "clean"]:
             hf.create_dataset(name_y, data=y)
-            if z is not None:
-                hf.create_dataset(name_z, data=z)
+            # if z is not None:
+            #    hf.create_dataset(name_z, data=z)
         elif train_type == "list":
             hf.create_dataset(name_y, data=z)
         hf.close()
@@ -305,9 +300,7 @@ def load_data(conf_path, data_type="train", key="x"):
     path = Path(config["paths"]["outpath"])
     bundle_paths = np.array([x for x in path.iterdir()])
     paths = [
-        path
-        for path in bundle_paths
-        if re.findall("samp_" + data_type, path.name)
+        path for path in bundle_paths if re.findall("samp_" + data_type, path.name)
     ]
     data = []
     for path_test in paths:
