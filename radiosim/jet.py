@@ -82,9 +82,8 @@ def create_jet(grid, num_comps, train_type):
                 )
             )
 
-            # rotation, random or align with the jet angle, empirical
-            rotation[i] = np.random.uniform(0, np.pi)
-            # rotation[i] = jet_angle + np.random.normal(0, 20)
+            # rotation aligned with the jet angle, empirical
+            rotation[i] = y_rotation + np.random.normal(0, np.pi / 18)
 
         # mirror the data for the counter jet
         amp = np.append(amp, amp[1:] * get_exp())
