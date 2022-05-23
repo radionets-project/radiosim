@@ -1,6 +1,4 @@
-from kornia import scale
 import numpy as np
-from radiosim.utils import get_exp, pol2cart
 from radiosim.gauss import twodgaussian
 from radiosim.jet import create_jet
 
