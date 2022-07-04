@@ -55,7 +55,7 @@ def twodgaussian(params: list, size: int):
     ----------
     params: list
         [amplitude, center_x, center_y, width_x, width_y, rot]
-        (rot (rotation) in degrees)
+        (rot (rotation) in radian)
     size: int
         length of the image
 
@@ -71,7 +71,6 @@ def twodgaussian(params: list, size: int):
     center_y, center_x = params[1], params[2]
     width_y, width_x = params[3], params[4]
     rot = params[5]
-    rot = np.pi / 180 * rot
     rcen_x = center_x * np.cos(rot) - center_y * np.sin(rot)
     rcen_y = center_x * np.sin(rot) + center_y * np.cos(rot)
 

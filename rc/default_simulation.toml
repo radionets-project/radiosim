@@ -2,17 +2,22 @@
 
 title = "Simulation configuration"
 
-[mode]
-training_type = 'clean'  # gauss or list or clean
+[general]
 quiet = true
+mode = "jet"   # jet or survey
 
 [paths]
 outpath = "./build/example_data/"
 
-[source_types]
-jets = true
+[jet]
+training_type = "gauss"  # gauss or list or clean
 num_jet_components = [3, 6]
-pointlike_gaussians = false
+
+[survey]
+num_sources = 20
+# classes are: jet, gaussian, pointlike
+class_distribution = [2, 1, 2]   # average share of each source in the images
+scale_sources = true
 
 [image_options]
 bundles_train = 1

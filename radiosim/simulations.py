@@ -1,3 +1,4 @@
+import click
 from tqdm import tqdm
 from radiosim.utils import (
     create_grid,
@@ -6,47 +7,61 @@ from radiosim.utils import (
     save_sky_distribution_bundle,
 )
 from radiosim.jet import create_jet
+from radiosim.survey import create_survey
 
 
 def simulate_sky_distributions(sim_conf):
     for opt in ["train", "valid", "test"]:
         create_sky_distribution(
+            mode=sim_conf["mode"],
+            outpath=sim_conf["outpath"],
             train_type=sim_conf["training_type"],
-            img_size=sim_conf["img_size"],
-            bundle_size=sim_conf["bundle_size"],
+            num_jet_comps=sim_conf["num_jet_components"],
+            num_sources=sim_conf["num_sources"],
+            class_distribution=sim_conf["class_distribution"],
+            scale_sources=sim_conf["scale_sources"],
             num_bundles=sim_conf["bundles_" + str(opt)],
+            bundle_size=sim_conf["bundle_size"],
+            img_size=sim_conf["img_size"],
             noise=sim_conf["noise"],
             noise_level=sim_conf["noise_level"],
-            num_jet_comps=sim_conf["num_jet_components"],
-            outpath=sim_conf["outpath"],
             option=opt,
         )
 
 
 def create_sky_distribution(
+    mode,
+    outpath,
     train_type,
+    num_jet_comps,
+    num_sources,
+    class_distribution,
+    scale_sources,
     num_bundles,
-    img_size,
     bundle_size,
+    img_size,
     noise,
     noise_level,
-    num_jet_comps,
-    outpath,
     option,
 ):
     for i in tqdm(range(num_bundles)):
         grid = create_grid(img_size, bundle_size)
-        jet, jet_comps, source_list = create_jet(grid, num_jet_comps, train_type)
-
-        jet_bundle = jet.copy()
-        comp_bundle = jet_comps.copy()
+        if mode == "jet":
+            sky, sky_classes, source_list = create_jet(grid, num_jet_comps, train_type)
+        elif mode == "survey":
+            sky, sky_classes, source_list = create_survey(
+                grid, num_sources, class_distribution, scale_sources
+            )
+        else:
+            click.echo("Given mode not found. Choose 'survey' or 'jet' in config file")
+        sky_bundle = sky.copy()
+        sky_classes_bundle = sky_classes.copy()
         if noise:
-            jet_bundle = add_noise(jet_bundle, noise_level)
-            for img in jet_bundle:
+            sky_bundle = add_noise(sky_bundle, noise_level)
+            for img in sky_bundle:
                 img -= img.min()
                 img /= img.max()
-
         path = adjust_outpath(outpath, "/samp_" + option)
         save_sky_distribution_bundle(
-            path, train_type, jet_bundle, comp_bundle, source_list
+            path, train_type, sky_bundle, sky_classes_bundle, source_list
         )

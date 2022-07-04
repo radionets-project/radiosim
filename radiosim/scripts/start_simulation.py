@@ -8,13 +8,7 @@ from radiosim.simulations import simulate_sky_distributions
 @click.argument("configuration_path", type=click.Path(exists=True, dir_okay=False))
 @click.option(
     "--mode",
-    type=click.Choice(
-        [
-            "simulate",
-            "overview",
-        ],
-        case_sensitive=False,
-    ),
+    type=click.Choice(["simulate", "overview",], case_sensitive=False,),
     default="simulate",
 )
 def main(configuration_path, mode):
@@ -23,17 +17,11 @@ def main(configuration_path, mode):
     print(sim_conf, "\n")
 
     outpath = config["paths"]["outpath"]
-    sim_sources = check_outpath(
-        outpath,
-        quiet=config["mode"]["quiet"],
-    )
+    sim_sources = check_outpath(outpath, quiet=config["general"]["quiet"],)
 
     if mode == "simulate":
         if sim_sources:
             simulate_sky_distributions(sim_conf)
-
-    # if mode == "overview":
-    #     create_simulation_overview(sim_conf)
 
 
 if __name__ == "__main__":
