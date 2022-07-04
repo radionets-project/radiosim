@@ -15,7 +15,7 @@ num_jet_components = [3, 6]
 
 [survey]
 num_sources = 20
-# classes are: jet, gaussian, ponitlike
+# classes are: jet, gaussian, pointlike
 class_distribution = [1, 1, 1]   # average share of each source in the images
 scale_sources = true
 
