@@ -1,6 +1,6 @@
 # This is a TOML document.
 
-title = "Iimulation configuration"
+title = "Simulation configuration"
 
 [general]
 quiet = true
@@ -23,7 +23,7 @@ scale_sources = true
 bundles_train = 1
 bundles_valid = 1
 bundles_test = 1
-bundle_size = 10
+bundle_size = 100
 img_size = 256
 noise = true
 noise_level = 15    # maximum intensity of noise in percent

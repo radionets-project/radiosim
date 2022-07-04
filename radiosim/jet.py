@@ -10,8 +10,8 @@ def create_jet(grid, num_comps, train_type):
 
     Parameters
     ----------
-    grid: 4darray
-        input grid of shape [n, 3, img_size, img_size]
+    grid: ndarray
+        input grid of shape [n, 1, img_size, img_size] or [1, img_size, img_size]
     num_comps: list
         list of two number: min number of components and max number of components
     train_type: str
