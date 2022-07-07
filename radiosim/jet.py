@@ -1,5 +1,5 @@
 import numpy as np
-from radiosim.utils import get_exp, pol2cart
+from radiosim.utils import get_exp, relativistic_boosting, pol2cart
 from radiosim.gauss import twodgaussian
 
 
@@ -47,15 +47,22 @@ def create_jet(grid, num_comps, train_type):
         sy = np.zeros(num_comps[1])
         rotation = np.zeros(num_comps[1])
 
-        y_rotation = np.random.uniform(0, 2 * np.pi)
-        z_rotation = np.random.uniform(0, 2 * np.pi)
+        # velocity in units of c_0, initialise velocity of first component
+        beta = np.zeros(num_comps[1]) 
+        beta[1] = np.random.uniform(0, 1)
+        y_rotation = np.random.uniform(0, np.pi)
+        z_rotation = np.random.uniform(0, np.pi / 2)
 
         for i in range(comps):
             # amplitude decreases for more distant components, empirical
-            amp[i] = np.exp(-np.sqrt(i) * np.random.normal(1.3, 0.4))
+            amp[i] = np.exp(-np.sqrt(i) * np.random.normal(1.3, 0.2))
+
+            # velocity decreases for more distant components, empirical
+            if i >= 2:
+                beta[i] = beta[1] * np.exp(-np.sqrt(i - 1) * np.random.normal(0.5, 0.1))
 
             # curving the jet, empirical
-            y_rotation += np.random.normal(0, np.pi / 18)
+            y_rotation += np.random.normal(0, np.pi / 24)
 
             # distance between components, r_factor to fill the corners
             jet_angle_cos = np.abs(np.cos(y_rotation))
@@ -68,7 +75,7 @@ def create_jet(grid, num_comps, train_type):
                 r_factor = np.sqrt(2)
 
             # *0.8 so the component center is not on the edge
-            r = i / (comps - 1) * img_size / 2 * r_factor * np.cos(z_rotation) * 0.8
+            r = i / (comps - 1) * img_size / 2 * r_factor * np.sin(z_rotation) * 0.8
 
             # get the cartesian coordinates
             x[i], y[i] = np.array(pol2cart(r, y_rotation)) + center
@@ -85,14 +92,18 @@ def create_jet(grid, num_comps, train_type):
             # rotation aligned with the jet angle, empirical
             rotation[i] = y_rotation + np.random.normal(0, np.pi / 18)
 
+        # print('Velocity of the jet:', beta)
+        boost_app, boost_rec = relativistic_boosting(z_rotation, beta)
+
         # mirror the data for the counter jet
-        amp = np.append(amp, amp[1:] * get_exp())
+        amp = np.concatenate((amp * boost_app, amp[1:] * boost_rec[1:]))
         x = np.append(x, img_size - x[1:])
         y = np.append(y, img_size - y[1:])
         sx = np.append(sx, sx[1:])
         sy = np.append(sy, sy[1:])
         rotation = np.append(rotation, rotation[1:])
         z_rotation = np.repeat(z_rotation, 2 * num_comps[1] - 1)
+        beta = np.append(beta, beta[1:])
 
         # creation of the image
         jet_img = img[0]
@@ -127,19 +138,19 @@ def create_jet(grid, num_comps, train_type):
         else:
             jet_comps.append(jet_comp)
 
-        if train_type == "list":
-            # scale the parameters between 0 and 1
-            x /= img_size
-            y /= img_size
-            sx /= np.sqrt(2 * (num_comps[0])) * img_size / (5 * num_comps[0])
-            sy /= np.sqrt(2 * (num_comps[0])) * img_size / (5 * num_comps[0])
-            rotation /= 2 * np.pi
-            z_rotation /= 2 * np.pi
+        # if train_type == "list":
+        #     # scale the parameters between 0 and 1
+        #     x /= img_size
+        #     y /= img_size
+        #     sx /= np.sqrt(2 * (num_comps[0])) * img_size / (5 * num_comps[0])
+        #     sy /= np.sqrt(2 * (num_comps[0])) * img_size / (5 * num_comps[0])
+        #     rotation /= 2 * np.pi
+        #     z_rotation /= 2 * np.pi
 
-        source_list = np.array([amp, x, y, sx, sy, rotation, z_rotation]).T
+        source_list = np.array([amp, x, y, sx, sy, rotation, z_rotation, beta]).T
 
-        if train_type == "list":
-            source_list = source_list[source_list[:, 0].argsort()]
+        # if train_type == "list":
+        #     source_list = source_list[source_list[:, 0].argsort()]
 
         source_lists.append(source_list)
     return (

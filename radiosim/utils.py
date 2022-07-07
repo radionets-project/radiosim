@@ -56,6 +56,31 @@ def get_exp(size=1):
     return np.random.choice(vals, size=size)
 
 
+def relativistic_boosting(theta, beta):
+    """
+    Calculate relativistic boosting factor for a jet.
+    Parameters
+    ----------
+    theta: float
+        angle of the jet in relation to the observer
+    beta: float
+        velocity of the jet components
+
+    Returns
+    -------
+    boost_app: float
+        boosting factor for the approaching jet
+    boost_rec: float
+        boosting factor for the receding jet
+    """
+    gamma = 1 / np.sqrt(1 - beta ** 2)  # Lorentz factor
+    mu = np.cos(theta)
+
+    boost_app = 1 / (gamma * (1 - beta * mu))
+    boost_rec = 1 / (gamma * (1 + beta * mu))
+    return boost_app, boost_rec
+
+
 def check_outpath(outpath, quiet=False):
     """
     Check if outpath exists. Check for existing source_bundle files.
