@@ -1,5 +1,5 @@
 import numpy as np
-from radiosim.utils import get_exp, relativistic_boosting, pol2cart
+from radiosim.utils import relativistic_boosting, pol2cart
 from radiosim.gauss import twodgaussian
 
 
@@ -125,9 +125,9 @@ def create_jet(grid, num_comps, train_type):
         amp /= jet_max
 
         # sum over the 'symmetric' components
-        for i in range(num_comps[1] - 1):
-            jet_comp[i + 1] += jet_comp[num_comps[1]]
-            jet_comp = np.delete(jet_comp, num_comps[1], axis=0)
+        # for i in range(num_comps[1] - 1):
+        #     jet_comp[i + 1] += jet_comp[num_comps[1]]
+        #     jet_comp = np.delete(jet_comp, num_comps[1], axis=0)
 
         # '1 - normalised' gives the background strength
         jet_comp = np.concatenate((jet_comp, (1 - jet_img)[None, :, :]))

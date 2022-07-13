@@ -7,7 +7,7 @@ quiet = true
 mode = "jet"   # jet or survey
 
 [paths]
-outpath = "/net/big-tank/POOL/projects/radio/simulations/survey/testing/"
+outpath = "/net/big-tank/POOL/projects/radio/simulations/jet_components/testing/"
 
 [jet]
 training_type = "list"  # gauss or list or clean

@@ -34,28 +34,6 @@ def create_grid(pixel, bundle_size):
     return grid
 
 
-def get_exp(size=1):
-    """
-    Returns random numbers between 0 and 1. The probability distribution looks like an 'U'.
-    Used for the parameter 'alpha' to change the amplitude of the counter jet.
-
-    Parameters
-    ----------
-    size: int
-        quantity of random numbers to be returned
-
-    Returns
-    -------
-    vals: ndarray
-        array of random numbers
-    """
-    num = np.ceil(size / 2).astype(int)
-    exp = np.random.exponential(scale=0.08, size=(num,))
-    exp_inv = 1 - np.random.exponential(scale=0.08, size=(num,))
-    vals = np.hstack([exp, exp_inv])
-    return np.random.choice(vals, size=size)
-
-
 def relativistic_boosting(theta, beta):
     """
     Calculate relativistic boosting factor for a jet.
