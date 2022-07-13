@@ -42,10 +42,11 @@ def create_survey(grid, num_sources, class_distribution, scale_sources=False):
     survey_comps = np.zeros(
         (grid.shape[0], len(class_distribution) + 1, img_size, img_size)
     )
-    source_list = []
+    # source_list = []
     for i_img, img in enumerate(grid):
         for i_source in range(num_sources):
             rand_class = np.random.uniform(0, sum(class_distribution))
+
             # create first class (jet)
             if rand_class < class_distribution[0]:
                 if scale_sources:
@@ -54,7 +55,7 @@ def create_survey(grid, num_sources, class_distribution, scale_sources=False):
                     jet_size = np.random.randint(100, 200)
                 num_comps = [4, 7]
                 x, y = np.random.rand(2) * img_size
-                jet, _, jet_list = create_jet(
+                jet, target = create_jet(
                     img[0:1, 0:jet_size, 0:jet_size], num_comps, "gauss"
                 )
                 posx_min = int(np.floor(x - jet_size / 2))
@@ -73,7 +74,7 @@ def create_survey(grid, num_sources, class_distribution, scale_sources=False):
                 if posy_max > img_size:
                     jet = jet[:, 0 : img_size - posy_max + jet_size]
                 survey_comps[i_img, 0, posx_min:posx_max, posy_min:posy_max] += jet
-                source_list.append(jet_list)
+                # source_list.append(jet_list)
 
             # create second class (gaussian)
             elif rand_class < class_distribution[0] + class_distribution[1]:
@@ -88,7 +89,7 @@ def create_survey(grid, num_sources, class_distribution, scale_sources=False):
                 rot = np.random.uniform(0, np.pi)
                 gauss = twodgaussian([amp, x, y, sx, sy, rot], img_size)
                 survey_comps[i_img, 1] += gauss
-                source_list.append([amp, x, y, sx, sy, rot])
+                # source_list.append([amp, x, y, sx, sy, rot])
 
             # create third class (pointsources)
             else:
@@ -103,7 +104,7 @@ def create_survey(grid, num_sources, class_distribution, scale_sources=False):
                 rot = np.random.uniform(0, np.pi)
                 gauss = twodgaussian([amp, x, y, sx, sy, rot], img_size)
                 survey_comps[i_img, 2] += gauss
-                source_list.append([amp, x, y, sx, sy, rot])
+                # source_list.append([amp, x, y, sx, sy, rot])
 
         survey[i_img] = np.sum(survey_comps[i_img], axis=0)
 
@@ -111,21 +112,20 @@ def create_survey(grid, num_sources, class_distribution, scale_sources=False):
         survey_max = survey[i_img].max()
         survey[i_img] /= survey_max
         survey_comps[i_img] /= survey_max
-        for source in source_list:
-            if isinstance(source, list):
-                source[0] /= survey_max
-            if isinstance(source, np.ndarray):
-                source[0, :, 0] /= survey_max
+        # for source in source_list:
+        #     if isinstance(source, list):
+        #         source[0] /= survey_max
+        #     if isinstance(source, np.ndarray):
+        #         source[0, :, 0] /= survey_max
 
         # '1 - normalised' gives the background strength
         survey_comps[i_img, -1] = 1 - survey[i_img]
 
     # set source list to 0, because the saving of the list with variable lengths is
     # not supported
-    source_list = 0
+    # source_list = 0
 
     return (
         survey,
         survey_comps,
-        source_list,
     )

@@ -35,8 +35,7 @@ def create_jet(grid, num_comps, train_type):
     img_size = grid.shape[-1]
     center = img_size // 2
     jets = []
-    jet_comps = []
-    source_lists = []
+    targets = []
     for img in grid:
         comps = np.random.randint(num_comps[0], num_comps[1] + 1)
 
@@ -106,17 +105,8 @@ def create_jet(grid, num_comps, train_type):
         beta = np.append(beta, beta[1:])
 
         # creation of the image
-        jet_img = img[0]
-        jet_comp = []
-        for i in range(2 * num_comps[1] - 1):
-            if amp[i] == 0:
-                jet_comp += [np.zeros((img_size, img_size))]
-            else:
-                g = twodgaussian(
-                    [amp[i], x[i], y[i], sx[i], sy[i], rotation[i]], img_size,
-                )
-                jet_comp += [g]
-                jet_img += g
+        jet_comp = component_from_list(img_size, amp, x, y, sx, sy, rotation)
+        jet_img = np.sum(jet_comp, axis=0)
 
         # normalisation
         jet_max = jet_img.max()
@@ -124,37 +114,77 @@ def create_jet(grid, num_comps, train_type):
         jet_comp /= jet_max
         amp /= jet_max
 
-        # sum over the 'symmetric' components
-        # for i in range(num_comps[1] - 1):
-        #     jet_comp[i + 1] += jet_comp[num_comps[1]]
-        #     jet_comp = np.delete(jet_comp, num_comps[1], axis=0)
-
-        # '1 - normalised' gives the background strength
-        jet_comp = np.concatenate((jet_comp, (1 - jet_img)[None, :, :]))
         jets.append(jet_img)
-        if train_type == "clean":
-            jet_sum = np.sum(jet_comp[0:-1], axis=0, keepdims=True)
-            jet_comps.append(np.concatenate((jet_sum, jet_comp[-1:None]), axis=0))
-        else:
-            jet_comps.append(jet_comp)
 
-        # if train_type == "list":
-        #     # scale the parameters between 0 and 1
-        #     x /= img_size
-        #     y /= img_size
-        #     sx /= np.sqrt(2 * (num_comps[0])) * img_size / (5 * num_comps[0])
-        #     sy /= np.sqrt(2 * (num_comps[0])) * img_size / (5 * num_comps[0])
-        #     rotation /= 2 * np.pi
-        #     z_rotation /= 2 * np.pi
-
+        jet_comp = np.concatenate((jet_comp, (1 - jet_img)[None, :, :]))
         source_list = np.array([amp, x, y, sx, sy, rotation, z_rotation, beta]).T
 
-        # if train_type == "list":
-        #     source_list = source_list[source_list[:, 0].argsort()]
+        target = apply_train_type(train_type, jet_img, jet_comp, source_list)
 
-        source_lists.append(source_list)
-    return (
-        np.array(jets)[:, None, :, :],
-        np.array(jet_comps),
-        np.array(source_lists),
-    )
+        targets.append(target)
+
+    jets = np.array(jets)[:, None, :, :]
+    targets = np.array(targets)
+
+    return jets, targets
+
+
+def apply_train_type(train_type, jet_img, jet_comp, source_list):
+    """
+    Creating the y-data dependent on the training type.
+
+    Parameters
+    ----------
+    train_type: str
+        'list': returns the components attributes only
+        'gauss': returns all components, background and list
+        'clean': returns sum of components and background (usage for softmax)
+    jet_comps: ndarray
+        simulated jet components as an image
+    source_list:
+        attributes of jet components
+
+    Returns
+    -------
+    y: ndarray
+        output data
+    """
+    if train_type == 'list':
+        y = source_list
+    if train_type == 'gauss':
+        size = jet_comp.shape[-1]
+        list_to_add = np.empty((1, size, size))
+        list_to_add[:] = np.nan
+        list_to_add[:, 0:source_list.shape[0], 0:source_list.shape[1]] = source_list
+        y = np.concatenate((jet_comp, list_to_add))
+    if train_type == 'clean':
+        y = np.concatenate((jet_img[None], jet_comp[-1:None]))
+    return y
+
+
+def component_from_list(size, amp, x, y, sx, sy, rotation):
+    """
+    Creating jet components from a list of attributes.
+
+    Parameters
+    ----------
+    size: int
+        shape of the output image will be (size, size)
+    attributes: list or array
+        [amp, x, y, sx, sy, rotation]
+
+    Returns
+    -------
+    jet_comp: list of ndarray
+        all jet components stored in one list
+    """
+    jet_comp = []
+    for i in range(len(amp)):
+        if amp[i] == 0:
+            jet_comp += [np.zeros((size, size))]
+        else:
+            g = twodgaussian(
+                [amp[i], x[i], y[i], sx[i], sy[i], rotation[i]], size,
+            )
+            jet_comp += [g]
+    return jet_comp

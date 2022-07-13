@@ -10,7 +10,7 @@ mode = "jet"   # jet or survey
 outpath = "/net/big-tank/POOL/projects/radio/simulations/jet_components/testing/"
 
 [jet]
-training_type = "list"  # gauss or list or clean
+training_type = "gauss"  # gauss or list or clean
 num_jet_components = [3, 6]
 
 [survey]
