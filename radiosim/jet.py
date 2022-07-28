@@ -1,5 +1,5 @@
 import numpy as np
-from radiosim.utils import relativistic_boosting, pol2cart
+from radiosim.utils import relativistic_boosting, pol2cart, zoom_on_source
 from radiosim.gauss import twodgaussian
 
 
@@ -74,18 +74,18 @@ def create_jet(grid, num_comps, train_type):
                 r_factor = np.sqrt(2)
 
             # *0.8 so the component center is not on the edge
-            r = i / (comps - 1) * img_size / 2 * r_factor * np.sin(z_rotation) * 0.8
+            r = i / (comps - 1) * img_size / 2 * r_factor * np.sin(z_rotation) * 0.75
 
             # get the cartesian coordinates
             x[i], y[i] = np.array(pol2cart(r, y_rotation)) + center
 
             # width of gaussian, empirical
             sx[i], sy[i] = (
-                r_factor
+                img_size
+                / comps
+                * r_factor
                 * np.sqrt(i + 1)
-                * np.random.uniform(
-                    img_size / (8 * comps), img_size / (6 * comps), size=2,
-                )
+                / np.random.uniform(6, 8, size=2)
             )
 
             # rotation aligned with the jet angle, empirical
@@ -105,8 +105,13 @@ def create_jet(grid, num_comps, train_type):
         beta = np.append(beta, beta[1:])
 
         # creation of the image
-        jet_comp = component_from_list(img_size, amp, x, y, sx, sy, rotation)
+        jet_comp = np.array(component_from_list(img_size, amp, x, y, sx, sy, rotation))
         jet_img = np.sum(jet_comp, axis=0)
+        jet_img, jet_comp, zoom_factor = zoom_on_source(jet_img, jet_comp)
+        x = img_size / 2 + (x - img_size / 2) * zoom_factor
+        y = img_size / 2 + (y - img_size / 2) * zoom_factor
+        sx *= zoom_factor
+        sy *= zoom_factor
 
         # normalisation
         jet_max = jet_img.max()

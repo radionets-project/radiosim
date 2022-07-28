@@ -1,6 +1,7 @@
 import os
 import re
 import sys
+import cv2
 import h5py
 import toml
 import click
@@ -37,6 +38,7 @@ def create_grid(pixel, bundle_size):
 def relativistic_boosting(theta, beta):
     """
     Calculate relativistic boosting factor for a jet.
+
     Parameters
     ----------
     theta: float
@@ -57,6 +59,53 @@ def relativistic_boosting(theta, beta):
     boost_app = 1 / (gamma * (1 - beta * mu))
     boost_rec = 1 / (gamma * (1 + beta * mu))
     return boost_app, boost_rec
+
+
+def zoom_on_source(img, comp=None, max_amp=0.02):
+    """
+    Zoom on source to cut out irrelevant area. Shape will stay equal.
+
+    Parameters
+    ----------
+    img: 2D array
+        Image of the sky used to zoom on
+    comp: 3D array (n, (img))
+        Images of the components, same zooming as on img
+    max_amp: float
+        Maximal amplitude which will be at the edge of the image
+
+    Returns
+    -------
+    zoomed_img: ndarray
+        Image after zooming
+    zoom_factor: float
+        Zooming factor
+    """
+    # find farest outside column or row with amplitude > max_amp
+    mask = img > max_amp
+    mask_flip = np.flip(mask)
+
+    idx_left = np.argmax(np.sum(mask, axis=0) > 0)
+    idx_right = np.argmax(np.sum(mask_flip, axis=0) > 0)
+    idx_bottom = np.argmax(np.sum(mask, axis=1) > 0)
+    idx_top = np.argmax(np.sum(mask_flip, axis=1) > 0)
+    # print(idx_left, idx_right, idx_bottom, idx_top)
+    idx = np.min([idx_left, idx_right, idx_bottom, idx_top])
+    size = img.shape[0]
+    zoom_factor = size / (size - 2 * idx)
+
+    # crop the source
+    cropped_img = img[idx:size-idx, idx:size-idx]
+    zoomed_img = cv2.resize(cropped_img, dsize=(size, size), interpolation=cv2.INTER_CUBIC)
+
+    if comp is not None:
+        cropped_comp = comp[:, idx:size-idx, idx:size-idx]
+        zoomed_comp = np.empty_like(comp)
+        for i, component in enumerate(cropped_comp):
+            zoomed_comp[i] = cv2.resize(component, dsize=(size, size), interpolation=cv2.INTER_CUBIC)
+        return zoomed_img, zoomed_comp, zoom_factor
+
+    return zoomed_img, zoom_factor
 
 
 def check_outpath(outpath, quiet=False):
