@@ -1,5 +1,5 @@
 import numpy as np
-from radiosim.utils import relativistic_boosting, pol2cart, zoom_on_source
+from radiosim.utils import relativistic_boosting, pol2cart, zoom_on_source, zoom_out
 from radiosim.gauss import twodgaussian
 
 
@@ -27,7 +27,7 @@ def create_jet(grid, num_comps, train_type):
         components. A jet with counter jet has c*2-1 components, since the center
         appears only once. Adding one channel for the backgound gives c*2 channels.
     source_lists: ndarray
-        array which stores all (six) properties of each component, shape: [n, c*2-1, 6]
+        array which stores all (seven) properties of each component, shape: [n, c*2-1, 7]
     """
     if len(grid.shape) == 3:
         grid = grid[None]
@@ -73,8 +73,8 @@ def create_jet(grid, num_comps, train_type):
             else:
                 r_factor = np.sqrt(2)
 
-            # *0.8 so the component center is not on the edge
-            r = i / (comps - 1) * img_size / 2 * r_factor * np.sin(z_rotation) * 0.75
+            # *0.7 so the last component is not on the edge
+            r = i / (comps - 1) * img_size / 2 * r_factor * np.sin(z_rotation) * 0.7
 
             # get the cartesian coordinates
             x[i], y[i] = np.array(pol2cart(r, y_rotation)) + center
@@ -93,11 +93,13 @@ def create_jet(grid, num_comps, train_type):
 
         # print('Velocity of the jet:', beta)
         boost_app, boost_rec = relativistic_boosting(z_rotation, beta)
+        center_shift_x = np.random.uniform(-img_size / 20, img_size / 20)
+        center_shift_y = np.random.uniform(-img_size / 20, img_size / 20)
 
         # mirror the data for the counter jet
         amp = np.concatenate((amp * boost_app, amp[1:] * boost_rec[1:]))
-        x = np.append(x, img_size - x[1:])
-        y = np.append(y, img_size - y[1:])
+        x = np.append(x + center_shift_x, img_size - x[1:] + center_shift_x)
+        y = np.append(y + center_shift_y, img_size - y[1:] + center_shift_y)
         sx = np.append(sx, sx[1:])
         sy = np.append(sy, sy[1:])
         rotation = np.append(rotation, rotation[1:])
@@ -107,11 +109,22 @@ def create_jet(grid, num_comps, train_type):
         # creation of the image
         jet_comp = np.array(component_from_list(img_size, amp, x, y, sx, sy, rotation))
         jet_img = np.sum(jet_comp, axis=0)
+
+        # zoom on source to equalize size differences from z-rotation
         jet_img, jet_comp, zoom_factor = zoom_on_source(jet_img, jet_comp)
         x = img_size / 2 + (x - img_size / 2) * zoom_factor
         y = img_size / 2 + (y - img_size / 2) * zoom_factor
         sx *= zoom_factor
         sy *= zoom_factor
+
+        # random zoom out for more variance
+        zoom_out_factor = np.random.uniform(1 / 8, 1) # 8: pad eg. 128 -> 1024
+        pad_value = (1 / zoom_out_factor - 1) * img_size / 2
+        jet_img, jet_comp = zoom_out(jet_img, jet_comp, pad_value=pad_value)
+        x = img_size / 2 + (x - img_size / 2) * zoom_out_factor
+        y = img_size / 2 + (y - img_size / 2) * zoom_out_factor
+        sx *= zoom_out_factor
+        sy *= zoom_out_factor
 
         # normalisation
         jet_max = jet_img.max()
@@ -122,7 +135,7 @@ def create_jet(grid, num_comps, train_type):
         jets.append(jet_img)
 
         jet_comp = np.concatenate((jet_comp, (1 - jet_img)[None, :, :]))
-        source_list = np.array([amp, x, y, sx, sy, rotation, z_rotation, beta]).T
+        source_list = np.array([amp, x, y, sx, sy, z_rotation, beta]).T
 
         target = apply_train_type(train_type, jet_img, jet_comp, source_list)
 

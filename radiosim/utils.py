@@ -61,7 +61,7 @@ def relativistic_boosting(theta, beta):
     return boost_app, boost_rec
 
 
-def zoom_on_source(img, comp=None, max_amp=0.02):
+def zoom_on_source(img, comp=None, max_amp=0.01):
     """
     Zoom on source to cut out irrelevant area. Shape will stay equal.
 
@@ -96,16 +96,49 @@ def zoom_on_source(img, comp=None, max_amp=0.02):
 
     # crop the source
     cropped_img = img[idx:size-idx, idx:size-idx]
-    zoomed_img = cv2.resize(cropped_img, dsize=(size, size), interpolation=cv2.INTER_CUBIC)
+    zoomed_img = cv2.resize(cropped_img, dsize=(size, size), interpolation=cv2.INTER_LINEAR)
 
     if comp is not None:
         cropped_comp = comp[:, idx:size-idx, idx:size-idx]
         zoomed_comp = np.empty_like(comp)
         for i, component in enumerate(cropped_comp):
-            zoomed_comp[i] = cv2.resize(component, dsize=(size, size), interpolation=cv2.INTER_CUBIC)
+            zoomed_comp[i] = cv2.resize(component, dsize=(size, size), interpolation=cv2.INTER_LINEAR)
         return zoomed_img, zoomed_comp, zoom_factor
 
     return zoomed_img, zoom_factor
+
+
+def zoom_out(img, comp=None, pad_value=0):
+    """
+    Zoom out of an image. Padding edges with zeros.
+
+    Parameters
+    ----------
+    img: 2D array
+        Image of the sky
+    comp: 3D array (n, (img))
+        Images of the components
+    pad_value: int
+        Number of pixels to pad around the source
+
+    Returns
+    -------
+    zoomed_img: ndarray
+        Image after zooming
+    zoomed_comp: ndarray
+        Componets after zooming
+    """
+    if not isinstance(pad_value, int):
+        pad_value = np.int(pad_value)
+    size = img.shape[0]
+    img = cv2.resize(np.pad(img, pad_value), dsize=(size, size), interpolation=cv2.INTER_LINEAR)
+
+    if comp is not None:
+        for component in comp:
+            component = cv2.resize(np.pad(component, pad_value), dsize=(size, size), interpolation=cv2.INTER_LINEAR)
+        return img, comp
+
+    return img
 
 
 def check_outpath(outpath, quiet=False):
