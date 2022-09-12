@@ -129,7 +129,7 @@ def zoom_out(img, comp=None, pad_value=0):
         Componets after zooming
     """
     if not isinstance(pad_value, int):
-        pad_value = np.int(pad_value)
+        pad_value = np.int64(pad_value)
     size = img.shape[0]
     img = cv2.resize(np.pad(img, pad_value), dsize=(size, size), interpolation=cv2.INTER_LINEAR)
 
