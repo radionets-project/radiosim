@@ -47,7 +47,7 @@ def create_jet(grid, num_comps, train_type):
         rotation = np.zeros(num_comps[1])
 
         # velocity in units of c_0, initialise velocity of first component
-        beta = np.zeros(num_comps[1]) 
+        beta = np.zeros(num_comps[1])
         beta[1] = np.random.uniform(0, 1)
         y_rotation = np.random.uniform(0, np.pi)
         z_rotation = np.random.uniform(0, np.pi / 2)
@@ -85,7 +85,7 @@ def create_jet(grid, num_comps, train_type):
                 / comps
                 * r_factor
                 * np.sqrt(i + 1)
-                / np.random.uniform(6, 8, size=2)
+                / np.random.uniform(4, 8, size=2)
             )
 
             # rotation aligned with the jet angle, empirical
@@ -93,18 +93,30 @@ def create_jet(grid, num_comps, train_type):
 
         # print('Velocity of the jet:', beta)
         boost_app, boost_rec = relativistic_boosting(z_rotation, beta)
+
         center_shift_x = np.random.uniform(-img_size / 20, img_size / 20)
         center_shift_y = np.random.uniform(-img_size / 20, img_size / 20)
 
         # mirror the data for the counter jet
-        amp = np.concatenate((amp * boost_app, amp[1:] * boost_rec[1:]))
-        x = np.append(x + center_shift_x, img_size - x[1:] + center_shift_x)
-        y = np.append(y + center_shift_y, img_size - y[1:] + center_shift_y)
-        sx = np.append(sx, sx[1:])
-        sy = np.append(sy, sy[1:])
-        rotation = np.append(rotation, rotation[1:])
-        z_rotation = np.repeat(z_rotation, 2 * num_comps[1] - 1)
-        beta = np.append(beta, beta[1:])
+        # random drop of counter jet, because the relativistic boosting only does not create clear one-sided jets
+        if 0.3 < np.random.rand():
+            amp = np.concatenate((amp * boost_app, amp[1:] * boost_rec[1:]))
+            x = np.concatenate((x + center_shift_x, img_size - x[1:] + center_shift_x))
+            y = np.concatenate((y + center_shift_y, img_size - y[1:] + center_shift_y))
+            sx = np.concatenate((sx, sx[1:]))
+            sy = np.concatenate((sy, sy[1:]))
+            rotation = np.concatenate((rotation, rotation[1:]))
+            z_rotation = np.repeat(z_rotation, 2 * num_comps[1] - 1)
+            beta = np.concatenate((beta, beta[1:]))
+        else:
+            amp = np.concatenate((amp * boost_app, np.zeros(num_comps[1] - 1)))
+            x = np.concatenate((x + center_shift_x, np.zeros(num_comps[1] - 1)))
+            y = np.concatenate((y + center_shift_y, np.zeros(num_comps[1] - 1)))
+            sx = np.concatenate((sx, np.zeros(num_comps[1] - 1)))
+            sy = np.concatenate((sy, np.zeros(num_comps[1] - 1)))
+            rotation = np.concatenate((rotation, np.zeros(num_comps[1] - 1)))
+            z_rotation = np.repeat(z_rotation, 2 * num_comps[1] - 1)
+            beta = np.concatenate((beta, np.zeros(num_comps[1] - 1)))
 
         # creation of the image
         jet_comp = np.array(component_from_list(img_size, amp, x, y, sx, sy, rotation))
@@ -118,7 +130,7 @@ def create_jet(grid, num_comps, train_type):
         sy *= zoom_factor
 
         # random zoom out for more variance
-        zoom_out_factor = np.random.uniform(1 / 8, 1) # 8: pad eg. 128 -> 1024
+        zoom_out_factor = np.random.uniform(1 / 8, 1)  # 8: pad eg. 128 -> 1024
         pad_value = (1 / zoom_out_factor - 1) * img_size / 2
         jet_img, jet_comp = zoom_out(jet_img, jet_comp, pad_value=pad_value)
         x = img_size / 2 + (x - img_size / 2) * zoom_out_factor
@@ -167,15 +179,15 @@ def apply_train_type(train_type, jet_img, jet_comp, source_list):
     y: ndarray
         output data
     """
-    if train_type == 'list':
+    if train_type == "list":
         y = source_list
-    if train_type == 'gauss':
+    if train_type == "gauss":
         size = jet_comp.shape[-1]
         list_to_add = np.empty((1, size, size))
         list_to_add[:] = np.nan
-        list_to_add[:, 0:source_list.shape[0], 0:source_list.shape[1]] = source_list
+        list_to_add[:, 0 : source_list.shape[0], 0 : source_list.shape[1]] = source_list
         y = np.concatenate((jet_comp, list_to_add))
-    if train_type == 'clean':
+    if train_type == "clean":
         y = np.concatenate((jet_img[None], jet_comp[-1:None]))
     return y
 
@@ -202,7 +214,8 @@ def component_from_list(size, amp, x, y, sx, sy, rotation):
             jet_comp += [np.zeros((size, size))]
         else:
             g = twodgaussian(
-                [amp[i], x[i], y[i], sx[i], sy[i], rotation[i]], size,
+                [amp[i], x[i], y[i], sx[i], sy[i], rotation[i]],
+                size,
             )
             jet_comp += [g]
     return jet_comp
