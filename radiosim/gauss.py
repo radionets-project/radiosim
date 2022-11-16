@@ -44,7 +44,6 @@ def twodgaussian(params: list, size: int):
     Returns a 2d gaussian function of the form:
     x' = np.cos(rot) * x - np.sin(rot) * y
     y' = np.sin(rot) * x + np.cos(rot) * y
-    (rot should be in degrees)
     g = a * np.exp ( - ( ((x-center_x)/width_x)**2 +
     ((y-center_y)/width_y)**2 ) / 2 )
 

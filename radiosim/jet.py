@@ -79,14 +79,14 @@ def create_jet(grid, num_comps, train_type):
             # get the cartesian coordinates
             x[i], y[i] = np.array(pol2cart(r, y_rotation)) + center
 
-            # width of gaussian, empirical
-            sx[i], sy[i] = (
+            # width of gaussian, empirical, sx > sy because rotation up to pi 'changes' this property - fixed to have consistency
+            sx[i], sy[i] = np.sort((
                 img_size
                 / comps
                 * r_factor
                 * np.sqrt(i + 1)
                 / np.random.uniform(4, 8, size=2)
-            )
+            ))[::-1]
 
             # rotation aligned with the jet angle, empirical
             rotation[i] = y_rotation + np.random.normal(0, np.pi / 18)
@@ -130,7 +130,7 @@ def create_jet(grid, num_comps, train_type):
         sy *= zoom_factor
 
         # random zoom out for more variance
-        zoom_out_factor = np.random.uniform(1 / 8, 1)  # 8: pad eg. 128 -> 1024
+        zoom_out_factor = np.random.uniform(1 / 2, 1)  # 1/8: pad eg. 128 -> 1024
         pad_value = (1 / zoom_out_factor - 1) * img_size / 2
         jet_img, jet_comp = zoom_out(jet_img, jet_comp, pad_value=pad_value)
         x = img_size / 2 + (x - img_size / 2) * zoom_out_factor
@@ -147,7 +147,7 @@ def create_jet(grid, num_comps, train_type):
         jets.append(jet_img)
 
         jet_comp = np.concatenate((jet_comp, (1 - jet_img)[None, :, :]))
-        source_list = np.array([amp, x, y, sx, sy, z_rotation, beta]).T
+        source_list = np.array([amp, x, y, sx, sy, rotation, z_rotation, beta]).T
 
         target = apply_train_type(train_type, jet_img, jet_comp, source_list)
 

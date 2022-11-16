@@ -7,11 +7,11 @@ quiet = true
 mode = "jet"   # jet or survey
 
 [paths]
-outpath = "/net/big-tank/POOL/projects/radio/simulations/jet_components/220912_n10000_s512/"
+outpath = "/net/big-tank/POOL/projects/radio/simulations/jet_components/221024_n20000_s256/"
 
 [jet]
 training_type = "list"  # gauss or list or clean
-num_jet_components = [2, 7]
+num_jet_components = [3, 10]
 
 [survey]
 num_sources = 20
@@ -20,10 +20,10 @@ class_distribution = [2, 1, 2]   # average share of each source in the images
 scale_sources = true
 
 [image_options]
-bundles_train = 100
+bundles_train = 200
 bundles_valid = 20
-bundles_test = 10
+bundles_test = 20
 bundle_size = 100
-img_size = 512
+img_size = 256
 noise = true
-noise_level = 15    # maximum intensity of noise in percent
+noise_level = 10    # maximum intensity of noise in percent
