@@ -54,7 +54,7 @@ def create_sky_distribution(
             )
         elif mode == "survey":
             sky, sky_classes, source_list = create_survey(
-                grid, num_sources, class_distribution, scale_sources
+                grid, num_sources, class_distribution, scale_sources, scaling
             )
         else:
             click.echo("Given mode not found. Choose 'survey' or 'jet' in config file")

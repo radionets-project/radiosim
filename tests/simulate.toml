@@ -12,6 +12,7 @@ outpath = "./tests/build/data/"
 [jet]
 training_type = "gauss"  # gauss or list or clean
 num_jet_components = [3, 6]
+scaling = "normalize"
 
 [survey]
 num_sources = 20

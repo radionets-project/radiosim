@@ -3,7 +3,9 @@ from radiosim.gauss import twodgaussian
 from radiosim.jet import create_jet
 
 
-def create_survey(grid, num_sources, class_distribution, scale_sources=False):
+def create_survey(
+    grid, num_sources, class_distribution, scale_sources=False, scaling="normalize"
+):
     """
     Creates a clean survey with all its components written in a list. It contains
     serveral classes:
@@ -55,7 +57,10 @@ def create_survey(grid, num_sources, class_distribution, scale_sources=False):
                 num_comps = [4, 7]
                 x, y = np.random.rand(2) * img_size
                 jet, _, jet_list = create_jet(
-                    img[0:1, 0:jet_size, 0:jet_size], num_comps, "gauss"
+                    img[0:1, 0:jet_size, 0:jet_size],
+                    num_comps,
+                    "gauss",
+                    scaling,
                 )
                 posx_min = int(np.floor(x - jet_size / 2))
                 posx_max = int(np.floor(x + jet_size / 2))
