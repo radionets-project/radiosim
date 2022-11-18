@@ -26,6 +26,7 @@ def simulate_sky_distributions(sim_conf):
             noise=sim_conf["noise"],
             noise_level=sim_conf["noise_level"],
             option=opt,
+            scaling=sim_conf["scaling"],
         )
 
 
@@ -43,11 +44,14 @@ def create_sky_distribution(
     noise,
     noise_level,
     option,
+    scaling,
 ):
     for i in tqdm(range(num_bundles)):
         grid = create_grid(img_size, bundle_size)
         if mode == "jet":
-            sky, sky_classes, source_list = create_jet(grid, num_jet_comps, train_type)
+            sky, sky_classes, source_list = create_jet(
+                grid, num_jet_comps, train_type, scaling
+            )
         elif mode == "survey":
             sky, sky_classes, source_list = create_survey(
                 grid, num_sources, class_distribution, scale_sources
