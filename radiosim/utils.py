@@ -30,7 +30,11 @@ def create_grid(pixel, bundle_size):
     y = np.linspace(0, pixel - 1, num=pixel)
     X, Y = np.meshgrid(x, y)
     grid = np.array([np.zeros(X.shape) + 1e-10, X, Y])
-    grid = np.repeat(grid[None, :, :, :], bundle_size, axis=0,)
+    grid = np.repeat(
+        grid[None, :, :, :],
+        bundle_size,
+        axis=0,
+    )
     return grid
 
 
@@ -121,6 +125,7 @@ def read_config(config):
     sim_conf["outpath"] = config["paths"]["outpath"]
     sim_conf["training_type"] = config["jet"]["training_type"]
     sim_conf["num_jet_components"] = config["jet"]["num_jet_components"]
+    sim_conf["scaling"] = config["jet"]["scaling"]
     sim_conf["num_sources"] = config["survey"]["num_sources"]
     sim_conf["class_distribution"] = config["survey"]["class_distribution"]
     sim_conf["scale_sources"] = config["survey"]["scale_sources"]
