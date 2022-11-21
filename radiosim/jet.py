@@ -1,9 +1,10 @@
 import numpy as np
 from radiosim.utils import get_exp, pol2cart
 from radiosim.gauss import twodgaussian
+from radiosim.flux_scaling import get_start_amp
 
 
-def create_jet(grid, num_comps, train_type):
+def create_jet(grid, num_comps, train_type, scaling):
     """
     Creates the clean jets with all its components written in a list. Dependend on the
     'train_type' the components will be seperated or summed up.
@@ -78,7 +79,9 @@ def create_jet(grid, num_comps, train_type):
                 r_factor
                 * np.sqrt(i + 1)
                 * np.random.uniform(
-                    img_size / (8 * comps), img_size / (6 * comps), size=2,
+                    img_size / (8 * comps),
+                    img_size / (6 * comps),
+                    size=2,
                 )
             )
 
@@ -87,6 +90,8 @@ def create_jet(grid, num_comps, train_type):
 
         # mirror the data for the counter jet
         amp = np.append(amp, amp[1:] * get_exp())
+        if scaling == "mojave":
+            amp *= get_start_amp("mojave")
         x = np.append(x, img_size - x[1:])
         y = np.append(y, img_size - y[1:])
         sx = np.append(sx, sx[1:])
@@ -102,16 +107,18 @@ def create_jet(grid, num_comps, train_type):
                 jet_comp += [np.zeros((img_size, img_size))]
             else:
                 g = twodgaussian(
-                    [amp[i], x[i], y[i], sx[i], sy[i], rotation[i]], img_size,
+                    [amp[i], x[i], y[i], sx[i], sy[i], rotation[i]],
+                    img_size,
                 )
                 jet_comp += [g]
                 jet_img += g
 
         # normalisation
-        jet_max = jet_img.max()
-        jet_img /= jet_max
-        jet_comp /= jet_max
-        amp /= jet_max
+        if scaling == "normalize":
+            jet_max = jet_img.max()
+            jet_img /= jet_max
+            jet_comp /= jet_max
+            amp /= jet_max
 
         # sum over the 'symmetric' components
         for i in range(num_comps[1] - 1):
