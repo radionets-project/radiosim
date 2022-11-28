@@ -1,9 +1,10 @@
 import numpy as np
 from radiosim.utils import relativistic_boosting, pol2cart, zoom_on_source, zoom_out
 from radiosim.gauss import twodgaussian
+from radiosim.flux_scaling import get_start_amp
 
 
-def create_jet(grid, num_comps, train_type):
+def create_jet(grid, num_comps, train_type, scaling):
     """
     Creates the clean jets with all its components written in a list. Dependend on the
     'train_type' the components will be seperated or summed up.
@@ -16,6 +17,8 @@ def create_jet(grid, num_comps, train_type):
         list of two number: min number of components and max number of components
     train_type: str
         determines the purpose of the simulations. Can be 'gauss', 'list' or 'clean'
+    scaling: str
+        scaling of the image. Can be 'normalize' or 'mojave'
 
     Returns
     -------
@@ -97,6 +100,9 @@ def create_jet(grid, num_comps, train_type):
         center_shift_x = np.random.uniform(-img_size / 20, img_size / 20)
         center_shift_y = np.random.uniform(-img_size / 20, img_size / 20)
 
+        if scaling == "mojave":
+            amp *= get_start_amp("mojave")
+
         # mirror the data for the counter jet
         # random drop of counter jet, because the relativistic boosting only does not create clear one-sided jets
         if 0.3 < np.random.rand():
@@ -139,10 +145,11 @@ def create_jet(grid, num_comps, train_type):
         sy *= zoom_out_factor
 
         # normalisation
-        jet_max = jet_img.max()
-        jet_img /= jet_max
-        jet_comp /= jet_max
-        amp /= jet_max
+        if scaling == "normalize":
+            jet_max = jet_img.max()
+            jet_img /= jet_max
+            jet_comp /= jet_max
+            amp /= jet_max
 
         jets.append(jet_img)
 
