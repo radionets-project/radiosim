@@ -12,6 +12,7 @@ outpath = "/net/big-tank/POOL/projects/radio/simulations/jet_components/221024_n
 [jet]
 training_type = "list"  # gauss or list or clean
 num_jet_components = [3, 10]
+scaling = "normalize"
 
 [survey]
 num_sources = 20
