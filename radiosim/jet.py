@@ -58,6 +58,8 @@ def create_jet(grid, num_comps, train_type, scaling):
         for i in range(comps):
             # amplitude decreases for more distant components, empirical
             amp[i] = np.exp(-np.sqrt(i) * np.random.normal(1.3, 0.2))
+            if i > 0 and np.random.rand() < 0.1:  # drop some components
+                amp[i] = 0
 
             # velocity decreases for more distant components, empirical
             if i >= 2:
@@ -105,7 +107,7 @@ def create_jet(grid, num_comps, train_type, scaling):
 
         # mirror the data for the counter jet
         # random drop of counter jet, because the relativistic boosting only does not create clear one-sided jets
-        if 0.3 < np.random.rand():
+        if np.random.rand() < 0.3:
             amp = np.concatenate((amp * boost_app, amp[1:] * boost_rec[1:]))
             x = np.concatenate((x + center_shift_x, img_size - x[1:] + center_shift_x))
             y = np.concatenate((y + center_shift_y, img_size - y[1:] + center_shift_y))
