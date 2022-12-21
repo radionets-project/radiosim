@@ -14,15 +14,15 @@ keywords:
 repository-code: "https://github.com/radionets-project/radiosim"
 license: "MIT License"
 authors:
-- family-names: Felix
-  given-names: Geyer
+- family-names: Schmidt
+  given-names: Kevin
   affiliation: "TU Dortmund University, Germany"
-  # orcid: "https://orcid.org/0000-0000-0000-0000"
-- family-names: Arne
-  given-names: Poggenpohl
+  orcid: "https://orcid.org/0000-0002-9883-4454"
+- family-names: Geyer
+  given-names: Felix
   affiliation: "TU Dortmund University, Germany"
-  # orcid: "https://orcid.org/0000-0000-0000-0000"
-- family-names: Kevin
-  given-names: Schmidt
+  orcid: "https://orcid.org/0000-0002-5615-2498"
+- family-names: Poggenpohl
+  given-names: Arne
   affiliation: "TU Dortmund University, Germany"
-  # orcid: "https://orcid.org/0000-0000-0000-0000"
+  orcid: "https://orcid.org/0000-0002-0746-4735"
