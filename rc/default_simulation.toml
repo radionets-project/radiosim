@@ -10,8 +10,8 @@ mode = "jet"   # jet or survey
 outpath = "./build/example_data/"
 
 [jet]
-training_type = "gauss"  # gauss or list or clean
-num_jet_components = [3, 6]
+training_type = "list"  # gauss or list or clean
+num_jet_components = [3, 10]
 scaling = "normalize"
 
 [survey]
