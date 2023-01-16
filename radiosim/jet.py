@@ -197,7 +197,7 @@ def apply_train_type(train_type, jet_img, jet_comp, source_list):
         list_to_add[:, 0 : source_list.shape[0], 0 : source_list.shape[1]] = source_list
         y = np.concatenate((jet_comp, list_to_add))
     if train_type == "clean":
-        y = np.concatenate((jet_img[None], jet_comp[-1:None]))
+        y = jet_img[None]
     return y
 
 
