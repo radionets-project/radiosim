@@ -10,3 +10,4 @@
 *build
 
 .flake8
+*.pdf

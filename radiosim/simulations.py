@@ -49,17 +49,15 @@ def create_sky_distribution(
     for i in tqdm(range(num_bundles)):
         grid = create_grid(img_size, bundle_size)
         if mode == "jet":
-            sky, sky_classes, source_list = create_jet(
-                grid, num_jet_comps, train_type, scaling
-            )
+            sky, target = create_jet(grid, num_jet_comps, train_type, scaling)
         elif mode == "survey":
-            sky, sky_classes, source_list = create_survey(
+            sky, target = create_survey(
                 grid, num_sources, class_distribution, scale_sources, scaling
             )
         else:
             click.echo("Given mode not found. Choose 'survey' or 'jet' in config file")
         sky_bundle = sky.copy()
-        sky_classes_bundle = sky_classes.copy()
+        target_bundle = target.copy()
         if noise:
             sky_bundle = add_noise(sky_bundle, noise_level)
             for img in sky_bundle:
@@ -67,5 +65,5 @@ def create_sky_distribution(
                 img /= img.max()
         path = adjust_outpath(outpath, "/samp_" + option)
         save_sky_distribution_bundle(
-            path, train_type, sky_bundle, sky_classes_bundle, source_list
+            path, sky_bundle, target_bundle
         )

@@ -20,6 +20,7 @@ setup(
         "astropy",
         "pathlib",
         "pytest",
+        "opencv-python",
     ],
     setup_requires=["pytest-runner"],
     tests_require=["pytest"],
