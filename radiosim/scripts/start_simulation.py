@@ -8,20 +8,29 @@ from radiosim.simulations import simulate_sky_distributions
 @click.argument("configuration_path", type=click.Path(exists=True, dir_okay=False))
 @click.option(
     "--mode",
-    type=click.Choice(["simulate", "overview",], case_sensitive=False,),
+    type=click.Choice(
+        [
+            "simulate",
+            "overview",
+        ],
+        case_sensitive=False,
+    ),
     default="simulate",
 )
 def main(configuration_path, mode):
     config = toml.load(configuration_path)
-    sim_conf = read_config(config)
-    print(sim_conf, "\n")
+    conf = read_config(config)
+    print(conf, "\n")
 
     outpath = config["paths"]["outpath"]
-    sim_sources = check_outpath(outpath, quiet=config["general"]["quiet"],)
+    sim_sources = check_outpath(
+        outpath,
+        quiet=config["general"]["quiet"],
+    )
 
     if mode == "simulate":
         if sim_sources:
-            simulate_sky_distributions(sim_conf)
+            simulate_sky_distributions(conf)
 
 
 if __name__ == "__main__":

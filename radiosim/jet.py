@@ -4,7 +4,7 @@ from radiosim.gauss import twodgaussian
 from radiosim.flux_scaling import get_start_amp
 
 
-def create_jet(grid, num_comps, train_type, scaling):
+def create_jet(grid, conf):
     """
     Creates the clean jets with all its components written in a list. Dependend on the
     'train_type' the components will be seperated or summed up.
@@ -13,12 +13,8 @@ def create_jet(grid, num_comps, train_type, scaling):
     ----------
     grid: ndarray
         input grid of shape [n, 1, img_size, img_size] or [1, img_size, img_size]
-    num_comps: list
-        list of two number: min number of components and max number of components
-    train_type: str
-        determines the purpose of the simulations. Can be 'gauss', 'list' or 'clean'
-    scaling: str
-        scaling of the image. Can be 'normalize' or 'mojave'
+    conf:
+        loaded config file
 
     Returns
     -------
@@ -32,6 +28,8 @@ def create_jet(grid, num_comps, train_type, scaling):
     source_lists: ndarray
         array which stores all (seven) properties of each component, shape: [n, c*2-1, 7]
     """
+    num_comps = conf["num_jet_components"]
+
     if len(grid.shape) == 3:
         grid = grid[None]
 
@@ -39,7 +37,7 @@ def create_jet(grid, num_comps, train_type, scaling):
     center = img_size // 2
     jets = []
     targets = []
-    for img in grid:
+    for _ in grid:
         comps = np.random.randint(num_comps[0], num_comps[1] + 1)
 
         amp = np.zeros(num_comps[1])
@@ -48,6 +46,7 @@ def create_jet(grid, num_comps, train_type, scaling):
         sx = np.zeros(num_comps[1])
         sy = np.zeros(num_comps[1])
         rotation = np.zeros(num_comps[1])
+        rotation[0] = np.random.uniform(0, np.pi)
 
         # velocity in units of c_0, initialise velocity of first component
         beta = np.zeros(num_comps[1])
@@ -58,7 +57,7 @@ def create_jet(grid, num_comps, train_type, scaling):
         for i in range(comps):
             # amplitude decreases for more distant components, empirical
             amp[i] = np.exp(-np.sqrt(i) * np.random.normal(1.3, 0.2))
-            if i > 0 and np.random.rand() < 0.1:  # drop some components
+            if i >= 1 and np.random.rand() < 0.1:  # drop some components
                 amp[i] = 0
 
             # velocity decreases for more distant components, empirical
@@ -91,12 +90,13 @@ def create_jet(grid, num_comps, train_type, scaling):
                     / comps
                     * r_factor
                     * np.sqrt(i + 1)
-                    / np.random.uniform(4, 8, size=2)
+                    / np.random.uniform(3, 8, size=2)
                 )
             )[::-1]
 
             # rotation aligned with the jet angle, empirical
-            rotation[i] = y_rotation + np.random.normal(0, np.pi / 18)
+            if i >= 1:
+                rotation[i] = rotation[i - 1] + np.random.normal(0, np.pi / 18)
 
         # print('Velocity of the jet:', beta)
         boost_app, boost_rec = relativistic_boosting(z_rotation, beta)
@@ -104,7 +104,7 @@ def create_jet(grid, num_comps, train_type, scaling):
         center_shift_x = np.random.uniform(-img_size / 20, img_size / 20)
         center_shift_y = np.random.uniform(-img_size / 20, img_size / 20)
 
-        if scaling == "mojave":
+        if conf["scaling"] == "mojave":
             amp *= get_start_amp("mojave")
 
         # mirror the data for the counter jet
@@ -161,7 +161,7 @@ def create_jet(grid, num_comps, train_type, scaling):
             sy *= zoom_out_factor
 
         # normalisation
-        if scaling == "normalize":
+        if conf["scaling"] == "normalize":
             jet_max = jet_img.max()
             jet_img /= jet_max
             jet_comp /= jet_max
@@ -172,7 +172,7 @@ def create_jet(grid, num_comps, train_type, scaling):
         jet_comp = np.concatenate((jet_comp, (1 - jet_img)[None, :, :]))
         source_list = np.array([amp, x, y, sx, sy, rotation, z_rotation, beta]).T
 
-        target = apply_train_type(train_type, jet_img, jet_comp, source_list)
+        target = apply_train_type(conf["training_type"], jet_img, jet_comp, source_list)
 
         targets.append(target)
 

@@ -3,9 +3,7 @@ from radiosim.gauss import twodgaussian
 from radiosim.jet import create_jet
 
 
-def create_survey(
-    grid, num_sources, class_distribution, scale_sources=False, scaling="normalize"
-):
+def create_survey(grid, conf):
     """
     Creates a clean survey with all its components written in a list. It contains
     serveral classes:
@@ -17,13 +15,8 @@ def create_survey(
     ----------
     grid: 4darray
         input grid of shape [n, 3, img_size, img_size]
-    num_sources: int
-        number of total sources in the image (a jet counts as one source)
-    class_distribution: list
-        list determining the proportion between the classes, at least one element must
-        be > 0, e.g. [1, 0, 3.1415]
-    scale_sources: boolean
-        scaling the sources with the image size, default size is 1024
+    conf:
+        loaded config file
 
     Returns
     -------
@@ -36,6 +29,9 @@ def create_survey(
         array which stores all properties of each component, shape: [n, 1, 6]
         for each image the class label and its properties.
     """
+    class_distribution = conf["class_distribution"]
+    scale_sources = conf["scale_sources"]
+
     if len(grid.shape) == 3:
         grid = grid[None]
 
@@ -46,7 +42,7 @@ def create_survey(
     )
     # source_list = []
     for i_img, img in enumerate(grid):
-        for i_source in range(num_sources):
+        for _ in range(conf["num_sources"]):
             rand_class = np.random.uniform(0, sum(class_distribution))
 
             # create first class (jet)
@@ -55,11 +51,8 @@ def create_survey(
                     jet_size = np.random.randint(img_size / 10.24, img_size / 5.12)
                 else:
                     jet_size = np.random.randint(100, 200)
-                num_comps = [4, 7]
                 x, y = np.random.rand(2) * img_size
-                jet, _ = create_jet(
-                    img[0:1, 0:jet_size, 0:jet_size], num_comps, "gauss", scaling,
-                )
+                jet, _ = create_jet(img[0:1, 0:jet_size, 0:jet_size], conf)
                 posx_min = int(np.floor(x - jet_size / 2))
                 posx_max = int(np.floor(x + jet_size / 2))
                 posy_min = int(np.floor(y - jet_size / 2))
@@ -130,4 +123,5 @@ def create_survey(
     return (
         survey,
         survey_comps,
+        # source_lists,
     )
