@@ -4,6 +4,7 @@ title = "Simulation configuration"
 
 [general]
 quiet = true
+seed = inf # inf means no seed
 mode = "jet"   # jet or survey
 
 [paths]
