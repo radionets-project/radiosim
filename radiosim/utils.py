@@ -207,6 +207,7 @@ def read_config(config):
     """
     sim_conf = {}
     sim_conf["mode"] = config["general"]["mode"]
+    sim_conf["seed"] = config["general"]["seed"]
     sim_conf["outpath"] = config["paths"]["outpath"]
     sim_conf["training_type"] = config["jet"]["training_type"]
     sim_conf["num_jet_components"] = config["jet"]["num_jet_components"]
