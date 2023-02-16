@@ -53,6 +53,7 @@ def create_jet(grid, conf):
         beta[1] = np.random.uniform(0, 1)
         y_rotation = np.random.uniform(0, np.pi)
         z_rotation = np.random.uniform(0, np.pi / 2)
+        extension = np.random.uniform(-0.5, 0.5)
 
         for i in range(comps):
             # amplitude decreases for more distant components, empirical
@@ -89,8 +90,8 @@ def create_jet(grid, conf):
                     img_size
                     / comps
                     * r_factor
-                    * np.sqrt(i + 1)
-                    / np.random.uniform(3, 8, size=2)
+                    * (i + 1) ** extension
+                    / np.random.uniform(5, 8, size=2)
                 )
             )[::-1]
 
@@ -101,8 +102,8 @@ def create_jet(grid, conf):
         # print('Velocity of the jet:', beta)
         boost_app, boost_rec = relativistic_boosting(z_rotation, beta)
 
-        center_shift_x = np.random.uniform(-img_size / 20, img_size / 20)
-        center_shift_y = np.random.uniform(-img_size / 20, img_size / 20)
+        center_shift_x = np.random.uniform(-img_size / 50, img_size / 50)  # will increase when zooming in
+        center_shift_y = np.random.uniform(-img_size / 50, img_size / 50)  # will increase when zooming in
 
         if conf["scaling"] == "mojave":
             amp *= get_start_amp("mojave")
