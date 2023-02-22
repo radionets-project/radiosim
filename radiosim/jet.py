@@ -53,7 +53,7 @@ def create_jet(grid, conf):
         beta[1] = np.random.uniform(0, 1)
         y_rotation = np.random.uniform(0, np.pi)
         z_rotation = np.random.uniform(0, np.pi / 2)
-        extension = np.random.uniform(-0.5, 0.5)
+        extension = np.random.uniform(0, 0.5)
 
         for i in range(comps):
             # amplitude decreases for more distant components, empirical
@@ -91,7 +91,7 @@ def create_jet(grid, conf):
                     / comps
                     * r_factor
                     * (i + 1) ** extension
-                    / np.random.uniform(5, 8, size=2)
+                    / np.random.uniform(3, 6, size=2)
                 )
             )[::-1]
 
