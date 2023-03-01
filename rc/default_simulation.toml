@@ -5,6 +5,7 @@ title = "Simulation configuration"
 [general]
 quiet = true
 mode = "jet"   # jet or survey
+fits = true
 
 [paths]
 outpath = "./build/example_data/"

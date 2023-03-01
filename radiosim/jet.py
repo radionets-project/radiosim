@@ -26,7 +26,7 @@ def create_jet(grid, conf):
         components. A jet with counter jet has c*2-1 components, since the center
         appears only once. Adding one channel for the backgound gives c*2 channels.
     source_lists: ndarray
-        array which stores all (seven) properties of each component, shape: [n, c*2-1, 7]
+        array which stores all (seven) properties of each component, shape: [n, c*2-1, 8]
     """
     num_comps = conf["num_jet_components"]
 
