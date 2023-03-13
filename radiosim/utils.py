@@ -166,7 +166,7 @@ def check_outpath(outpath, quiet=False):
     path = Path(outpath)
     exists = path.exists()
     if exists is True:
-        formats = ['.h5', '.fits']
+        formats = [".h5", ".fits"]
         source = []
         for form in formats:
             source.extend(p for p in path.rglob("*samp*" + form) if p.is_file())
@@ -335,21 +335,28 @@ def save_sky_distribution_bundle(conf, opt, x, y, name_x="x", name_y="y"):
         hf.close()
 
     if conf["fits"] and opt == "test":
+        # header attributes needed for pybdsf
+        hdr = fits.Header()
+        hdr["CTYPE1"] = ("RA---SIN", "Axis name")
+        hdr["CDELT1"] = (-2.7777778241006E-08, "Pixel increment")
+        hdr["CTYPE2"] = ("DEC--SIN", "Axis name")
+        hdr["CDELT2"] = (2.7777778241006E-08, "Pixel increment")
+
         for i in range(len(x)):
             path_fits = adjust_outpath(conf["outpath"], "/samp_" + opt, form="fits")
             
-            hdu_x = fits.PrimaryHDU(x[i, 0])
+            hdu_x = fits.PrimaryHDU(data=x[i, 0], header=hdr)
             hdul = fits.HDUList([hdu_x])
 
             if conf["training_type"] == "list":
-                c1 = fits.Column(name='amplitude', array=y[i, :, 0], format='E')
-                c2 = fits.Column(name='x', array=y[i, :, 1], format='E')
-                c3 = fits.Column(name='y', array=y[i, :, 2], format='E')
-                c4 = fits.Column(name='sx', array=y[i, :, 3], format='E')
-                c5 = fits.Column(name='sy', array=y[i, :, 4], format='K')
-                c6 = fits.Column(name='rotation', array=y[i, :, 5], format='E')
-                c7 = fits.Column(name='z_rotation', array=y[i, :, 6], format='E')
-                c8 = fits.Column(name='beta', array=y[i, :, 7], format='E')
+                c1 = fits.Column(name="amplitude", array=y[i, :, 0], format="E")
+                c2 = fits.Column(name="x", array=y[i, :, 1], format="E")
+                c3 = fits.Column(name="y", array=y[i, :, 2], format="E")
+                c4 = fits.Column(name="sx", array=y[i, :, 3], format="E")
+                c5 = fits.Column(name="sy", array=y[i, :, 4], format="K")
+                c6 = fits.Column(name="rotation", array=y[i, :, 5], format="E")
+                c7 = fits.Column(name="z_rotation", array=y[i, :, 6], format="E")
+                c8 = fits.Column(name="beta", array=y[i, :, 7], format="E")
                 hdu_y = fits.BinTableHDU.from_columns([c1, c2, c3, c4, c5, c6, c7, c8])
                 if y.shape[-1] != len(hdu_y.columns):
                     print(f"Simulated columns: {y.shape[-1]} vs. Saved columns: {len(hdu_y.columns)}")
