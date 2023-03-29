@@ -304,7 +304,7 @@ def adjust_outpath(path, option, form="h5"):
     return out
 
 
-def save_sky_distribution_bundle(path, x, y, name_x="x", name_y="y"):
+def save_sky_distribution_bundle(path, x, y, z=[], name_x="x", name_y="y", name_z="z"):
     """
     Write images created in analysis to h5 file.
 
@@ -316,14 +316,20 @@ def save_sky_distribution_bundle(path, x, y, name_x="x", name_y="y"):
         image of the full jet, sum over all components
     y: ndarray
         images of components or list, depends on train_type
+    z: ndarry
+        images of components, if train_type = gausslist
     name_x: str
         name of the x-data
     name_y: str
         name of the y-data
+    name_z: str
+        name of the z-data
     """
     with h5py.File(path, "w") as hf:
         hf.create_dataset(name_x, data=x)
         hf.create_dataset(name_y, data=y)
+        if len(z)!=0:
+            hf.create_dataset(name_z, data=z)
         hf.close()
 
 

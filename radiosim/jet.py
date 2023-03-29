@@ -37,6 +37,7 @@ def create_jet(grid, conf):
     center = img_size // 2
     jets = []
     targets = []
+    components = []
     for _ in grid:
         comps = np.random.randint(num_comps[0], num_comps[1] + 1)
 
@@ -171,13 +172,20 @@ def create_jet(grid, conf):
 
         jet_comp = np.concatenate((jet_comp, (1 - jet_img)[None, :, :]))
         source_list = np.array([amp, x, y, sx, sy, rotation, z_rotation, beta]).T
-
-        target = apply_train_type(conf["training_type"], jet_img, jet_comp, source_list)
+        if conf["training_type"] == "gausslist":
+            target, component = apply_train_type(conf["training_type"], jet_img, jet_comp, source_list)
+            components.append(component)
+        else:
+            target = apply_train_type(conf["training_type"], jet_img, jet_comp, source_list)
 
         targets.append(target)
 
     jets = np.array(jets)[:, None, :, :]
     targets = np.array(targets)
+
+    if conf["training_type"] == "gausslist":
+        components = np.array(components)
+        return jets, targets, components
 
     return jets, targets
 
@@ -212,6 +220,14 @@ def apply_train_type(train_type, jet_img, jet_comp, source_list):
         y = np.concatenate((jet_comp, list_to_add))
     if train_type == "clean":
         y = jet_img[None]
+    if train_type == "gausslist":
+        size = jet_comp.shape[-1]
+        list_to_add = np.empty((1, size, size))
+        list_to_add[:] = np.nan
+        list_to_add[:, 0 : source_list.shape[0], 0 : source_list.shape[1]] = source_list
+        y = np.concatenate((jet_comp, list_to_add))
+        z = source_list
+        return y, z
     return y
 
 

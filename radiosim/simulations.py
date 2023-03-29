@@ -22,7 +22,10 @@ def create_sky_distribution(conf, opt: str):
     for _ in tqdm(range(conf["bundles_" + opt])):
         grid = create_grid(conf["img_size"], conf["bundle_size"])
         if conf["mode"] == "jet":
-            sky, target = create_jet(grid, conf)
+            if conf["training_type"] == "gausslist":
+                sky, target, components = create_jet(grid, conf)
+            else:
+                sky, target = create_jet(grid, conf)
         elif conf["mode"] == "survey":
             sky, target = create_survey(grid, conf)
         else:
@@ -30,10 +33,15 @@ def create_sky_distribution(conf, opt: str):
 
         sky_bundle = sky.copy()
         target_bundle = target.copy()
+        if conf["training_type"] == "gausslist":
+            components_bundle = components.copy()
         if conf["noise"] and conf["noise_level"] > 0:
             sky_bundle = add_noise(sky_bundle, conf["noise_level"])
             for img in sky_bundle:
                 img -= img.min()
                 img /= img.max()
         path = adjust_outpath(conf["outpath"], "/samp_" + opt)
-        save_sky_distribution_bundle(path, sky_bundle, target_bundle)
+        if conf["training_type"] == "gausslist":
+            save_sky_distribution_bundle(path, sky_bundle, target_bundle, components_bundle)
+        else:
+            save_sky_distribution_bundle(path, sky_bundle, target_bundle)
