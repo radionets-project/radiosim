@@ -21,6 +21,7 @@ setup(
         "pathlib",
         "pytest",
         "opencv-python",
+        "torch",
     ],
     setup_requires=["pytest-runner"],
     tests_require=["pytest"],
