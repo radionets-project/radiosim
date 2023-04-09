@@ -9,7 +9,6 @@ import numpy as np
 from pathlib import Path
 from scipy import signal
 from astropy.convolution import Gaussian2DKernel
-from astropy.io import fits
 
 
 def create_grid(pixel, bundle_size):
@@ -166,10 +165,7 @@ def check_outpath(outpath, quiet=False):
     path = Path(outpath)
     exists = path.exists()
     if exists is True:
-        formats = ['.h5', '.fits']
-        source = []
-        for form in formats:
-            source.extend(p for p in path.rglob("*samp*" + form) if p.is_file())
+        source = {p for p in path.rglob("*samp*.h5") if p.is_file()}
         if source:
             click.echo("Found existing source simulations!")
             if quiet:
@@ -211,7 +207,6 @@ def read_config(config):
     """
     sim_conf = {}
     sim_conf["mode"] = config["general"]["mode"]
-    sim_conf["fits"] = config["general"]["fits"]
     sim_conf["outpath"] = config["paths"]["outpath"]
     sim_conf["training_type"] = config["jet"]["training_type"]
     sim_conf["num_jet_components"] = config["jet"]["num_jet_components"]
@@ -308,16 +303,14 @@ def adjust_outpath(path, option, form="h5"):
     return out
 
 
-def save_sky_distribution_bundle(conf, opt, x, y, name_x="x", name_y="y"):
+def save_sky_distribution_bundle(path, x, y, name_x="x", name_y="y"):
     """
     Write images created in analysis to h5 file.
 
     Parameters
     ----------
-    conf: dict
-        configurations with all parameters
-    opt: str
-        dataset option (train, valid, test)
+    path: str
+        path to save file
     x: ndarray
         image of the full jet, sum over all components
     y: ndarray
@@ -327,44 +320,10 @@ def save_sky_distribution_bundle(conf, opt, x, y, name_x="x", name_y="y"):
     name_y: str
         name of the y-data
     """
-    path = adjust_outpath(conf["outpath"], "/samp_" + opt)
-
     with h5py.File(path, "w") as hf:
         hf.create_dataset(name_x, data=x)
         hf.create_dataset(name_y, data=y)
         hf.close()
-
-    if conf["fits"] and opt == "test":
-        for i in range(len(x)):
-            path_fits = adjust_outpath(conf["outpath"], "/samp_" + opt, form="fits")
-            
-            hdu_x = fits.PrimaryHDU(x[i, 0])
-            hdul = fits.HDUList([hdu_x])
-
-            if conf["training_type"] == "list":
-                c1 = fits.Column(name='amplitude', array=y[i, :, 0], format='E')
-                c2 = fits.Column(name='x', array=y[i, :, 1], format='E')
-                c3 = fits.Column(name='y', array=y[i, :, 2], format='E')
-                c4 = fits.Column(name='sx', array=y[i, :, 3], format='E')
-                c5 = fits.Column(name='sy', array=y[i, :, 4], format='K')
-                c6 = fits.Column(name='rotation', array=y[i, :, 5], format='E')
-                c7 = fits.Column(name='z_rotation', array=y[i, :, 6], format='E')
-                c8 = fits.Column(name='beta', array=y[i, :, 7], format='E')
-                hdu_y = fits.BinTableHDU.from_columns([c1, c2, c3, c4, c5, c6, c7, c8])
-                if y.shape[-1] != len(hdu_y.columns):
-                    print(f"Simulated columns: {y.shape[-1]} vs. Saved columns: {len(hdu_y.columns)}")
-                hdul.append(hdu_y)
-
-            elif conf["training_type"] == "clean":
-                hdu_y = fits.ImageHDU(y[i, 0], name=name_y)
-                hdul.append(hdu_y)
-
-            elif conf["training_type"] == "gauss":
-                for j in range(y.shape[1]):
-                    hdu_y = fits.ImageHDU(y[i, j], name=name_y + str(j))
-                    hdul.append(hdu_y)
-
-            hdul.writeto(path_fits, overwrite=True)
 
 
 def cart2pol(x: float, y: float):

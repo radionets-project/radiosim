@@ -3,6 +3,7 @@ from tqdm import tqdm
 from radiosim.utils import (
     create_grid,
     add_noise,
+    adjust_outpath,
     save_sky_distribution_bundle,
 )
 from radiosim.jet import create_jet
@@ -34,5 +35,5 @@ def create_sky_distribution(conf, opt: str):
             for img in sky_bundle:
                 img -= img.min()
                 img /= img.max()
-
-        save_sky_distribution_bundle(conf, opt, sky_bundle, target_bundle)
+        path = adjust_outpath(conf["outpath"], "/samp_" + opt)
+        save_sky_distribution_bundle(path, sky_bundle, target_bundle)
