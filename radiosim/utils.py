@@ -206,7 +206,9 @@ def read_config(config):
         unpacked configurations
     """
     sim_conf = {}
+    sim_conf["quiet"] = config["general"]["quiet"]
     sim_conf["mode"] = config["general"]["mode"]
+    sim_conf["multiprocessing"] = config["general"]["multiprocessing"]
     sim_conf["outpath"] = config["paths"]["outpath"]
     sim_conf["training_type"] = config["jet"]["training_type"]
     sim_conf["num_jet_components"] = config["jet"]["num_jet_components"]

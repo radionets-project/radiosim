@@ -4,7 +4,8 @@ title = "Simulation configuration"
 
 [general]
 quiet = true
-mode = "jet"   # jet or survey
+mode = "jet"            # jet or survey
+multiprocessing = true  # no progress bar (to be implemented)
 
 [paths]
 outpath = "./build/example_data/"

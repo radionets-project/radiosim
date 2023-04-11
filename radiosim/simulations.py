@@ -28,19 +28,24 @@ class create_sky_distribution:
     def __call__(self):
         n_bundels = self.conf["bundles_" + self.opt]
         n_cores = int(multiprocessing.cpu_count() * 0.5)  # use 50% of available cores
-        print("Number of cpu cores:", n_cores)
-
-        if n_cores == 1:
+        if n_cores == 1 or not self.conf["multiprocessing"]:
             for _ in tqdm(range(n_bundels)):
-                self.multiprocessing_func(0)
+                self.sky_distribution(0)
         else:
             print()
             with multiprocessing.Pool(n_cores) as p:
-                # r = list(tqdm(p.imap(self.multiprocessing_func, range(n_bundels)), total=n_bundels))  # sometimes leads to error in tqdm: BlockingIOError: [Errno 11] Unable to create file (unable to lock file, errno = 11, error message = 'Resource temporarily unavailable')
-                for _ in p.imap(self.multiprocessing_func, range(n_bundels)):
+                # r = list(tqdm(p.imap(self.sky_distribution, range(n_bundels)), total=n_bundels))  # sometimes leads to error in tqdm: BlockingIOError: [Errno 11] Unable to create file (unable to lock file, errno = 11, error message = 'Resource temporarily unavailable')
+                for _ in p.imap(self.sky_distribution, range(n_bundels)):
                     continue
 
-    def multiprocessing_func(self, _):
+    def sky_distribution(self, _):
+        """Create and save the sky distribution
+        
+        Parameters
+        ----------
+        _: Any
+            dummy parameter needed for 'imap' method of multiprocessing
+        """
         grid = create_grid(self.conf["img_size"], self.conf["bundle_size"])
         if self.conf["mode"] == "jet":
             sky, target = create_jet(grid, self.conf)
