@@ -95,7 +95,7 @@ def create_jet(grid, conf):
                 )
             )[::-1]
 
-            # rotation aligned with the jet angle, empirical
+            # rotation of the gauss component, empirical
             if i >= 1:
                 rotation[i] = rotation[i - 1] + np.random.normal(0, np.pi / 18)
 
@@ -110,7 +110,7 @@ def create_jet(grid, conf):
 
         # mirror the data for the counter jet
         # random drop of counter jet, because the relativistic boosting only does not create clear one-sided jets
-        if np.random.rand() < 0.3:
+        if np.random.rand() < 0.5:
             amp = np.concatenate((amp * boost_app, amp[1:] * boost_rec[1:]))
             x = np.concatenate((x + center_shift_x, img_size - x[1:] + center_shift_x))
             y = np.concatenate((y + center_shift_y, img_size - y[1:] + center_shift_y))

@@ -33,11 +33,24 @@ class create_sky_distribution:
                 self.sky_distribution(0)
         else:
             print()
+            # with multiprocessing.Pool(n_cores) as p:
+            #     with tqdm(total=n_bundels) as pbar:
+            #         for _ in p.imap(self.sky_distribution, range(n_bundels)):
+            #             pbar.update()
+            #             # p.close()
+            #             # p.join()
+
             with multiprocessing.Pool(n_cores) as p:
-                _ = list(tqdm(p.imap(self.sky_distribution, range(n_bundels)), total=n_bundels))  # sometimes leads to error in tqdm: BlockingIOError: [Errno 11] Unable to create file (unable to lock file, errno = 11, error message = 'Resource temporarily unavailable')
+                # can lead to error: BlockingIOError: [Errno 11] Unable to create file (unable to lock file, errno = 11, error message = 'Resource temporarily unavailable')
+
+                # with tqdm
+                results = list(tqdm(p.imap(self.sky_distribution, range(n_bundels)), total=n_bundels))
+                # for result in results:
+                #     pass
                 
+                # without tqdm
                 # for _ in p.imap(self.sky_distribution, range(n_bundels)):
-                #     continue
+                #     pass
 
     def sky_distribution(self, _):
         """Create and save the sky distribution

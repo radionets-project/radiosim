@@ -5,10 +5,10 @@ title = "Simulation configuration"
 [general]
 quiet = true
 mode = "jet"            # jet or survey
-multiprocessing = true  # no progress bar (to be implemented)
+multiprocessing = true
 
 [paths]
-outpath = "/mnt/nvme1n1/simulations/230417_n10000_s256"
+outpath = "/mnt/nvme1n1/simulations/230423_n50000_s256"
 
 [jet]
 training_type = "list"  # gauss or list or clean
@@ -22,9 +22,9 @@ class_distribution = [2, 1, 2]   # average share of each source in the images
 scale_sources = true
 
 [image_options]
-bundles_train = 100
-bundles_valid = 20
-bundles_test = 20
+bundles_train = 500
+bundles_valid = 50
+bundles_test = 50
 bundle_size = 100
 img_size = 256
 noise = true
