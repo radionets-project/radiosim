@@ -1,14 +1,14 @@
 import click
 import multiprocessing
 from tqdm import tqdm
-from radiosim.utils import (
-    create_grid,
-    add_noise,
-    adjust_outpath,
-    save_sky_distribution_bundle,
-)
+
 from radiosim.jet import create_jet
 from radiosim.survey import create_survey
+from radiosim.utils import (
+    add_noise,
+    create_grid,
+    save_sky_distribution_bundle,
+)
 
 
 def simulate_sky_distributions(conf):
@@ -29,36 +29,23 @@ class create_sky_distribution:
         n_bundels = self.conf["bundles_" + self.opt]
         n_cores = int(multiprocessing.cpu_count() * 0.5)  # use 50% of available cores
         if n_cores == 1 or not self.conf["multiprocessing"]:
-            for _ in tqdm(range(n_bundels)):
-                self.sky_distribution(0)
+            for i in tqdm(range(n_bundels)):
+                self.sky_distribution(i)
         else:
-            print()
-            # with multiprocessing.Pool(n_cores) as p:
-            #     with tqdm(total=n_bundels) as pbar:
-            #         for _ in p.imap(self.sky_distribution, range(n_bundels)):
-            #             pbar.update()
-            #             # p.close()
-            #             # p.join()
-
             with multiprocessing.Pool(n_cores) as p:
-                # can lead to error: BlockingIOError: [Errno 11] Unable to create file (unable to lock file, errno = 11, error message = 'Resource temporarily unavailable')
+                _ = list(
+                    tqdm(
+                        p.imap(self.sky_distribution, range(n_bundels)), total=n_bundels
+                    )
+                )
 
-                # with tqdm
-                results = list(tqdm(p.imap(self.sky_distribution, range(n_bundels)), total=n_bundels))
-                # for result in results:
-                #     pass
-                
-                # without tqdm
-                # for _ in p.imap(self.sky_distribution, range(n_bundels)):
-                #     pass
-
-    def sky_distribution(self, _):
+    def sky_distribution(self, i: int):
         """Create and save the sky distribution
-        
+
         Parameters
         ----------
-        _: Any
-            dummy parameter needed for 'imap' method of multiprocessing
+        i: int
+            n-th sky distribution to be saved
         """
         grid = create_grid(self.conf["img_size"], self.conf["bundle_size"])
         if self.conf["mode"] == "jet":
@@ -75,6 +62,5 @@ class create_sky_distribution:
             for img in sky_bundle:
                 img -= img.min()
                 img /= img.max()
-        path = adjust_outpath(self.conf["outpath"], "/samp_" + self.opt)
+        path = self.conf["outpath"] + "/samp_" + self.opt + "_" + str(i) + ".h5"
         save_sky_distribution_bundle(path, sky_bundle, target_bundle)
-        

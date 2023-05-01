@@ -57,7 +57,7 @@ def relativistic_boosting(theta, beta):
     boost_rec: float
         boosting factor for the receding jet
     """
-    gamma = 1 / np.sqrt(1 - beta ** 2)  # Lorentz factor
+    gamma = 1 / np.sqrt(1 - beta**2)  # Lorentz factor
     mu = np.cos(theta)
 
     boost_app = 1 / (gamma * (1 - beta * mu))
@@ -99,14 +99,18 @@ def zoom_on_source(img, comp=None, max_amp=0.01):
     zoom_factor = size / (size - 2 * idx)
 
     # crop the source
-    cropped_img = img[idx:size-idx, idx:size-idx]
-    zoomed_img = cv2.resize(cropped_img, dsize=(size, size), interpolation=cv2.INTER_LINEAR)
+    cropped_img = img[idx : size - idx, idx : size - idx]
+    zoomed_img = cv2.resize(
+        cropped_img, dsize=(size, size), interpolation=cv2.INTER_LINEAR
+    )
 
     if comp is not None:
-        cropped_comp = comp[:, idx:size-idx, idx:size-idx]
+        cropped_comp = comp[:, idx : size - idx, idx : size - idx]
         zoomed_comp = np.empty_like(comp)
         for i, component in enumerate(cropped_comp):
-            zoomed_comp[i] = cv2.resize(component, dsize=(size, size), interpolation=cv2.INTER_LINEAR)
+            zoomed_comp[i] = cv2.resize(
+                component, dsize=(size, size), interpolation=cv2.INTER_LINEAR
+            )
         return zoomed_img, zoomed_comp, zoom_factor
 
     return zoomed_img, zoom_factor
@@ -135,11 +139,17 @@ def zoom_out(img, comp=None, pad_value=0):
     if not isinstance(pad_value, int):
         pad_value = np.int64(pad_value)
     size = img.shape[0]
-    img = cv2.resize(np.pad(img, pad_value), dsize=(size, size), interpolation=cv2.INTER_LINEAR)
+    img = cv2.resize(
+        np.pad(img, pad_value), dsize=(size, size), interpolation=cv2.INTER_LINEAR
+    )
 
     if comp is not None:
         for component in comp:
-            component = cv2.resize(np.pad(component, pad_value), dsize=(size, size), interpolation=cv2.INTER_LINEAR)
+            component = cv2.resize(
+                np.pad(component, pad_value),
+                dsize=(size, size),
+                interpolation=cv2.INTER_LINEAR,
+            )
         return img, comp
 
     return img
@@ -279,32 +289,6 @@ def add_noise(image, noise_level):
     return image_noised
 
 
-def adjust_outpath(path, option, form="h5"):
-    """
-    Add number to out path when filename already exists.
-
-    Parameters
-    ----------
-    path: str
-        path to save directory
-    option: str
-        additional keyword to add to path
-    form: str
-        file extension
-
-    Returns
-    -------
-    out: str
-        adjusted path
-    """
-    counter = 0
-    filename = str(path) + (option + "_{}." + form)
-    while os.path.isfile(filename.format(counter)):
-        counter += 1
-    out = filename.format(counter)
-    return out
-
-
 def save_sky_distribution_bundle(path, x, y, name_x="x", name_y="y"):
     """
     Write images created in analysis to h5 file.
@@ -346,7 +330,7 @@ def cart2pol(x: float, y: float):
     phi: float
         angle in radian
     """
-    r = np.sqrt(x ** 2 + y ** 2)
+    r = np.sqrt(x**2 + y**2)
     phi = np.arctan2(y, x)
     return (r, phi)
 

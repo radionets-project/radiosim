@@ -8,11 +8,11 @@ mode = "jet"            # jet or survey
 multiprocessing = true
 
 [paths]
-outpath = "/mnt/nvme1n1/simulations/230423_n50000_s256"
+outpath = "/mnt/nvme1n1/simulations/230502_n50000_s128"
 
 [jet]
 training_type = "list"  # gauss or list or clean
-num_jet_components = [3, 9]
+num_jet_components = [2, 9]
 scaling = "normalize"
 
 [survey]
@@ -26,6 +26,6 @@ bundles_train = 500
 bundles_valid = 50
 bundles_test = 50
 bundle_size = 100
-img_size = 256
+img_size = 128
 noise = true
 noise_level = 15    # maximum intensity of noise in percent
