@@ -22,10 +22,10 @@ def main(configuration_path, mode):
     conf = read_config(config)
     print(conf, "\n")
 
-    outpath = config["paths"]["outpath"]
+    outpath = conf["outpath"]
     sim_sources = check_outpath(
         outpath,
-        quiet=config["general"]["quiet"],
+        quiet=conf["quiet"],
     )
 
     if mode == "simulate":

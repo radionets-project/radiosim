@@ -4,7 +4,8 @@ title = "Simulation configuration"
 
 [general]
 quiet = true
-mode = "survey"   # jet or survey
+mode = "survey"         # jet or survey
+multiprocessing = true
 
 [paths]
 outpath = "./tests/build/data/"

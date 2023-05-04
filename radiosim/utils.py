@@ -57,92 +57,12 @@ def relativistic_boosting(theta, beta):
     boost_rec: float
         boosting factor for the receding jet
     """
-    gamma = 1 / np.sqrt(1 - beta ** 2)  # Lorentz factor
+    gamma = 1 / np.sqrt(1 - beta**2)  # Lorentz factor
     mu = np.cos(theta)
 
     boost_app = 1 / (gamma * (1 - beta * mu))
     boost_rec = 1 / (gamma * (1 + beta * mu))
     return boost_app, boost_rec
-
-
-def zoom_on_source(img, comp=None, max_amp=0.01):
-    """
-    Zoom on source to cut out irrelevant area. Shape will stay equal.
-
-    Parameters
-    ----------
-    img: 2D array
-        Image of the sky used to zoom on
-    comp: 3D array (n, (img))
-        Images of the components, same zooming as on img
-    max_amp: float
-        Maximal amplitude which will be at the edge of the image
-
-    Returns
-    -------
-    zoomed_img: ndarray
-        Image after zooming
-    zoom_factor: float
-        Zooming factor
-    """
-    # find farest outside column or row with amplitude > max_amp
-    mask = img > max_amp
-    mask_flip = np.flip(mask)
-
-    idx_left = np.argmax(np.sum(mask, axis=0) > 0)
-    idx_right = np.argmax(np.sum(mask_flip, axis=0) > 0)
-    idx_bottom = np.argmax(np.sum(mask, axis=1) > 0)
-    idx_top = np.argmax(np.sum(mask_flip, axis=1) > 0)
-    # print(idx_left, idx_right, idx_bottom, idx_top)
-    idx = np.min([idx_left, idx_right, idx_bottom, idx_top])
-    size = img.shape[0]
-    zoom_factor = size / (size - 2 * idx)
-
-    # crop the source
-    cropped_img = img[idx:size-idx, idx:size-idx]
-    zoomed_img = cv2.resize(cropped_img, dsize=(size, size), interpolation=cv2.INTER_LINEAR)
-
-    if comp is not None:
-        cropped_comp = comp[:, idx:size-idx, idx:size-idx]
-        zoomed_comp = np.empty_like(comp)
-        for i, component in enumerate(cropped_comp):
-            zoomed_comp[i] = cv2.resize(component, dsize=(size, size), interpolation=cv2.INTER_LINEAR)
-        return zoomed_img, zoomed_comp, zoom_factor
-
-    return zoomed_img, zoom_factor
-
-
-def zoom_out(img, comp=None, pad_value=0):
-    """
-    Zoom out of an image. Padding edges with zeros.
-
-    Parameters
-    ----------
-    img: 2D array
-        Image of the sky
-    comp: 3D array (n, (img))
-        Images of the components
-    pad_value: int
-        Number of pixels to pad around the source
-
-    Returns
-    -------
-    zoomed_img: ndarray
-        Image after zooming
-    zoomed_comp: ndarray
-        Componets after zooming
-    """
-    if not isinstance(pad_value, int):
-        pad_value = np.int64(pad_value)
-    size = img.shape[0]
-    img = cv2.resize(np.pad(img, pad_value), dsize=(size, size), interpolation=cv2.INTER_LINEAR)
-
-    if comp is not None:
-        for component in comp:
-            component = cv2.resize(np.pad(component, pad_value), dsize=(size, size), interpolation=cv2.INTER_LINEAR)
-        return img, comp
-
-    return img
 
 
 def check_outpath(outpath, quiet=False):
@@ -206,7 +126,9 @@ def read_config(config):
         unpacked configurations
     """
     sim_conf = {}
+    sim_conf["quiet"] = config["general"]["quiet"]
     sim_conf["mode"] = config["general"]["mode"]
+    sim_conf["multiprocessing"] = config["general"]["multiprocessing"]
     sim_conf["outpath"] = config["paths"]["outpath"]
     sim_conf["training_type"] = config["jet"]["training_type"]
     sim_conf["num_jet_components"] = config["jet"]["num_jet_components"]
@@ -277,32 +199,6 @@ def add_noise(image, noise_level):
     return image_noised
 
 
-def adjust_outpath(path, option, form="h5"):
-    """
-    Add number to out path when filename already exists.
-
-    Parameters
-    ----------
-    path: str
-        path to save directory
-    option: str
-        additional keyword to add to path
-    form: str
-        file extension
-
-    Returns
-    -------
-    out: str
-        adjusted path
-    """
-    counter = 0
-    filename = str(path) + (option + "_{}." + form)
-    while os.path.isfile(filename.format(counter)):
-        counter += 1
-    out = filename.format(counter)
-    return out
-
-
 def save_sky_distribution_bundle(path, x, y, name_x="x", name_y="y"):
     """
     Write images created in analysis to h5 file.
@@ -344,7 +240,7 @@ def cart2pol(x: float, y: float):
     phi: float
         angle in radian
     """
-    r = np.sqrt(x ** 2 + y ** 2)
+    r = np.sqrt(x**2 + y**2)
     phi = np.arctan2(y, x)
     return (r, phi)
 

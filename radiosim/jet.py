@@ -1,5 +1,5 @@
 import numpy as np
-from radiosim.utils import relativistic_boosting, pol2cart, zoom_on_source, zoom_out
+from radiosim.utils import relativistic_boosting, pol2cart
 from radiosim.gauss import twodgaussian
 from radiosim.flux_scaling import get_start_amp
 
@@ -39,6 +39,7 @@ def create_jet(grid, conf):
     targets = []
     for _ in grid:
         comps = np.random.randint(num_comps[0], num_comps[1] + 1)
+        comps4sim = np.random.uniform(comps, num_comps[1])
 
         amp = np.zeros(num_comps[1])
         x = np.zeros(num_comps[1])
@@ -51,12 +52,13 @@ def create_jet(grid, conf):
         # velocity in units of c_0, initialise velocity of first component
         beta = np.zeros(num_comps[1])
         beta[1] = np.random.uniform(0, 1)
-        y_rotation = np.random.uniform(0, np.pi)
+        y_rotation = np.random.uniform(0, 2 * np.pi)
         z_rotation = np.random.uniform(0, np.pi / 2)
+        expansion = np.random.uniform(0, 0.5)
 
         for i in range(comps):
             # amplitude decreases for more distant components, empirical
-            amp[i] = np.exp(-np.sqrt(i) * np.random.normal(1.3, 0.2))
+            amp[i] = np.exp(-np.sqrt(i) * np.random.normal(1.1, 0.2))
             if i >= 1 and np.random.rand() < 0.1:  # drop some components
                 amp[i] = 0
 
@@ -65,7 +67,7 @@ def create_jet(grid, conf):
                 beta[i] = beta[1] * np.exp(-np.sqrt(i - 1) * np.random.normal(0.5, 0.1))
 
             # curving the jet, empirical
-            y_rotation += np.random.normal(0, np.pi / 24)
+            y_rotation += np.random.normal(0, np.pi / 36)
 
             # distance between components, r_factor to fill the corners
             jet_angle_cos = np.abs(np.cos(y_rotation))
@@ -78,7 +80,7 @@ def create_jet(grid, conf):
                 r_factor = np.sqrt(2)
 
             # *0.7 so the last component is not on the edge
-            r = i / (comps - 1) * img_size / 2 * r_factor * np.sin(z_rotation) * 0.7
+            r = i / (comps4sim - 1) * img_size / 2 * r_factor * np.sin(z_rotation) * 0.7
 
             # get the cartesian coordinates
             x[i], y[i] = np.array(pol2cart(r, y_rotation)) + center
@@ -87,29 +89,33 @@ def create_jet(grid, conf):
             sx[i], sy[i] = np.sort(
                 (
                     img_size
-                    / comps
+                    / comps4sim
                     * r_factor
-                    * np.sqrt(i + 1)
-                    / np.random.uniform(3, 8, size=2)
+                    * (i + 1) ** expansion
+                    / np.random.uniform(3, 9, size=2)
                 )
             )[::-1]
 
-            # rotation aligned with the jet angle, empirical
+            # rotation of the gauss component, empirical
             if i >= 1:
                 rotation[i] = rotation[i - 1] + np.random.normal(0, np.pi / 18)
 
         # print('Velocity of the jet:', beta)
         boost_app, boost_rec = relativistic_boosting(z_rotation, beta)
 
-        center_shift_x = np.random.uniform(-img_size / 20, img_size / 20)
-        center_shift_y = np.random.uniform(-img_size / 20, img_size / 20)
+        center_shift_x = np.random.uniform(
+            -img_size / 20, img_size / 20
+        )
+        center_shift_y = np.random.uniform(
+            -img_size / 20, img_size / 20
+        )
 
         if conf["scaling"] == "mojave":
             amp *= get_start_amp("mojave")
 
         # mirror the data for the counter jet
         # random drop of counter jet, because the relativistic boosting only does not create clear one-sided jets
-        if np.random.rand() < 0.3:
+        if np.random.rand() < 0.5:
             amp = np.concatenate((amp * boost_app, amp[1:] * boost_rec[1:]))
             x = np.concatenate((x + center_shift_x, img_size - x[1:] + center_shift_x))
             y = np.concatenate((y + center_shift_y, img_size - y[1:] + center_shift_y))
@@ -131,34 +137,6 @@ def create_jet(grid, conf):
         # creation of the image
         jet_comp = np.array(component_from_list(img_size, amp, x, y, sx, sy, rotation))
         jet_img = np.sum(jet_comp, axis=0)
-
-        # get values at the edge of the image
-        edge_list = [
-            jet_img[0, :-1],
-            jet_img[:-1, -1],
-            jet_img[-1, ::-1],
-            jet_img[-2:0:-1, 0],
-        ]
-        edges = np.concatenate(edge_list)
-        edge_threshold = 0.01
-        if edges.max() < edge_threshold:
-            # zoom on source to equalize size differences from z-rotation
-            jet_img, jet_comp, zoom_factor = zoom_on_source(
-                jet_img, jet_comp, max_amp=edge_threshold
-            )
-            x = img_size / 2 + (x - img_size / 2) * zoom_factor
-            y = img_size / 2 + (y - img_size / 2) * zoom_factor
-            sx *= zoom_factor
-            sy *= zoom_factor
-
-            # random zoom out for more variance
-            zoom_out_factor = np.random.uniform(1 / 2, 1)  # 1/8: pad eg. 128 -> 1024
-            pad_value = (1 / zoom_out_factor - 1) * img_size / 2
-            jet_img, jet_comp = zoom_out(jet_img, jet_comp, pad_value=pad_value)
-            x = img_size / 2 + (x - img_size / 2) * zoom_out_factor
-            y = img_size / 2 + (y - img_size / 2) * zoom_out_factor
-            sx *= zoom_out_factor
-            sy *= zoom_out_factor
 
         # normalisation
         if conf["scaling"] == "normalize":
