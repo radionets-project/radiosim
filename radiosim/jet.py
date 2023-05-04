@@ -39,6 +39,7 @@ def create_jet(grid, conf):
     targets = []
     for _ in grid:
         comps = np.random.randint(num_comps[0], num_comps[1] + 1)
+        comps4sim = np.random.uniform(comps, num_comps[1])
 
         amp = np.zeros(num_comps[1])
         x = np.zeros(num_comps[1])
@@ -79,7 +80,7 @@ def create_jet(grid, conf):
                 r_factor = np.sqrt(2)
 
             # *0.7 so the last component is not on the edge
-            r = i / (comps - 1) * img_size / 2 * r_factor * np.sin(z_rotation) * 0.7
+            r = i / (comps4sim - 1) * img_size / 2 * r_factor * np.sin(z_rotation) * 0.7
 
             # get the cartesian coordinates
             x[i], y[i] = np.array(pol2cart(r, y_rotation)) + center
@@ -88,7 +89,7 @@ def create_jet(grid, conf):
             sx[i], sy[i] = np.sort(
                 (
                     img_size
-                    / comps
+                    / comps4sim
                     * r_factor
                     * (i + 1) ** expansion
                     / np.random.uniform(3, 9, size=2)
@@ -104,10 +105,10 @@ def create_jet(grid, conf):
 
         center_shift_x = np.random.uniform(
             -img_size / 20, img_size / 20
-        )  # will increase when zooming in
+        )
         center_shift_y = np.random.uniform(
             -img_size / 20, img_size / 20
-        )  # will increase when zooming in
+        )
 
         if conf["scaling"] == "mojave":
             amp *= get_start_amp("mojave")
