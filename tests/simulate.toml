@@ -4,7 +4,7 @@ title = "Simulation configuration"
 
 [general]
 quiet = true
-seed = inf
+seed = "none"
 mode = "survey"   # jet or survey
 
 [paths]

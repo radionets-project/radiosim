@@ -23,8 +23,8 @@ def main(configuration_path, mode):
     conf = read_config(config)
     print(conf, "\n")
 
-    if conf["seed"] != np.inf:
-        click.echo(f"Using numpy random seed {conf['seed']}.")
+    if conf["seed"] != "none":
+        click.echo(f"Using numpy random seed {conf['seed']}. \n")
         np.random.seed(conf["seed"])
 
     outpath = config["paths"]["outpath"]
