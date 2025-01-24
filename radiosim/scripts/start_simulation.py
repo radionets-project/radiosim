@@ -18,7 +18,7 @@ from radiosim.simulations import simulate_sky_distributions
     ),
     default="simulate",
 )
-def main(configuration_path, mode):
+def main(configuration_path, mode) -> None:
     config = toml.load(configuration_path)
     conf = read_config(config)
     print(conf, "\n")

@@ -6,6 +6,7 @@ import h5py
 import toml
 import click
 import numpy as np
+from numpy.typing import ArrayLike
 from pathlib import Path
 from scipy import signal
 from astropy.convolution import Gaussian2DKernel
@@ -206,8 +207,9 @@ def read_config(config):
         unpacked configurations
     """
     sim_conf = {}
-    sim_conf["mode"] = config["general"]["mode"]
     sim_conf["seed"] = config["general"]["seed"]
+    sim_conf["mode"] = config["general"]["mode"]
+    sim_conf["threads"] = config["general"]["threads"]
     sim_conf["outpath"] = config["paths"]["outpath"]
     sim_conf["training_type"] = config["jet"]["training_type"]
     sim_conf["num_jet_components"] = config["jet"]["num_jet_components"]
@@ -215,6 +217,7 @@ def read_config(config):
     sim_conf["num_sources"] = config["survey"]["num_sources"]
     sim_conf["class_distribution"] = config["survey"]["class_distribution"]
     sim_conf["scale_sources"] = config["survey"]["scale_sources"]
+    sim_conf["class_ratio"] = config["mojave"]["class_ratio"]
     sim_conf["bundles_train"] = config["image_options"]["bundles_train"]
     sim_conf["bundles_valid"] = config["image_options"]["bundles_valid"]
     sim_conf["bundles_test"] = config["image_options"]["bundles_test"]
@@ -326,6 +329,41 @@ def save_sky_distribution_bundle(path, x, y, name_x="x", name_y="y"):
         hf.create_dataset(name_y, data=y)
         hf.close()
 
+def _save_mojave_bundle(path : str, data : tuple, data_name : tuple) -> None:
+    """
+    Write MOJAVE simulations created in analysis to h5 file.
+
+    Parameters
+    ----------
+    path: str
+        path to save file
+    data : tuple
+        data to store, e.g. galaxies, classes, coordinates, …
+    data_name : tuple
+        name of the data columns
+    """
+    assert len(data) == len(data_name)
+    with h5py.File(path, "w") as hf:
+        for dat, name in zip(data, data_name):
+            hf.create_dataset(name, data=dat)
+        hf.close()
+
+def _gen_vlba_obs_position(rng, size : int) -> tuple[float, float]:
+    ra = rng.uniform(0, 360, size=size)
+    dec = rng.uniform(-30, 87, size=size)
+    return ra, dec
+
+def _gen_date(rng, start_date : str, size : int) -> ArrayLike:
+    from datetime import datetime
+    from h5py import string_dtype
+    # define fixed string length for h5py
+    utf8_type = string_dtype("utf-8", 10)
+
+    start_date = np.datetime64(start_date)
+    now = np.datetime64(datetime.now().date())
+    delta = now - start_date
+    dates = start_date + rng.integers(delta.astype(int), size=size)
+    return dates.astype(utf8_type)
 
 def cart2pol(x: float, y: float):
     """

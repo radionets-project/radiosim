@@ -1,6 +1,8 @@
 import numpy as np
+from numpy.typing import ArrayLike
 from astropy.convolution import Gaussian2DKernel
 from astropy.nddata.utils import Cutout2D
+from scipy.stats import norm, skewnorm
 
 
 def gauss(params: list, size: int):
@@ -82,3 +84,60 @@ def twodgaussian(params: list, size: int):
         return g
 
     return rotgauss(*np.indices((size, size)))
+
+
+def skewed_gauss(
+    size: int,
+    x: float,
+    y: float,
+    amp: float,
+    width: float,
+    length: float,
+    a: float,
+) -> ArrayLike:
+    """
+    Generate a skewed 2d normal distribution.
+
+    Parameters
+    ----------
+    size: int
+        length of the square image
+    x: float
+        x coordinate of the center
+    y: float
+        y coordinate of the center
+    amp: float
+        maximal amplitude of the distribution
+    width: float
+        width of the distribution (perpendicular to the skewed function)
+    length: float
+        length of the distribution
+    a: float
+        skewness parameter
+
+    Returns
+    -------
+    skew_gauss: ArrayLike
+        two dimensional skewed gaussian distribution
+    """
+
+    def skewfunc(x: float, **args) -> ArrayLike:
+        func = skewnorm.pdf(x, **args)
+        func /= func.max()
+        return func
+
+    vals = np.arange(size)
+    normal = norm.pdf(vals, loc=size / 2, scale=width).reshape(-1, 1)
+    normal /= normal.max()
+
+    skew = skewfunc(vals, a=a, loc=size / 2, scale=length)
+
+    skew_gauss = normal * skew
+    skew_gauss *= amp
+    skew_gauss[np.isclose(skew_gauss, 0)] = 0
+
+    skew_gauss = np.roll(
+        skew_gauss, (y - int(size / 2), x - int(size / 2)), axis=(0, 1)
+    )
+
+    return skew_gauss
