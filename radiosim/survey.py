@@ -5,8 +5,8 @@ from radiosim.jet import create_jet
 
 def create_survey(grid, conf):
     """
-    Creates a clean survey with all its components written in a list. It contains
-    serveral classes:
+    Creates a clean survey with all its components written in
+    a list. It contains serveral classes:
     - jets
     - gaussian
     - pointsources
@@ -21,9 +21,11 @@ def create_survey(grid, conf):
     Returns
     -------
     survey: ndarray
-        image of the survey, sum over all sources, shape: [n, 1, img_size, img_size]
+        image of the survey, sum over all sources,
+        shape: [n, 1, img_size, img_size]
     class_survey: ndarray
-        images of each class and background class, shape: [n, c + 1, img_size, img_size]
+        images of each class and background class,
+        shape: [n, c + 1, img_size, img_size]
         with c being the max number of classes.
     source_lists: ndarray
         array which stores all properties of each component, shape: [n, 1, 6]

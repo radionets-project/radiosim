@@ -8,7 +8,9 @@ def get_start_amp(scale_type):
 
 
 def draw_from_mojave_dist():
-    """Values from a fit to the peak fluxes distribution in the MOJAVE data archive."""
+    """Values from a fit to the peak fluxes distribution
+    in the MOJAVE data archive.
+    """
     a = 0.8639672251677816
     b = 47.64189171625089
     loc = 0.09163404776954732

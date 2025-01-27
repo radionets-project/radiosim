@@ -6,27 +6,33 @@ from radiosim.flux_scaling import get_start_amp
 
 def create_jet(grid, conf):
     """
-    Creates the clean jets with all its components written in a list. Dependend on the
-    'train_type' the components will be seperated or summed up.
+    Creates the clean jets with all its components written
+    in a list. Dependend on the 'train_type' the components
+    will be seperated or summed up.
 
     Parameters
     ----------
     grid: ndarray
-        input grid of shape [n, 1, img_size, img_size] or [1, img_size, img_size]
+        input grid of shape [n, 1, img_size, img_size] or
+        [1, img_size, img_size]
     conf:
         loaded config file
 
     Returns
     -------
     jets: ndarray
-        image of the full jet, sum over all components, shape: [n, 1, img_size, img_size]
+        image of the full jet, sum over all components,
+        shape: [n, 1, img_size, img_size]
     jet_comps: ndarray
-        images of each component and background, shape: [n, c*2, img_size, img_size]
-        with c being the max number of components. A jet without counter jet has c
-        components. A jet with counter jet has c*2-1 components, since the center
-        appears only once. Adding one channel for the backgound gives c*2 channels.
+        images of each component and background,
+        shape: [n, c*2, img_size, img_size] with c being the
+        max number of components. A jet without counter jet
+        has c components. A jet with counter jet has c*2-1
+        components, since the center appears only once. Adding
+        one channel for the backgound gives c*2 channels.
     source_lists: ndarray
-        array which stores all (seven) properties of each component, shape: [n, c*2-1, 7]
+        array which stores all (seven) properties of each component,
+        shape: [n, c*2-1, 7]
     """
     num_comps = conf["num_jet_components"]
 
@@ -83,7 +89,8 @@ def create_jet(grid, conf):
             # get the cartesian coordinates
             x[i], y[i] = np.array(pol2cart(r, y_rotation)) + center
 
-            # width of gaussian, empirical, sx > sy because rotation up to pi 'changes' this property - fixed to have consistency
+            # width of gaussian, empirical, sx > sy because rotation up
+            # to pi 'changes' this property - fixed to have consistency
             sx[i], sy[i] = np.sort(
                 (
                     img_size
@@ -108,7 +115,8 @@ def create_jet(grid, conf):
             amp *= get_start_amp("mojave")
 
         # mirror the data for the counter jet
-        # random drop of counter jet, because the relativistic boosting only does not create clear one-sided jets
+        # random drop of counter jet, because the relativistic
+        # boosting only does not create clear one-sided jets
         if np.random.rand() < 0.3:
             amp = np.concatenate((amp * boost_app, amp[1:] * boost_rec[1:]))
             x = np.concatenate((x + center_shift_x, img_size - x[1:] + center_shift_x))
@@ -212,6 +220,7 @@ def apply_train_type(train_type, jet_img, jet_comp, source_list):
         y = np.concatenate((jet_comp, list_to_add))
     if train_type == "clean":
         y = jet_img[None]
+
     return y
 
 
@@ -241,4 +250,5 @@ def component_from_list(size, amp, x, y, sx, sy, rotation):
                 size,
             )
             jet_comp += [g]
+
     return jet_comp

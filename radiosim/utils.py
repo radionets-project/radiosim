@@ -58,7 +58,7 @@ def relativistic_boosting(theta, beta):
     boost_rec: float
         boosting factor for the receding jet
     """
-    gamma = 1 / np.sqrt(1 - beta ** 2)  # Lorentz factor
+    gamma = 1 / np.sqrt(1 - beta**2)  # Lorentz factor
     mu = np.cos(theta)
 
     boost_app = 1 / (gamma * (1 - beta * mu))
@@ -100,14 +100,18 @@ def zoom_on_source(img, comp=None, max_amp=0.01):
     zoom_factor = size / (size - 2 * idx)
 
     # crop the source
-    cropped_img = img[idx:size-idx, idx:size-idx]
-    zoomed_img = cv2.resize(cropped_img, dsize=(size, size), interpolation=cv2.INTER_LINEAR)
+    cropped_img = img[idx : size - idx, idx : size - idx]
+    zoomed_img = cv2.resize(
+        cropped_img, dsize=(size, size), interpolation=cv2.INTER_LINEAR
+    )
 
     if comp is not None:
-        cropped_comp = comp[:, idx:size-idx, idx:size-idx]
+        cropped_comp = comp[:, idx : size - idx, idx : size - idx]
         zoomed_comp = np.empty_like(comp)
         for i, component in enumerate(cropped_comp):
-            zoomed_comp[i] = cv2.resize(component, dsize=(size, size), interpolation=cv2.INTER_LINEAR)
+            zoomed_comp[i] = cv2.resize(
+                component, dsize=(size, size), interpolation=cv2.INTER_LINEAR
+            )
         return zoomed_img, zoomed_comp, zoom_factor
 
     return zoomed_img, zoom_factor
@@ -136,11 +140,17 @@ def zoom_out(img, comp=None, pad_value=0):
     if not isinstance(pad_value, int):
         pad_value = np.int64(pad_value)
     size = img.shape[0]
-    img = cv2.resize(np.pad(img, pad_value), dsize=(size, size), interpolation=cv2.INTER_LINEAR)
+    img = cv2.resize(
+        np.pad(img, pad_value), dsize=(size, size), interpolation=cv2.INTER_LINEAR
+    )
 
     if comp is not None:
         for component in comp:
-            component = cv2.resize(np.pad(component, pad_value), dsize=(size, size), interpolation=cv2.INTER_LINEAR)
+            component = cv2.resize(
+                np.pad(component, pad_value),
+                dsize=(size, size),
+                interpolation=cv2.INTER_LINEAR,
+            )
         return img, comp
 
     return img
@@ -166,7 +176,7 @@ def check_outpath(outpath, quiet=False):
     path = Path(outpath)
     exists = path.exists()
     if exists is True:
-        source = {p for p in path.rglob("*samp*.h5") if p.is_file()}
+        source = {p for p in path.rglob("*data*.h5") if p.is_file()}
         if source:
             click.echo("Found existing source simulations!")
             if quiet:
@@ -225,6 +235,7 @@ def read_config(config):
     sim_conf["img_size"] = config["image_options"]["img_size"]
     sim_conf["noise"] = config["image_options"]["noise"]
     sim_conf["noise_level"] = config["image_options"]["noise_level"]
+
     return sim_conf
 
 
@@ -329,7 +340,8 @@ def save_sky_distribution_bundle(path, x, y, name_x="x", name_y="y"):
         hf.create_dataset(name_y, data=y)
         hf.close()
 
-def _save_mojave_bundle(path : str, data : tuple, data_name : tuple) -> None:
+
+def _save_mojave_bundle(path: str, data: tuple, data_name: tuple) -> None:
     """
     Write MOJAVE simulations created in analysis to h5 file.
 
@@ -348,14 +360,18 @@ def _save_mojave_bundle(path : str, data : tuple, data_name : tuple) -> None:
             hf.create_dataset(name, data=dat)
         hf.close()
 
-def _gen_vlba_obs_position(rng, size : int) -> tuple[float, float]:
+
+def _gen_vlba_obs_position(rng, size: int) -> tuple[float, float]:
     ra = rng.uniform(0, 360, size=size)
     dec = rng.uniform(-30, 87, size=size)
+
     return ra, dec
 
-def _gen_date(rng, start_date : str, size : int) -> ArrayLike:
+
+def _gen_date(rng, start_date: str, size: int) -> ArrayLike:
     from datetime import datetime
     from h5py import string_dtype
+
     # define fixed string length for h5py
     utf8_type = string_dtype("utf-8", 10)
 
@@ -363,7 +379,9 @@ def _gen_date(rng, start_date : str, size : int) -> ArrayLike:
     now = np.datetime64(datetime.now().date())
     delta = now - start_date
     dates = start_date + rng.integers(delta.astype(int), size=size)
+
     return dates.astype(utf8_type)
+
 
 def cart2pol(x: float, y: float):
     """
@@ -383,8 +401,9 @@ def cart2pol(x: float, y: float):
     phi: float
         angle in radian
     """
-    r = np.sqrt(x ** 2 + y ** 2)
+    r = np.sqrt(x**2 + y**2)
     phi = np.arctan2(y, x)
+
     return (r, phi)
 
 
@@ -408,6 +427,7 @@ def pol2cart(r: float, phi: float):
     """
     x = r * np.cos(phi)
     y = r * np.sin(phi)
+
     return (x, y)
 
 
@@ -416,10 +436,11 @@ def load_data(conf_path, data_type="train", key="x"):
     path = Path(config["paths"]["outpath"])
     bundle_paths = np.array([x for x in path.iterdir()])
     paths = [
-        path for path in bundle_paths if re.findall("samp_" + data_type, path.name)
+        path for path in bundle_paths if re.findall("data*" + data_type, path.name)
     ]
     data = []
     for path_test in paths:
         df = h5py.File(path_test, "r")
         data.extend(df[key])
+
     return data

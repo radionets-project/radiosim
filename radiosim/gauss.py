@@ -38,6 +38,7 @@ def gauss(params: list, size: int):
         size=(size, size),
     ).data
     gaussian_scaled = gaussian_cutout / gaussian_cutout.max() * params[0]
+
     return gaussian_scaled
 
 
@@ -65,6 +66,8 @@ def twodgaussian(params: list, size: int):
     rotgauss: 2darray
         gaussian distribution in two dimensions
 
+    Notes
+    -----
     Short version of 'twodgaussian':
     https://github.com/keflavich/gaussfitter/blob/0891cd3605ab5ba000c2d5e1300dd21c15eee1fd/gaussfitter/gaussfitter.py#L75
     """
