@@ -30,6 +30,7 @@ classifiers=[
 dependencies = [
   "astropy",
   "click",
+  "scikit-image",
   "h5py",
   "matplotlib",
   "numpy",
