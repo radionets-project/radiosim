@@ -24,7 +24,7 @@ There are currently three supported simulation types:
 
 In the `radiosim` environment you can start the simulation with
 ```
-$ radiosim path/to/rc/file.toml
+$ radiosim-simulate path/to/rc/file.toml
 ```
 You can find an exemplary file in `rc/default_simulation.toml`.
 The simulations will be saved as `.h5` files.
