@@ -3,7 +3,7 @@
     channels:
         - defaults
     dependencies:
-      - python
+      - python<=3.11
       - pip
       - pip:
         - -e .
