@@ -6,6 +6,7 @@ title = "Simulation configuration"
 quiet = true
 seed = "none"
 mode = "survey"   # jet or survey
+threads = "none" # "none" or int > 0
 
 [paths]
 outpath = "./tests/build/data/"
@@ -20,6 +21,9 @@ num_sources = 20
 # classes are: jet, gaussian, pointlike
 class_distribution = [1, 1, 1]   # average share of each source in the images
 scale_sources = true
+
+[mojave]
+class_ratio = [5, 5, 1] # rel. amount of each class [compact, one_jet, two_jets]
 
 [image_options]
 bundles_train = 1
