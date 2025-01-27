@@ -26,12 +26,12 @@ def create_mojave(conf, rng):
     if threads == "none":
         threads = 1
     elif not isinstance(threads, int):
-        raise ValueError("threads has to be int >0 or \"none\"")
+        raise ValueError('threads has to be int >0 or "none"')
     elif threads <= 0:
-        raise ValueError("threads has to be int >0 or \"none\"")
-    
+        raise ValueError('threads has to be int >0 or "none"')
+
     size = conf["img_size"]
-        
+
     # calculate amount of each class to generate per bundle
     bundle_size = conf["bundle_size"]
     ratio = np.array(conf["class_ratio"])
@@ -42,11 +42,17 @@ def create_mojave(conf, rng):
         amount[amount.argmax()] += 1
 
     jets = []
-    compact = Parallel(n_jobs=threads)(delayed(gen_compact)(rng=child, size=size) for child in rng.spawn(amount[0]))
-    one_jet = Parallel(n_jobs=threads)(delayed(gen_one_jet)(rng=child, size=size) for child in rng.spawn(amount[1]))
-    two_jet = Parallel(n_jobs=threads)(delayed(gen_two_jet)(rng=child, size=size) for child in rng.spawn(amount[2]))
+    compact = Parallel(n_jobs=threads)(
+        delayed(gen_compact)(rng=child, size=size) for child in rng.spawn(amount[0])
+    )
+    one_jet = Parallel(n_jobs=threads)(
+        delayed(gen_one_jet)(rng=child, size=size) for child in rng.spawn(amount[1])
+    )
+    two_jet = Parallel(n_jobs=threads)(
+        delayed(gen_two_jet)(rng=child, size=size) for child in rng.spawn(amount[2])
+    )
     jets = np.array([*compact, *one_jet, *two_jet])
-    
+
     glx_class = []
     for glx_type, amt in zip([0, 1, 2], amount):
         glx_class.extend([glx_type] * amt)
@@ -63,9 +69,12 @@ def create_mojave(conf, rng):
 
     return data, data_name
 
-def gen_jet(size: int, amplitude: float, width: float, length: float, a: float) -> ArrayLike:
+
+def gen_jet(
+    size: int, amplitude: float, width: float, length: float, a: float
+) -> ArrayLike:
     """
-    Generate jet from skewed 2d normal distributiuon. 
+    Generate jet from skewed 2d normal distributiuon.
 
     Parameters
     ----------
@@ -89,14 +98,30 @@ def gen_jet(size: int, amplitude: float, width: float, length: float, a: float) 
     jet : ArrayLike
         jet for source
     """
-    
-    jet = skewed_gauss(size=size, x=size/2, y=size/2, amp=amplitude, width=width, length=length, a=a)
+
+    jet = skewed_gauss(
+        size=size,
+        x=size / 2,
+        y=size / 2,
+        amp=amplitude,
+        width=width,
+        length=length,
+        a=a,
+    )
 
     jet[np.isclose(jet, 0)] = 0
 
     return jet
 
-def gen_shocks(jet: ArrayLike, shock_comp: int, length: float, width: float, sx: float, rng: "np.Generator") -> tuple[ArrayLike, tuple, int]:
+
+def gen_shocks(
+    jet: ArrayLike,
+    shock_comp: int,
+    length: float,
+    width: float,
+    sx: float,
+    rng: "np.Generator",
+) -> tuple[ArrayLike, tuple, int]:
     """
     Generate equally spaced shocks in jet.
 
@@ -114,7 +139,7 @@ def gen_shocks(jet: ArrayLike, shock_comp: int, length: float, width: float, sx:
         sx component of main gaussian
     rng : np.Generator
         numpy random generator
-    
+
     Returns
     -------
     jet : ArrayLike
@@ -175,13 +200,17 @@ def gen_shocks(jet: ArrayLike, shock_comp: int, length: float, width: float, sx:
         ps_orientation.append("r")
 
         s_dist += s_dist0
+
     return (
         jet,
         (ps_orientation, ps_amp, ps_x, ps_y, ps_sx, ps_sy, ps_rot, ps_dist, ps_a),
         skipped,
     )
 
-def add_swirl(jet: ArrayLike, rng: "np.Generator", first_jet_params: tuple | None = None) -> tuple[ArrayLike, tuple]:
+
+def add_swirl(
+    jet: ArrayLike, rng: "np.Generator", first_jet_params: tuple | None = None
+) -> tuple[ArrayLike, tuple]:
     """
     Add swirl distortion to the jet.
 
@@ -195,7 +224,7 @@ def add_swirl(jet: ArrayLike, rng: "np.Generator", first_jet_params: tuple | Non
         Use when generate two jet sources.
         Tuple of parameters to generate similar swirl for second jet.
         Contains the returned parameters from the first jet.
-    
+
     Returns
     -------
     swirled_jet : ArrayLike
@@ -218,7 +247,8 @@ def add_swirl(jet: ArrayLike, rng: "np.Generator", first_jet_params: tuple | Non
 
     return swirled_jet, (strength, radius, center)
 
-def gen_two_jet(rng : int, size : int = 1024, printout : bool = False) -> ArrayLike:
+
+def gen_two_jet(rng: int, size: int = 1024, printout: bool = False) -> ArrayLike:
     """
     Generate a two jet galaxy.
 
@@ -260,10 +290,10 @@ def gen_two_jet(rng : int, size : int = 1024, printout : bool = False) -> ArrayL
 
     sx = rng.uniform(dimensions.min(), dimensions.max()) * 1.5  # too large
     sy = rng.uniform(dimensions.min(), dimensions.max()) * 1.5
-    while np.any(
-            [sx / sy < 1 / 2, sx / sy > 2]
-        ):  # redraw if gaussian is too elliptical
-            sy = rng.uniform(dimensions.min(), dimensions.max()) * 1.5
+
+    # redraw if gaussian is too elliptical
+    while np.any([sx / sy < 1 / 2, sx / sy > 2]):
+        sy = rng.uniform(dimensions.min(), dimensions.max()) * 1.5
     rot = rng.uniform(0, 2 * np.pi)
 
     a = 4
@@ -275,10 +305,14 @@ def gen_two_jet(rng : int, size : int = 1024, printout : bool = False) -> ArrayL
     shock_comp_l = int(np.round(rng.power(0.5), decimals=1) * 10)
 
     if shock_comp_r > 0:
-        r_jet, r_printout, r_skipped = gen_shocks(r_jet, shock_comp_r, r_length, r_width, sx, rng)
+        r_jet, r_printout, r_skipped = gen_shocks(
+            r_jet, shock_comp_r, r_length, r_width, sx, rng
+        )
 
     if shock_comp_l > 0:
-        l_jet, l_printout, l_skipped = gen_shocks(l_jet, shock_comp_l, l_length, l_width, sx, rng)
+        l_jet, l_printout, l_skipped = gen_shocks(
+            l_jet, shock_comp_l, l_length, l_width, sx, rng
+        )
 
     r_jet, r_swirl_comp = add_swirl(r_jet, rng=rng)
     l_jet, l_swirl_comp = add_swirl(l_jet, rng=rng, first_jet_params=r_swirl_comp)
@@ -346,7 +380,8 @@ def gen_two_jet(rng : int, size : int = 1024, printout : bool = False) -> ArrayL
 
     return glx
 
-def gen_one_jet(rng : int, size : int = 1024, printout : bool = False) -> ArrayLike:
+
+def gen_one_jet(rng: int, size: int = 1024, printout: bool = False) -> ArrayLike:
     """
     Generate a one jet galaxy.
 
@@ -379,12 +414,12 @@ def gen_one_jet(rng : int, size : int = 1024, printout : bool = False) -> ArrayL
 
     dimensions = np.sort([width / 2, length / 5])
 
-    sx = rng.uniform(*dimensions) * 1.5 # too large
+    sx = rng.uniform(*dimensions) * 1.5  # too large
     sy = rng.uniform(*dimensions) * 1.5
-    while np.any(
-            [sx / sy < 1 / 2, sx / sy > 2]
-        ):  # redraw if gaussian is too elliptical
-            sy = rng.uniform(dimensions.min(), dimensions.max()) * 1.5
+
+    # redraw if gaussian is too elliptical
+    while np.any([sx / sy < 1 / 2, sx / sy > 2]):
+        sy = rng.uniform(dimensions.min(), dimensions.max()) * 1.5
     rot = rng.uniform(0, 2 * np.pi)
 
     a = 4
@@ -439,7 +474,8 @@ def gen_one_jet(rng : int, size : int = 1024, printout : bool = False) -> ArrayL
 
     return glx
 
-def gen_compact(rng : int, size : int = 1024, printout : bool = False) -> ArrayLike:
+
+def gen_compact(rng: int, size: int = 1024, printout: bool = False) -> ArrayLike:
     """Generate a compact galaxy.
 
     Parameters
@@ -468,7 +504,7 @@ def gen_compact(rng : int, size : int = 1024, printout : bool = False) -> ArrayL
 
     amp = expon.rvs(*amp_params, random_state=rng)
 
-    jet_amp = amp * rng.normal(2/3, 0.05)
+    jet_amp = amp * rng.normal(2 / 3, 0.05)
 
     y = np.arange(size)
 
@@ -503,7 +539,7 @@ def gen_compact(rng : int, size : int = 1024, printout : bool = False) -> ArrayL
             x = 0
             y = 0
         if i == 0:
-            sx = rng.uniform(*dimensions) * 1.7 # too large
+            sx = rng.uniform(*dimensions) * 1.7  # too large
             j = 0
             while sx > 15:
                 if j > 10:
@@ -523,7 +559,9 @@ def gen_compact(rng : int, size : int = 1024, printout : bool = False) -> ArrayL
                 j += 1
 
             j = 0
-            while np.any([sx/sy < 0.33, sx/sy>3]) or np.all([sx/sy > 0.75, sx/sy < 1.33]):
+            while np.any([sx / sy < 0.33, sx / sy > 3]) or np.all(
+                [sx / sy > 0.75, sx / sy < 1.33]
+            ):
                 if j > 10:
                     sy = sx * rng.choice([rng.uniform(0.4, 0.8), rng.uniform(1.2, 2.5)])
                     if sy > 15:
@@ -537,25 +575,25 @@ def gen_compact(rng : int, size : int = 1024, printout : bool = False) -> ArrayL
                         break
                     sy = rng.uniform(*dimensions) * 1.7
                     k += 1
-                j+=1
+                j += 1
         else:
             sx = comp_sx[-1] * deviation[0]
             sy = comp_sy[-1] * deviation[1]
-        
+
         if i == 0:
             if sx > sy:
                 vertical = True
             else:
                 vertical = False
-        
+
         try:
             rot = rng.uniform(comp_rot[-1] - 0.1, comp_rot[-1] + 0.1)
         except IndexError:
             if vertical:
-                rot = rng.uniform(-np.pi/4, np.pi/4)
+                rot = rng.uniform(-np.pi / 4, np.pi / 4)
             else:
-                rot = rng.uniform(-np.pi/4+np.pi/2, np.pi/4+np.pi/2)
-        
+                rot = rng.uniform(-np.pi / 4 + np.pi / 2, np.pi / 4 + np.pi / 2)
+
         c_amp = amp * rng.uniform(0.5, 1.2)
 
         gauss = twodgaussian([c_amp, size / 2 - x, size / 2 - y, sx, sy, rot], size)
@@ -578,7 +616,7 @@ def gen_compact(rng : int, size : int = 1024, printout : bool = False) -> ArrayL
     glx = np.roll(glx, shift=shift, axis=[0, 1])
 
     glx[np.isclose(glx, 0)] = 0
-    
+
     glx /= glx.max()
     glx *= amp
 
