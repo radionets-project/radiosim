@@ -4,7 +4,7 @@ requires_backend = "setuptools.build_meta"
 
 [project]
 name = "radiosim"
-version = "0.3.0"
+version = "0.4.0"
 description="Simulation of radio skies to create astrophysical data sets"
 
 authors =[{ name = "Kevin Schmidt, Felix Geyer, Paul-Simon Blomenkamp, Stefan Fröse, Christian Arauner" }]
@@ -31,6 +31,7 @@ dependencies = [
   "astropy",
   "click",
   "scikit-image",
+  "joblib",
   "h5py",
   "matplotlib",
   "numpy",
