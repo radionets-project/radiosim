@@ -32,7 +32,7 @@ def create_sky_distribution(conf, opt: str) -> None:
             raise TypeError('seed has to be int or "none"')
 
     for _ in tqdm(range(conf["bundles_" + opt])):
-        path = adjust_outpath(conf["outpath"], f"/data_{conf["mode"]}_" + opt)
+        path = adjust_outpath(conf["outpath"], f"/data_{conf['mode']}_" + opt)
         grid = create_grid(conf["img_size"], conf["bundle_size"])
         if conf["mode"] == "jet":
             sky, target = create_jet(grid, conf)
