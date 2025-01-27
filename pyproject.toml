@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=64", "setuptools_scm[toml]>=8"]
+requires_backend = "setuptools.build_meta"
+
+[project]
+name = "radiosim"
+version = "0.3.0"
+description="Simulation of radio skies to create astrophysical data sets"
+
+authors =[{ name = "Kevin Schmidt, Felix Geyer, Paul-Simon Blomenkamp, Stefan Fröse, Christian Arauner" }]
+maintainers = [
+  { name = "Kevin Schmitz", email = "kevin2.schmiz@tu-dortmund.de" },
+  { name = "Christian Arauner", email = "christian.arauner@tu-dortmund.de" },
+]
+
+license = { text = "MIT" }
+classifiers=[
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: MIT License",
+  "Natural Language :: English",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3 :: Only",
+  "Topic :: Scientific/Engineering :: Astronomy",
+  "Topic :: Scientific/Engineering :: Physics",
+]
+
+dependencies = [
+  "astropy",
+  "click",
+  "h5py",
+  "matplotlib",
+  "numpy",
+  "opencv-python",
+  "pathlib",
+  "pytest",
+  "scipy",
+  "toml",
+  "tqdm",
+]
+
+[project.urls]
+Repository = "https://github.com/radionets-project/radiosim"
+
+[project.optional-dependencies]
+tests = [
+  "pytest",
+  "pytest-cov"
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+[project.scripts]
+radiosim-simulate = "radiosim.scripts.start_simulation:main"
