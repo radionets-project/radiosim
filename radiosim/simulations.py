@@ -14,14 +14,6 @@ from numpy.random import default_rng
 
 
 def simulate_sky_distributions(conf):
-    for opt in ["train", "valid", "test"]:
-        create_sky_distribution(
-            conf=conf,
-            opt=opt,
-        )
-
-
-def create_sky_distribution(conf, opt: str) -> None:
     if conf["mode"] == "mojave":
         seed = conf["seed"]
         if seed == "none":
@@ -30,7 +22,17 @@ def create_sky_distribution(conf, opt: str) -> None:
             rng = default_rng(seed)
         else:
             raise TypeError('seed has to be int or "none"')
+    else:
+        rng = None
+    for opt in ["train", "valid", "test"]:
+        create_sky_distribution(
+            conf=conf,
+            opt=opt,
+            rng=rng,
+        )
 
+
+def create_sky_distribution(conf, opt: str, rng=None) -> None:
     for _ in tqdm(range(conf["bundles_" + opt])):
         path = adjust_outpath(conf["outpath"], f"/data_{conf['mode']}_" + opt)
         grid = create_grid(conf["img_size"], conf["bundle_size"])
