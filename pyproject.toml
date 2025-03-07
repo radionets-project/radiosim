@@ -52,6 +52,11 @@ tests = [
   "pytest-cov"
 ]
 
+torch = [
+  "torch",
+  "torchvision"
+]
+
 [tool.setuptools.packages.find]
 where = ["."]
 

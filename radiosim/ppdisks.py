@@ -1,6 +1,11 @@
 import numpy as np
 
-import torch
+try:
+    import torch
+except ImportError as e:
+    raise ModuleNotFoundError("You need torch to use the ppdisks module of radiosim!"
+                              "Use pip install \".[torch]\" to install the necessary packages!")
+    
 from torch.fft import fft2, ifft2
 
 from tqdm.autonotebook import tqdm
