@@ -100,13 +100,13 @@ def zoom_on_source(img, comp=None, max_amp=0.01):
     zoom_factor = size / (size - 2 * idx)
 
     # crop the source
-    cropped_img = img[idx : size - idx, idx : size - idx]
+    cropped_img = img[idx: size - idx, idx: size - idx]
     zoomed_img = cv2.resize(
         cropped_img, dsize=(size, size), interpolation=cv2.INTER_LINEAR
     )
 
     if comp is not None:
-        cropped_comp = comp[:, idx : size - idx, idx : size - idx]
+        cropped_comp = comp[:, idx: size - idx, idx: size - idx]
         zoomed_comp = np.empty_like(comp)
         for i, component in enumerate(cropped_comp):
             zoomed_comp[i] = cv2.resize(
@@ -262,7 +262,8 @@ def add_noise(image, noise_level):
         """
         max_noise = np.random.uniform(0, 1, img_shape[0])
         noise = (
-            np.random.normal(mean, std, size=img_shape) * max_noise[:, None, None, None]
+            np.random.normal(mean, std, size=img_shape) *
+            max_noise[:, None, None, None]
         )
         g_kernel = Gaussian2DKernel(kernel / 2).array[None, None, :]
         return signal.convolve(noise, g_kernel, mode="same")
@@ -286,8 +287,13 @@ def add_noise(image, noise_level):
     strengths = [0.2, 0.3, 0.5]  # have to add up to 1
 
     noise = call_noise(kernels, strengths)
-    noise /= np.abs(noise).max() / (noise_level / 100)
-    image_noised = image + noise
+
+    noise_level = np.random.uniform(
+        *noise_level, size=image.shape[0])[:, None, None, None] / 100
+
+    noise /= noise.max(axis=(1, 2, 3))[:, None, None, None]
+    noise *= image.max(axis=(1, 2, 3))[:, None, None, None] * noise_level
+    image_noised = noise + image
 
     return image_noised
 
@@ -350,7 +356,7 @@ def _save_mojave_bundle(path: str, data: tuple, data_name: tuple) -> None:
     path: str
         path to save file
     data : tuple
-        data to store, e.g. galaxies, classes, coordinates, …
+        data to store, e.g. galaxies, classes, coordinates, u2026
     data_name : tuple
         name of the data columns
     """
