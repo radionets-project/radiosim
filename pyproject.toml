@@ -5,16 +5,18 @@ requires_backend = "setuptools.build_meta"
 [project]
 name = "radiosim"
 version = "0.4.0"
-description="Simulation of radio skies to create astrophysical data sets"
+description = "Simulation of radio skies to create astrophysical data sets"
 
-authors =[{ name = "Kevin Schmidt, Felix Geyer, Paul-Simon Blomenkamp, Stefan Fröse, Christian Arauner" }]
+authors = [
+  { name = "Kevin Schmidt, Felix Geyer, Paul-Simon Blomenkamp, Stefan Fröse, Christian Arauner" },
+]
 maintainers = [
   { name = "Kevin Schmitz", email = "kevin2.schmiz@tu-dortmund.de" },
   { name = "Christian Arauner", email = "christian.arauner@tu-dortmund.de" },
 ]
 
 license = { text = "MIT" }
-classifiers=[
+classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Science/Research",
   "License :: OSI Approved :: MIT License",
@@ -47,18 +49,13 @@ dependencies = [
 Repository = "https://github.com/radionets-project/radiosim"
 
 [project.optional-dependencies]
-tests = [
-  "pytest",
-  "pytest-cov"
-]
+tests = ["pytest", "pytest-cov"]
 
-torch = [
-  "torch",
-  "torchvision"
-]
+torch = ["torch", "torchvision"]
 
 [tool.setuptools.packages.find]
 where = ["."]
 
 [project.scripts]
 radiosim-simulate = "radiosim.scripts.start_simulation:main"
+radiosim-ppdisk = "radiosim.scripts.simulate_ppdisks:main"
