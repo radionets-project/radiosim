@@ -1,0 +1,21 @@
+# This is a TOML document.
+
+[metadata]
+img_size = 512                # int
+alpha_range = [0.0, 180.0]    # list with two entries
+ratio_range = [3.0, 15.0]     # list with two entries
+size_ratio_range = [0.1, 1.0] # list with two entries
+seed = 1337                   # int or "none"
+
+[simulation]
+device = "cuda:0" # str with valid pytorch device (e.g. "cuda:0")
+verbose = false
+
+[dataset]
+file_prefix = "ppdisks"              # str
+outpath = "./build/example_ppdisks/" # str with valid directory name
+batch_size = 5                       # int
+batches = 10                         # int
+batches_train_ratio = 0.7            # float
+batches_valid_ratio = 0.2            # float
+batches_test_ratio = 0.1             # float
