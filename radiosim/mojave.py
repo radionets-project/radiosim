@@ -80,11 +80,7 @@ def gen_jet(
     ----------
     size : int
         length of the square image
-    x : float
-        x coordinate of the center
-    y : float
-        y coordinate of the center
-    amp : float
+    amplitude : float
         maximal amplitude of the distribution
     width : float
         width of the distribution (perpendicular to the skewed function)
