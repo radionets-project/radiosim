@@ -1,8 +1,9 @@
-import toml
 import click
 import numpy as np
-from radiosim.utils import read_config, check_outpath
+import toml
+
 from radiosim.simulations import simulate_sky_distributions
+from radiosim.utils import check_outpath, read_config
 
 
 @click.command()

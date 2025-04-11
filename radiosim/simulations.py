@@ -1,16 +1,18 @@
 import click
+import numpy as np
+from numpy.random import default_rng
 from tqdm import tqdm
+
+from radiosim.jet import create_jet
+from radiosim.mojave import create_mojave
+from radiosim.survey import create_survey
 from radiosim.utils import (
-    create_grid,
+    _save_mojave_bundle,
     add_noise,
     adjust_outpath,
+    create_grid,
     save_sky_distribution_bundle,
-    _save_mojave_bundle,
 )
-from radiosim.jet import create_jet
-from radiosim.survey import create_survey
-from radiosim.mojave import create_mojave
-from numpy.random import default_rng
 
 
 def simulate_sky_distributions(conf):
@@ -42,10 +44,22 @@ def create_sky_distribution(conf, opt: str, rng=None) -> None:
             sky, target = create_survey(grid, conf)
         elif conf["mode"] == "mojave":
             data, data_name = create_mojave(conf, rng)
-            _save_mojave_bundle(path, data=data, data_name=data_name)
+            sky_bundle = data[0].copy()
+            if conf["noise"]:
+                sky_bundle = np.squeeze(
+                    add_noise(np.expand_dims(sky_bundle, axis=1), conf["noise_level"]),
+                    axis=1,
+                )
+                # for img in data:
+                #     img -= img.min()
+                #     img /= img.max()
+            _save_mojave_bundle(path, data=[sky_bundle, *data[1:]], data_name=data_name)
             continue
         else:
-            click.echo("Given mode not found. Choose 'survey' or 'jet' in config file")
+            click.echo(
+                "Given mode not found. Choose 'survey', "
+                "'jet' or 'mojave' in config file"
+            )
 
         sky_bundle = sky.copy()
         target_bundle = target.copy()

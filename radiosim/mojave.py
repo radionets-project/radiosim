@@ -1,10 +1,11 @@
 import numpy as np
+from joblib import Parallel, delayed
 from numpy.typing import ArrayLike
+from scipy.stats import expon, skewnorm
+from skimage.transform import rotate, swirl
+
 from radiosim.gauss import skewed_gauss, twodgaussian
 from radiosim.utils import _gen_date, _gen_vlba_obs_position
-from scipy.stats import skewnorm, expon
-from skimage.transform import swirl, rotate
-from joblib import Parallel, delayed
 
 
 def create_mojave(conf, rng):
@@ -620,16 +621,25 @@ def gen_compact(rng: int, size: int = 1024, printout: bool = False) -> ArrayLike
         if outflow:
             print("Skewed dist:")
             print(
-                f"width = {width:.3f}, length = {length:.3f}, jet_amp = {jet_amp:.3f}, a = {a:.3f}"
+                f"width = {width:.3f}, "
+                "length = {length:.3f}, "
+                "jet_amp = {jet_amp:.3f}, a = {a:.3f}"
             )
             print("Swirl:")
             print(
-                f"strength = {swirl_comp[0]:.3f}, radius = {swirl_comp[1]:.3f}, center = {swirl_comp[2]}"
+                f"strength = {swirl_comp[0]:.3f},"
+                "radius = {swirl_comp[1]:.3f}, "
+                "center = {swirl_comp[2]}"
             )
         print("Sources:")
         for cx, cy, csx, csy, cr in zip(comp_x, comp_y, comp_sx, comp_sy, comp_rot):
             print(
-                f"amp = {amp:.3f}, x = {cx:.0f}, y = {cy:.0f}, sx = {csx:.3f}, sy = {csy:.3f}, rot = {cr:.3f}"
+                f"amp = {amp:.3f},"
+                "x = {cx:.0f}, "
+                "y = {cy:.0f}, "
+                "sx = {csx:.3f}, "
+                "sy = {csy:.3f}, "
+                "rot = {cr:.3f}"
             )
 
     return glx

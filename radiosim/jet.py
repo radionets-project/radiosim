@@ -1,7 +1,8 @@
 import numpy as np
-from radiosim.utils import relativistic_boosting, pol2cart, zoom_on_source, zoom_out
-from radiosim.gauss import twodgaussian
+
 from radiosim.flux_scaling import get_start_amp
+from radiosim.gauss import twodgaussian
+from radiosim.utils import pol2cart, relativistic_boosting, zoom_on_source, zoom_out
 
 
 def create_jet(grid, conf):

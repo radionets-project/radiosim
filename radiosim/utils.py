@@ -1,15 +1,16 @@
 import os
 import re
 import sys
+from pathlib import Path
+
+import click
 import cv2
 import h5py
-import toml
-import click
 import numpy as np
-from numpy.typing import ArrayLike
-from pathlib import Path
-from scipy import signal
+import toml
 from astropy.convolution import Gaussian2DKernel
+from numpy.typing import ArrayLike
+from scipy import signal
 
 
 def create_grid(pixel, bundle_size):
@@ -286,8 +287,14 @@ def add_noise(image, noise_level):
     strengths = [0.2, 0.3, 0.5]  # have to add up to 1
 
     noise = call_noise(kernels, strengths)
-    noise /= np.abs(noise).max() / (noise_level / 100)
-    image_noised = image + noise
+
+    noise_level = (
+        np.random.uniform(*noise_level, size=image.shape[0])[:, None, None, None] / 100
+    )
+
+    noise /= noise.max(axis=(1, 2, 3))[:, None, None, None]
+    noise *= image.max(axis=(1, 2, 3))[:, None, None, None] * noise_level
+    image_noised = noise + image
 
     return image_noised
 
@@ -350,7 +357,7 @@ def _save_mojave_bundle(path: str, data: tuple, data_name: tuple) -> None:
     path: str
         path to save file
     data : tuple
-        data to store, e.g. galaxies, classes, coordinates, …
+        data to store, e.g. galaxies, classes, coordinates, u2026
     data_name : tuple
         name of the data columns
     """
@@ -370,6 +377,7 @@ def _gen_vlba_obs_position(rng, size: int) -> tuple[float, float]:
 
 def _gen_date(rng, start_date: str, size: int) -> ArrayLike:
     from datetime import datetime
+
     from h5py import string_dtype
 
     # define fixed string length for h5py
