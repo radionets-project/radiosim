@@ -17,6 +17,8 @@ after the installation.
 
 ## Usage
 
+### Radio Galaxy Simulations
+
 There are currently three supported simulation types: 
 1. `survey` full sky simulation
 2. `jet` extended source
@@ -28,3 +30,23 @@ $ radiosim-simulate path/to/rc/file.toml
 ```
 You can find an exemplary file in `rc/default_simulation.toml`.
 The simulations will be saved as `.h5` files.
+
+### Protoplanetary Disk Simulations
+
+Simulating protoplanetary disks requires `pytorch`. You can install
+the necessary dependencies using the command
+
+```
+$ pip install ".[torch]"
+```
+
+In the `radiosim` environment you can start the simulation with
+
+```
+$ radiosim-ppdisk path/to/rc/file.toml
+```
+You can find an exemplary file in `rc/default_ppdisks_simulation.toml`.
+The simulations will be saved as .h5 files.
+
+The meaning of the simulation parameters is described in the `ppdisks` module.
+

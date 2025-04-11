@@ -130,17 +130,13 @@ def skewed_gauss(
         return func
 
     vals = np.arange(size)
-    normal = norm.pdf(vals, loc=size / 2, scale=width).reshape(-1, 1)
+    normal = norm.pdf(vals, loc=y, scale=width).reshape(-1, 1)
     normal /= normal.max()
 
-    skew = skewfunc(vals, a=a, loc=size / 2, scale=length)
+    skew = skewfunc(vals, a=a, loc=x, scale=length)
 
     skew_gauss = normal * skew
     skew_gauss *= amp
     skew_gauss[np.isclose(skew_gauss, 0)] = 0
-
-    skew_gauss = np.roll(
-        skew_gauss, (y - int(size / 2), x - int(size / 2)), axis=(0, 1)
-    )
 
     return skew_gauss
