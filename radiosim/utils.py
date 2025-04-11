@@ -1,15 +1,16 @@
 import os
 import re
 import sys
+from pathlib import Path
+
+import click
 import cv2
 import h5py
-import toml
-import click
 import numpy as np
-from numpy.typing import ArrayLike
-from pathlib import Path
-from scipy import signal
+import toml
 from astropy.convolution import Gaussian2DKernel
+from numpy.typing import ArrayLike
+from scipy import signal
 
 
 def create_grid(pixel, bundle_size):
@@ -100,13 +101,13 @@ def zoom_on_source(img, comp=None, max_amp=0.01):
     zoom_factor = size / (size - 2 * idx)
 
     # crop the source
-    cropped_img = img[idx: size - idx, idx: size - idx]
+    cropped_img = img[idx : size - idx, idx : size - idx]
     zoomed_img = cv2.resize(
         cropped_img, dsize=(size, size), interpolation=cv2.INTER_LINEAR
     )
 
     if comp is not None:
-        cropped_comp = comp[:, idx: size - idx, idx: size - idx]
+        cropped_comp = comp[:, idx : size - idx, idx : size - idx]
         zoomed_comp = np.empty_like(comp)
         for i, component in enumerate(cropped_comp):
             zoomed_comp[i] = cv2.resize(
@@ -262,8 +263,7 @@ def add_noise(image, noise_level):
         """
         max_noise = np.random.uniform(0, 1, img_shape[0])
         noise = (
-            np.random.normal(mean, std, size=img_shape) *
-            max_noise[:, None, None, None]
+            np.random.normal(mean, std, size=img_shape) * max_noise[:, None, None, None]
         )
         g_kernel = Gaussian2DKernel(kernel / 2).array[None, None, :]
         return signal.convolve(noise, g_kernel, mode="same")
@@ -288,8 +288,9 @@ def add_noise(image, noise_level):
 
     noise = call_noise(kernels, strengths)
 
-    noise_level = np.random.uniform(
-        *noise_level, size=image.shape[0])[:, None, None, None] / 100
+    noise_level = (
+        np.random.uniform(*noise_level, size=image.shape[0])[:, None, None, None] / 100
+    )
 
     noise /= noise.max(axis=(1, 2, 3))[:, None, None, None]
     noise *= image.max(axis=(1, 2, 3))[:, None, None, None] * noise_level
@@ -376,6 +377,7 @@ def _gen_vlba_obs_position(rng, size: int) -> tuple[float, float]:
 
 def _gen_date(rng, start_date: str, size: int) -> ArrayLike:
     from datetime import datetime
+
     from h5py import string_dtype
 
     # define fixed string length for h5py

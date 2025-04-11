@@ -1,7 +1,7 @@
 import numpy as np
-from numpy.typing import ArrayLike
 from astropy.convolution import Gaussian2DKernel
 from astropy.nddata.utils import Cutout2D
+from numpy.typing import ArrayLike
 from scipy.stats import norm, skewnorm
 
 
