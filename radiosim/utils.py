@@ -266,7 +266,7 @@ def add_noise(image, noise_level):
             np.random.normal(mean, std, size=img_shape) * max_noise[:, None, None, None]
         )
         g_kernel = Gaussian2DKernel(kernel / 2).array[None, None, :]
-        return signal.convolve(noise, g_kernel, mode="same")
+        return signal.fftconvolve(noise, g_kernel, mode="same")
 
     def call_noise(kernels, strengths):
         """
