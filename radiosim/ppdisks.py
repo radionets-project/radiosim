@@ -2,7 +2,7 @@ import numpy as np
 
 try:
     import torch
-except ImportError:
+except ImportError:  # pragma: no cover
     raise ModuleNotFoundError(
         "You need torch to use the ppdisks module of radiosim!"
         'Use pip install ".[torch]" to install the necessary packages!'
