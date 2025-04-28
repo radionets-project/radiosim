@@ -60,6 +60,7 @@ jobs:
           python --version
           pip install pytest-cov restructuredtext-lint pytest-xdist 'coverage!=6.3.0'
           pip install -e .[all]
+          pip install -e ".[torch]"
           pip freeze
           pip list
 
