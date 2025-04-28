@@ -1,5 +1,6 @@
 def test_generate_proto_set():
     import h5py
+    import numpy as np
     import torch
 
     from radiosim.ppdisks import generate_proto_set
@@ -28,5 +29,27 @@ def test_generate_proto_set():
     for img_size in img_sizes:
         with h5py.File(f"./tests/ppdisks_{img_size}.h5", "r") as hf:
             assert torch.allclose(
-                torch.from_numpy(hf["y"][()]), torch.tensor(images[str(img_size)])
+                torch.from_numpy(hf["y"][()]),
+                torch.from_numpy(np.array(images[str(img_size)])),
             )
+
+
+def test_generate_proto_no_seed():
+    from radiosim.ppdisks import create_proto
+
+    img_sizes = [128, 512]
+    alphas = [0.0, 180.0]
+    size_ratios = [0.1, 1.0]
+    ratios = [3, 15]
+
+    for img_size in img_sizes:
+        for alpha in alphas:
+            for ratio in ratios:
+                for size_ratio in size_ratios:
+                    create_proto(
+                        img_size=img_size,
+                        alpha=alpha,
+                        ratio=ratio,
+                        size_ratio=size_ratio,
+                        seed=None,
+                    )
