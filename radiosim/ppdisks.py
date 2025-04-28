@@ -2,7 +2,7 @@ import numpy as np
 
 try:
     import torch
-except ImportError:
+except ImportError:  # pragma: no cover
     raise ModuleNotFoundError(
         "You need torch to use the ppdisks module of radiosim!"
         'Use pip install ".[torch]" to install the necessary packages!'
@@ -38,7 +38,7 @@ def generate_proto_set(
     The amount of images to simulate
 
     alpha_range: tuple of float, optional
-    The range of values of the inclination of the disk
+    The range of values of the inclination of the disk in degrees
 
     ratio_range: tuple of float, optional
     The range of values of the ratio the minor axis should be of the major axis a / b
@@ -110,7 +110,7 @@ def create_proto(
     The size of the image (height and width)
 
     alpha: float
-    The inclination angle of the disk
+    The inclination angle of the disk in degrees
 
     ratio: float
     The ratio the minor axis should be of the major axis a / b
@@ -310,7 +310,7 @@ def _sim_core(
 
     """
 
-    a = np.random.randint(3, 15)
+    a = np.float64(np.random.randint(3, 15))
     core, d_core = _create_ellipse(img_size, a, a / ratio, center, alpha, device=device)
     return core, d_core
 
