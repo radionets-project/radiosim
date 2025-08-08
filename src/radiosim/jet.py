@@ -4,6 +4,12 @@ from radiosim.flux_scaling import get_start_amp
 from radiosim.gauss import twodgaussian
 from radiosim.utils import pol2cart, relativistic_boosting, zoom_on_source, zoom_out
 
+__all__ = [
+    "apply_train_type",
+    "component_from_list",
+    "create_jet",
+]
+
 
 def create_jet(grid, conf):
     """
@@ -93,13 +99,11 @@ def create_jet(grid, conf):
             # width of gaussian, empirical, sx > sy because rotation up
             # to pi 'changes' this property - fixed to have consistency
             sx[i], sy[i] = np.sort(
-                (
-                    img_size
-                    / comps
-                    * r_factor
-                    * np.sqrt(i + 1)
-                    / np.random.uniform(3, 8, size=2)
-                )
+                img_size
+                / comps
+                * r_factor
+                * np.sqrt(i + 1)
+                / np.random.uniform(3, 8, size=2)
             )[::-1]
 
             # rotation aligned with the jet angle, empirical

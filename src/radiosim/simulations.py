@@ -14,6 +14,8 @@ from radiosim.utils import (
     save_sky_distribution_bundle,
 )
 
+__all__ = ["create_sky_distribution", "simulate_sky_distributions"]
+
 
 def simulate_sky_distributions(conf):
     if conf["mode"] == "mojave":

@@ -12,6 +12,21 @@ from astropy.convolution import Gaussian2DKernel
 from numpy.typing import ArrayLike
 from scipy import signal
 
+__all__ = [
+    "add_noise",
+    "adjust_outpath",
+    "cart2pol",
+    "check_outpath",
+    "create_grid",
+    "load_data",
+    "pol2cart",
+    "read_config",
+    "relativistic_boosting",
+    "save_sky_distribution_bundle",
+    "zoom_on_source",
+    "zoom_out",
+]
+
 
 def create_grid(pixel, bundle_size):
     """
@@ -180,12 +195,7 @@ def check_outpath(outpath, quiet=False):
         source = {p for p in path.rglob("*data*.h5") if p.is_file()}
         if source:
             click.echo("Found existing source simulations!")
-            if quiet:
-                click.echo("Overwriting existing source simulations!")
-                [p.unlink() for p in source]
-                sim_sources = True
-                return sim_sources
-            elif click.confirm(
+            if quiet or click.confirm(
                 "Do you really want to overwrite existing files?", abort=False
             ):
                 click.echo("Overwriting existing source simulations!")

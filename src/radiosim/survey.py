@@ -3,6 +3,8 @@ import numpy as np
 from radiosim.gauss import twodgaussian
 from radiosim.jet import create_jet
 
+__all__ = ["create_survey"]
+
 
 def create_survey(grid, conf):
     """
