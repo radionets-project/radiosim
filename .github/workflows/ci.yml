@@ -104,7 +104,7 @@ jobs:
         run: |
           sudo apt update --yes && sudo apt install --yes git
           uv pip install --system . -U pip towncrier
-          uv pip install --system . --group docs -e .
+          uv pip install --system . --group docs -e ".[torch]"
           git describe --tags
 
       - name: Build docs
