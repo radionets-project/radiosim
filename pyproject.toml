@@ -9,7 +9,7 @@ description = "Simulation of radio skies to create astrophysical data sets"
 readme = "README.md"
 
 authors = [
-  { name = "Kevin Schmidt, Felix Geyer, Paul-Simon Blomenkamp, Stefan Fröse, Christian Arauner, Anno Knierim" },
+  { name = "radionets Developers" },
 ]
 maintainers = [
   { name = "Kevin Schmitz", email = "kevin2.schmiz@tu-dortmund.de" },
