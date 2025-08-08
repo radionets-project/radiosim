@@ -2,14 +2,26 @@
 .ipynb_checkpoints
 *.ipynb
 
-.coverage
-
-.vscode
-*.egg-info
-.eggs
-
 *__pycache__
 *build
 
-.flake8
 *.pdf
+
+*.pyc
+*.vscode
+*.eggs
+*.egg-info
+.flake8
+.makerc
+.coverage
+dist/
+*.csv
+*.swp
+*.whl
+
+*.ruff_cache
+
+src/radiosim/_version.py
+
+docs/_build
+docs/api
