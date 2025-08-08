@@ -1,3 +1,37 @@
+Radiosim v0.1.1 (2025-08-08)
+============================
+
+
+API Changes
+-----------
+
+
+Bug Fixes
+---------
+
+
+Data Model Changes
+------------------
+
+
+New Features
+------------
+
+
+Maintenance
+-----------
+
+- - Update CITATION.cff [`#35 <https://github.com/radionets-project/radiosim/pull/35>`__]
+
+- - Update README
+
+    - Add badges
+    - Switch to rst [`#36 <https://github.com/radionets-project/radiosim/pull/36>`__]
+
+
+Refactoring and Optimization
+----------------------------
+
 Radiosim v0.1.0 (2025-08-08)
 ============================
 
