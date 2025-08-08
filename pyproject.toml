@@ -48,7 +48,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-cuda = ["torch", "torchvision"]
+torch = ["torch", "torchvision"]
 
 [dependency-groups]
 tests = [

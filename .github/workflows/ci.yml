@@ -63,7 +63,7 @@ jobs:
         run: |
           python --version
           uv pip install --upgrade pip
-          uv pip install --group tests -e .
+          uv pip install --group tests -e ".[torch]"
           uv pip freeze
           uv pip list
 
