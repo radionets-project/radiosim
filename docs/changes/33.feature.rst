@@ -1,4 +1,0 @@
-- Added docs
-- Added changelog CI
-- Add pypi-publish CD
-- Added dependency groups for dev, tests, and docs
