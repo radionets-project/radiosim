@@ -1,16 +1,16 @@
 # Metadata for citation of this software according to the CFF format (https://citation-file-format.github.io/)
 cff-version: 1.2.0
 title: "radiosim: Simulation of radio skies to create astrophysical data sets."
-# abstract: 
+# abstract:
 type: software
 message: "If you use this software, please cite it as below."
-# url: 
-# doi: 
+# url:
+# doi:
 keywords:
 - Astronomy
 - "Data analysis"
-# version: 
-# date-released: 
+# version:
+# date-released:
 repository-code: "https://github.com/radionets-project/radiosim"
 license: "MIT License"
 authors:

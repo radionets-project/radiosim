@@ -19,7 +19,7 @@ after the installation.
 
 ### Radio Galaxy Simulations
 
-There are currently three supported simulation types: 
+There are currently three supported simulation types:
 1. `survey` full sky simulation
 2. `jet` extended source
 3. `mojave` MOJAVE like extended source
@@ -49,4 +49,3 @@ You can find an exemplary file in `rc/default_ppdisks_simulation.toml`.
 The simulations will be saved as .h5 files.
 
 The meaning of the simulation parameters is described in the `ppdisks` module.
-
