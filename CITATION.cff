@@ -1,28 +1,46 @@
-# Metadata for citation of this software according to the CFF format (https://citation-file-format.github.io/)
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
 cff-version: 1.2.0
-title: "radiosim: Simulation of radio skies to create astrophysical data sets."
-# abstract:
+title: >-
+  radiosim: Simulation of radio skies to create
+  astrophysical data sets.
+message: 'If you use this software, please cite it as below.'
 type: software
-message: "If you use this software, please cite it as below."
-# url:
-# doi:
-keywords:
-- Astronomy
-- "Data analysis"
-# version:
-# date-released:
-repository-code: "https://github.com/radionets-project/radiosim"
-license: "MIT License"
 authors:
-- family-names: Schmidt
-  given-names: Kevin
-  affiliation: "TU Dortmund University, Germany"
-  orcid: "https://orcid.org/0000-0002-9883-4454"
-- family-names: Geyer
-  given-names: Felix
-  affiliation: "TU Dortmund University, Germany"
-  orcid: "https://orcid.org/0000-0002-5615-2498"
-- family-names: Poggenpohl
-  given-names: Arne
-  affiliation: "TU Dortmund University, Germany"
-  orcid: "https://orcid.org/0000-0002-0746-4735"
+  - family-names: Schmitz
+    given-names: Kevin
+    affiliation: 'TU Dortmund University, Germany'
+    orcid: 'https://orcid.org/0000-0002-9883-4454'
+    email: kevin2.schmitz@tu-dortmund.de
+  - family-names: Geyer
+    given-names: Felix
+    affiliation: 'TU Dortmund University, Germany'
+    orcid: 'https://orcid.org/0000-0002-5615-2498'
+    email: felix.geyer@tu-dortmund.de
+  - family-names: Poggenpohl
+    given-names: Arne
+    affiliation: 'TU Dortmund University, Germany'
+    orcid: 'https://orcid.org/0000-0002-0746-4735'
+    email: arne.poggenpohl@tu-dortmund.de
+  - given-names: Christian
+    family-names: Arauner
+    email: christian.arauner@tu-dortmund.de
+    affiliation: 'TU Dortmund University, Germany'
+  - given-names: Anno
+    family-names: Knierim
+    email: anno.knierim@tu-dortmund.de
+    affiliation: 'TU Dortmund University, Germany'
+    orcid: 'https://orcid.org/0009-0004-8728-2879'
+  - orcid: 'https://orcid.org/0009-0008-5497-0885'
+    given-names: Tom
+    family-names: Groß
+    email: tom.gross@tu-dortmund.de
+    affiliation: 'TU Dortmund University, Germany'
+repository-code: 'https://github.com/radionets-project/radiosim'
+url: 'https://radiosim.readthedocs.io/en/latest/'
+keywords:
+  - Astronomy
+  - Data analysis
+  - Simulation
+license: MIT
