@@ -1,0 +1,4 @@
+- Update README
+
+  - Add badges
+  - Switch to rst
