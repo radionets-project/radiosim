@@ -6,7 +6,7 @@ build-backend = "hatchling.build"
 name = "radiosim"
 dynamic = ["version"]
 description = "Simulation of radio skies to create astrophysical data sets"
-readme = "README.md"
+readme = "README.rst"
 
 authors = [
   { name = "radionets Developers" },
