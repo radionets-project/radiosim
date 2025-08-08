@@ -1,5 +1,7 @@
 from scipy import stats
 
+__all__ = ["draw_from_mojave_dist", "get_start_amp"]
+
 
 def get_start_amp(scale_type):
     if scale_type == "mojave":

@@ -1,0 +1,17 @@
+[
+  {
+    "name": "dev",
+    "version": "latest",
+    "url": "https://radiosim.readthedocs.io/en/latest/"
+  },
+  {
+    "name": "stable",
+    "version": "stable",
+    "url": "https://radiosim.readthedocs.io/en/stable/"
+  },
+  {
+    "name": "v0.1.0",
+    "version": "v0.1.0",
+    "url": "https://radiosim.readthedocs.io/en/v0.1.0/"
+  }
+]

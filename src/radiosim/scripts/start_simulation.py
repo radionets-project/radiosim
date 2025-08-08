@@ -34,9 +34,8 @@ def main(configuration_path, mode) -> None:
         quiet=config["general"]["quiet"],
     )
 
-    if mode == "simulate":
-        if sim_sources:
-            simulate_sky_distributions(conf)
+    if mode == "simulate" and sim_sources:
+        simulate_sky_distributions(conf)
 
 
 if __name__ == "__main__":

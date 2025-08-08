@@ -10,7 +10,10 @@ from radiosim.ppdisks import generate_proto_set
 
 
 @click.command()
-@click.argument("configuration_path", type=click.Path(exists=True, dir_okay=False))
+@click.argument(
+    "configuration_path",
+    type=click.Path(exists=True, dir_okay=False),
+)
 def main(configuration_path) -> None:
     config = toml.load(configuration_path)
     rng = np.random.default_rng(seed=config["metadata"]["seed"])
