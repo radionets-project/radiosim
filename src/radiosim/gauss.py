@@ -1,11 +1,16 @@
 import numpy as np
 from astropy.convolution import Gaussian2DKernel
 from astropy.nddata.utils import Cutout2D
-from numpy.typing import ArrayLike
 from scipy.stats import norm, skewnorm
 
+__all__ = [
+    "gauss",
+    "skewed_gauss",
+    "twodgaussian",
+]
 
-def gauss(params: list, size: int):
+
+def gauss(params: list, size: int) -> np.ndarray:
     """
     Returns a 2d gaussian distribution. Creates a gaussian in the center with twice
     the image size and then cuts out the correct position.
@@ -42,16 +47,19 @@ def gauss(params: list, size: int):
     return gaussian_scaled
 
 
-def twodgaussian(params: list, size: int):
-    """
+def twodgaussian(params: list, size: int) -> np.ndarray:
+    r"""
     Returns a 2d gaussian function of the form:
-    x' = np.cos(rot) * x - np.sin(rot) * y
-    y' = np.sin(rot) * x + np.cos(rot) * y
-    g = a * np.exp ( - ( ((x-center_x)/width_x)**2 +
-    ((y-center_y)/width_y)**2 ) / 2 )
 
-    Pro: Faster than gauss
-    Con: More difficult to understand
+    .. math::
+
+       x' &= \cos(rot) * x - \sin(rot) * y \\
+       y' &= \sin(rot) * x + \cos(rot) * y \\
+       g  &= a * \exp(-(((x - \mathtt{center\_x})/ \mathtt{width\_x})^2 \\
+          &\phantom{=} + ((y - \mathtt{center\_y}) / \mathtt{width\_y})^2 ) / 2 )
+
+    - Pro: Faster than gauss
+    - Con: More difficult to understand
 
     Parameters
     ----------
@@ -63,12 +71,12 @@ def twodgaussian(params: list, size: int):
 
     Returns
     -------
-    rotgauss: 2darray
+    rotgauss: array_like
         gaussian distribution in two dimensions
 
     Notes
     -----
-    Short version of 'twodgaussian':
+    Short version of ``twodgaussian``:
     https://github.com/keflavich/gaussfitter/blob/0891cd3605ab5ba000c2d5e1300dd21c15eee1fd/gaussfitter/gaussfitter.py#L75
     """
     amplitude = params[0]
@@ -97,7 +105,7 @@ def skewed_gauss(
     width: float,
     length: float,
     a: float,
-) -> ArrayLike:
+) -> np.ndarray:
     """
     Generate a skewed 2d normal distribution.
 
@@ -120,11 +128,11 @@ def skewed_gauss(
 
     Returns
     -------
-    skew_gauss: ArrayLike
+    skew_gauss: array_like
         two dimensional skewed gaussian distribution
     """
 
-    def skewfunc(x: float, **args) -> ArrayLike:
+    def skewfunc(x: float, **args) -> np.ndarray:
         func = skewnorm.pdf(x, **args)
         func /= func.max()
         return func

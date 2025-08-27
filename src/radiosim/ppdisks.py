@@ -1,19 +1,21 @@
+# Code adapted from Andreas Maisinger (TU Dortmund University)
+
 import numpy as np
 
 try:
     import torch
-except ImportError:  # pragma: no cover
+except ImportError as err:  # pragma: no cover
     raise ModuleNotFoundError(
         "You need torch to use the ppdisks module of radiosim!"
-        'Use pip install ".[torch]" to install the necessary packages!'
-    )
+        'Use uv pip install "radiosim[torch]" to install the necessary packages!'
+    ) from err
 
 from astropy.convolution import Gaussian2DKernel
 from torch.fft import fft2, ifft2
 from torchvision.transforms.functional import resize
 from tqdm.autonotebook import tqdm
 
-# Original code by Andreas Maisinger (TU Dortmund University)
+__all__ = ["create_proto", "generate_proto_set"]
 
 
 def generate_proto_set(
@@ -32,36 +34,33 @@ def generate_proto_set(
     Parameters
     ----------
     img_size: int
-    The size of the image (height and width)
-
+        The size of the image (height and width)
     size: int
-    The amount of images to simulate
-
+        The amount of images to simulate
     alpha_range: tuple of float, optional
-    The range of values of the inclination of the disk in degrees
-
+        The range of values of the inclination of the
+        disk in degrees. Default: (0, 180)
     ratio_range: tuple of float, optional
-    The range of values of the ratio the minor axis should be of the major axis a / b
-
+        The range of values of the ratio the minor axis should
+        be of the major axis :math:`a / b`. Default: (3, 15)
     size_ratio_range: tuple of float, optional
-    The range of values of the ratio of the image size the disk should take up
-
+        The range of values of the ratio of the image
+        size the disk should take up. Default: (0.1, 1)
     device: str, optional
-    The name of the device to run the simulations on (with torch)
-
+        The name of the device to run the simulations
+        on (with torch). Default: 'cpu'
     seed: int, optional
-    The seed for the random generator
-
+        The seed for the random generator. Default: 1337
     verbose: bool, optional
-    Whether
+        Whether to show a progress bar or not. Default: False
 
     Returns
     -------
     protos: list of torch.tensor
-    List of the simulated images
+        List of the simulated images
 
     params: dict
-    The used simulation parameters
+        The used simulation parameters
 
     """
 
@@ -107,27 +106,22 @@ def create_proto(
     Parameters
     ----------
     img_size: int
-    The size of the image (height and width)
-
+        The size of the image (height and width)
     alpha: float
-    The inclination angle of the disk in degrees
-
+        The inclination angle of the disk in degrees
     ratio: float
-    The ratio the minor axis should be of the major axis a / b
-
+        The ratio the minor axis should be of the major axis a / b
     size_ratio: float
-    The ratio of the image size the disk should take up
-
+        The ratio of the image size the disk should take up
     device: str, optional
-    The name of the device to run the simulations on (with torch)
-
+        The name of the device to run the simulations on (with torch)
     seed: int, optional
-    The seed for the random generator. If set to ``None``, the seed is ignored.
+        The seed for the random generator. If set to ``None``, the seed is ignored.
 
     Returns
     -------
     proto: torch.tensor
-    The simulated image of the protoplanetary disk
+        The simulated image of the protoplanetary disk
 
     """
 
@@ -192,7 +186,12 @@ def create_proto(
 
 
 def _create_ellipse(
-    img_size: int, a: float, b: float, center: tuple, alpha: float, device: str = "cpu"
+    img_size: int,
+    a: float,
+    b: float,
+    center: tuple,
+    alpha: float,
+    device: str = "cpu",
 ):
     """
     Generates an ellipse
@@ -200,31 +199,24 @@ def _create_ellipse(
     Parameters
     ----------
     img_size: int
-    The size of the image (height and width)
-
+        The size of the image (height and width)
     a: float
-    The major axis of the ellipse
-
+        The major axis of the ellipse
     b: float
-    The minor axis of the ellipse
-
+        The minor axis of the ellipse
     center: tuple of float
-    The center of the ellipse
-
+        The center of the ellipse
     alpha: float
-    The rotation angle of the ellipse
-
+        The rotation angle of the ellipse
     device: str, optional
-    The name of the device to run the simulations on (with torch)
+        The name of the device to run the simulations on (with torch)
 
     Returns
     -------
     ellipse: torch.tensor
-    The image of the ellipse
-
+        The image of the ellipse
     average_distance: float
-    The average distance from the center of the ellipse
-
+        The average distance from the center of the ellipse
     """
 
     x_0 = center[0]

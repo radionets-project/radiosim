@@ -1,11 +1,20 @@
 import numpy as np
 from joblib import Parallel, delayed
-from numpy.typing import ArrayLike
 from scipy.stats import expon, skewnorm
 from skimage.transform import rotate, swirl
 
 from radiosim.gauss import skewed_gauss, twodgaussian
 from radiosim.utils import _gen_date, _gen_vlba_obs_position
+
+__all__ = [
+    "add_swirl",
+    "create_mojave",
+    "gen_compact",
+    "gen_jet",
+    "gen_one_jet",
+    "gen_shocks",
+    "gen_two_jet",
+]
 
 
 def create_mojave(conf, rng):
@@ -19,17 +28,15 @@ def create_mojave(conf, rng):
 
     Returns:
     --------
-    glx : ArrayLike
+    glx : array_like
         generated sources
     """
 
     threads = conf["threads"]
     if threads == "none":
         threads = 1
-    elif not isinstance(threads, int):
-        raise ValueError('threads has to be int >0 or "none"')
-    elif threads <= 0:
-        raise ValueError('threads has to be int >0 or "none"')
+    elif not isinstance(threads, int) or threads <= 0:
+        raise ValueError("threads has to be int >0 or 'none'")
 
     size = conf["img_size"]
 
@@ -73,7 +80,7 @@ def create_mojave(conf, rng):
 
 def gen_jet(
     size: int, amplitude: float, width: float, length: float, a: float
-) -> ArrayLike:
+) -> np.ndarray:
     """
     Generate jet from skewed 2d normal distributiuon.
 
@@ -92,7 +99,7 @@ def gen_jet(
 
     Returns
     -------
-    jet : ArrayLike
+    jet : array_like
         jet for source
     """
 
@@ -112,19 +119,19 @@ def gen_jet(
 
 
 def gen_shocks(
-    jet: ArrayLike,
+    jet: np.ndarray,
     shock_comp: int,
     length: float,
     width: float,
     sx: float,
-    rng: "np.Generator",
-) -> tuple[ArrayLike, tuple, int]:
+    rng: np.random.Generator,
+) -> tuple[np.ndarray, tuple, int]:
     """
     Generate equally spaced shocks in jet.
 
     Parameters
     ----------
-    jet : ArrayLike
+    jet : array_like
         generated jet without shock
     shock_comp : int
         max amount of shocks
@@ -134,12 +141,12 @@ def gen_shocks(
         width of jet
     sx : float
         sx component of main gaussian
-    rng : np.Generator
+    rng : :class:`~numpy.random.Generator`
         numpy random generator
 
     Returns
     -------
-    jet : ArrayLike
+    jet : array_like
         jet with shock components
     printout_information : tuple
         information about each component
@@ -167,7 +174,7 @@ def gen_shocks(
     s_dist = s_length / shock_comp
     s_dist0 = s_dist
     skipped = 0
-    for i in range(shock_comp):
+    for _ in range(shock_comp):
         # skip randomly
         if rng.uniform(0, 1) > 2 / 3:
             skipped += 1
@@ -208,16 +215,18 @@ def gen_shocks(
 
 
 def add_swirl(
-    jet: ArrayLike, rng: "np.Generator", first_jet_params: tuple | None = None
-) -> tuple[ArrayLike, tuple]:
+    jet: np.ndarray,
+    rng: np.random.Generator,
+    first_jet_params: tuple | None = None,
+) -> tuple[np.ndarray, tuple]:
     """
     Add swirl distortion to the jet.
 
     Parameters
     ----------
-    jet : ArrayLike
+    jet : array_like
         generated jet
-    rng : np.Generator
+    rng : :class:`~numpy.random.Generator`
         numpy random generator
     first_jet_params : tuple | None, default: None
         Use when generate two jet sources.
@@ -226,7 +235,7 @@ def add_swirl(
 
     Returns
     -------
-    swirled_jet : ArrayLike
+    swirled_jet : array_like
         swirl distorted input jet
     parameters : tuple
         parameters of the aplied swirl distortion
@@ -247,13 +256,17 @@ def add_swirl(
     return swirled_jet, (strength, radius, center)
 
 
-def gen_two_jet(rng: int, size: int = 1024, printout: bool = False) -> ArrayLike:
+def gen_two_jet(
+    rng: int,
+    size: int = 1024,
+    printout: bool = False,
+) -> np.ndarray:
     """
     Generate a two jet galaxy.
 
     Parameters
     ----------
-    rng : np.Generator | int
+    rng : :class:`~numpy.random.Generator` | int
     numpy random generator or seed to generate random number generator
     size : int, default: 1024
         size of the galaxy to be genrated
@@ -262,7 +275,7 @@ def gen_two_jet(rng: int, size: int = 1024, printout: bool = False) -> ArrayLike
 
     Returns
     -------
-    glx : ArrayLike
+    glx : array_like
         simulated two jet source
     """
     if isinstance(rng, int):
@@ -350,7 +363,7 @@ def gen_two_jet(rng: int, size: int = 1024, printout: bool = False) -> ArrayLike
                 f"Right Shock, {shock_comp_r} Components, \
                     {r_skipped} skipped:"
             )
-            for orient, amp, x, y, sx, sy, rot, dist, a in zip(*r_printout):
+            for _, amp, x, y, sx, sy, rot, dist, _ in zip(*r_printout):
                 print(
                     f"amp = {amp:.6f}, x = {x:.0f}, y = {y:.0f}, \
                         sx = {sx:.3f}, sy = {sy:.3f}, rot = {rot:.3f}, \
@@ -361,7 +374,7 @@ def gen_two_jet(rng: int, size: int = 1024, printout: bool = False) -> ArrayLike
                 f"Left Shock, {shock_comp_l} Components, \
                     {l_skipped} skipped:"
             )
-            for orient, amp, x, y, sx, sy, rot, dist, a in zip(*l_printout):
+            for _, amp, x, y, sx, sy, rot, dist, _ in zip(*l_printout):
                 print(
                     f"amp = {amp:.6f}, x = {x:.0f}, y = {y:.0f}, \
                         sx = {sx:.3f}, sy = {sy:.3f}, rot = {rot:.3f}, \
@@ -380,13 +393,13 @@ def gen_two_jet(rng: int, size: int = 1024, printout: bool = False) -> ArrayLike
     return glx
 
 
-def gen_one_jet(rng: int, size: int = 1024, printout: bool = False) -> ArrayLike:
+def gen_one_jet(rng: int, size: int = 1024, printout: bool = False) -> np.ndarray:
     """
     Generate a one jet galaxy.
 
     Parameters
     ----------
-    rng : np.Generator | int
+    rng : :class:`~numpy.random.Generator` | int
         numpy generator or seed to generate random number generator
     size : int, default: 1024
         size of the galaxy to be genrated
@@ -459,7 +472,7 @@ def gen_one_jet(rng: int, size: int = 1024, printout: bool = False) -> ArrayLike
         )
         if shock_comp > 0:
             print(f"{shock_comp} shock components, {skipped} skipped:")
-            for orient, amp, x, y, sx, sy, rot, dist, a in zip(shock_printout):
+            for _, amp, x, y, sx, sy, rot, dist, _ in zip(shock_printout):
                 print(
                     f"amp = {amp:.6f}, x = {x:.0f}, y = {y:.0f}, \
                         sx = {sx:.3f}, sy = {sy:.3f}, rot = {rot:.3f}, \
@@ -474,12 +487,12 @@ def gen_one_jet(rng: int, size: int = 1024, printout: bool = False) -> ArrayLike
     return glx
 
 
-def gen_compact(rng: int, size: int = 1024, printout: bool = False) -> ArrayLike:
+def gen_compact(rng: int, size: int = 1024, printout: bool = False) -> np.ndarray:
     """Generate a compact galaxy.
 
     Parameters
     ----------
-    rng : np.Generator | int
+    rng : :class:`~numpy.random.Generator` | int
         numpy generator or seed to generate random number generator.
     size : int, default: 1024
         size of the galaxy to be genrated
@@ -580,10 +593,7 @@ def gen_compact(rng: int, size: int = 1024, printout: bool = False) -> ArrayLike
             sy = comp_sy[-1] * deviation[1]
 
         if i == 0:
-            if sx > sy:
-                vertical = True
-            else:
-                vertical = False
+            vertical = sx > sy
 
         try:
             rot = rng.uniform(comp_rot[-1] - 0.1, comp_rot[-1] + 0.1)
@@ -637,11 +647,11 @@ def gen_compact(rng: int, size: int = 1024, printout: bool = False) -> ArrayLike
         for cx, cy, csx, csy, cr in zip(comp_x, comp_y, comp_sx, comp_sy, comp_rot):
             print(
                 f"amp = {amp:.3f},"
-                "x = {cx:.0f}, "
-                "y = {cy:.0f}, "
-                "sx = {csx:.3f}, "
-                "sy = {csy:.3f}, "
-                "rot = {cr:.3f}"
+                f"x = {cx:.0f}, "
+                f"y = {cy:.0f}, "
+                f"sx = {csx:.3f}, "
+                f"sy = {csy:.3f}, "
+                f"rot = {cr:.3f}"
             )
 
     return glx
