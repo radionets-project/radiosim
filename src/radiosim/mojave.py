@@ -4,7 +4,8 @@ from scipy.stats import expon, skewnorm
 from skimage.transform import rotate, swirl
 
 from radiosim.gauss import skewed_gauss, twodgaussian
-from radiosim.utils import _gen_date, _gen_vlba_obs_position
+from radiosim.utils import setup_logger
+from radiosim.utils.utils import _gen_date, _gen_vlba_obs_position
 
 __all__ = [
     "add_swirl",
@@ -15,6 +16,8 @@ __all__ = [
     "gen_shocks",
     "gen_two_jet",
 ]
+
+LOGGER = setup_logger(namespace=__name__)
 
 
 def create_mojave(conf, rng):
@@ -182,7 +185,12 @@ def gen_shocks(
 
         s_x = size / 2 + s_dist
         s_y = size / 2
-        s_amp = jet[int(s_y), int(s_x)] * rng.uniform(0.03, 0.6)
+
+        try:
+            s_amp = jet[int(s_y), int(s_x)] * rng.uniform(0.03, 0.6)
+        except IndexError:  # catch if image is too small - must fix properly later
+            # LOGGER.exception(e)
+            continue
 
         s_sx = rng.uniform(*np.sort([2, width]))
         s_sy = rng.uniform(*np.sort([s_sx, length / shock_comp]))
