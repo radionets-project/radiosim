@@ -12,6 +12,8 @@ from astropy.convolution import Gaussian2DKernel
 from numpy.typing import ArrayLike
 from scipy import signal
 
+from radiosim.logging import setup_logger
+
 __all__ = [
     "add_noise",
     "adjust_outpath",
@@ -26,6 +28,9 @@ __all__ = [
     "zoom_on_source",
     "zoom_out",
 ]
+
+
+LOGGER = setup_logger(namespace=__name__, tracebacks_suppress=[click])
 
 
 def create_grid(pixel, bundle_size):
@@ -194,16 +199,16 @@ def check_outpath(outpath, quiet=False):
     if exists is True:
         source = {p for p in path.rglob("*data*.h5") if p.is_file()}
         if source:
-            click.echo("Found existing source simulations!")
+            LOGGER.warning("Found existing source simulations!")
             if quiet or click.confirm(
                 "Do you really want to overwrite existing files?", abort=False
             ):
-                click.echo("Overwriting existing source simulations!")
+                LOGGER.warning("Overwriting existing source simulations!")
                 [p.unlink() for p in source]
                 sim_sources = True
                 return sim_sources
             else:
-                click.echo("Keeping existing source simulations!")
+                LOGGER.info("Keeping existing source simulations!")
                 sim_sources = False
                 sys.exit()
         else:
