@@ -189,7 +189,6 @@ def gen_shocks(
         try:
             s_amp = jet[int(s_y), int(s_x)] * rng.uniform(0.03, 0.6)
         except IndexError:  # catch if image is too small - must fix properly later
-            # LOGGER.exception(e)
             continue
 
         s_sx = rng.uniform(*np.sort([2, width]))
