@@ -97,7 +97,7 @@ Repository = "https://github.com/radionets-project/radiosim"
 [project.scripts]
 radiosim-simulate = "radiosim.tools.start_simulation:main"
 radiosim-ppdisk = "radiosim.tools.simulate_ppdisks:main"
-radiosim-quickstart = "radiosim.tools.quickstart:main"
+radiosim-quickstart = "radiosim.tools.quickstart:quickstart"
 
 [tool.hatch.version]
 source = "vcs"
@@ -139,7 +139,7 @@ extend-select = [
   "B", # flake8-bugbear
   "SIM", # flake8-simplify
 ]
-ignore = ["B905"]
+ignore = ["B905", "UP038"]
 
 fixable = ["ALL"]
 unfixable = []
