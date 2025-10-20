@@ -380,7 +380,6 @@ def _save_mojave_bundle(path: str, data: tuple, data_name: tuple) -> None:
     with h5py.File(path, "w") as hf:
         for dat, name in zip(data, data_name):
             hf.create_dataset(name, data=dat)
-        hf.close()
 
 
 def _gen_vlba_obs_position(rng, size: int) -> tuple[float, float]:
