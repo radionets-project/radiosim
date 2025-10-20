@@ -372,7 +372,7 @@ def _save_mojave_bundle(path: str, data: tuple, data_name: tuple) -> None:
     path: str
         path to save file
     data : tuple
-        data to store, e.g. galaxies, classes, coordinates, u2026
+        data to store, e.g. galaxies, classes, coordinates, ...
     data_name : tuple
         name of the data columns
     """
