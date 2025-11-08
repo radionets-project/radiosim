@@ -1,10 +1,10 @@
 from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
 
-__all__ = ["PPDataSetConfig", "PPMetdaData", "PPGeneralConfig"]
+__all__ = ["PPDataSetConfig", "PPMetdaDataConfig"]
 
 
-class PPMetdaData(BaseModel):
+class PPMetdaDataConfig(BaseModel):
     img_size: int = Field(default_value=512, ge=64)
     alpha_range: list[float] = [0.0, 180.0]
     ratio_range: list[float] = [3.0, 15.0]
