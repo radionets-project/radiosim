@@ -34,7 +34,7 @@ class MojaveConfig(BaseModel):
 
 
 class PPDiskConfig(BaseModel):
-    metadata: PPMetdaData = PPMetdaData
+    metadata: PPMetdaDataConfig = PPMetdaDataConfig
     dataset: PPDataSetConfig = PPDataSetConfig
 
 
