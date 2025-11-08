@@ -4,7 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from ._ppdisks_config import PPDataSetConfig, PPMetdaDataConfig
+from ._ppdisks_config import PPDataSetConfig
 
 
 class GeneralConfig(BaseModel):
