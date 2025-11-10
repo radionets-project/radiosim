@@ -1,13 +1,9 @@
-[build-system]
-requires = ["hatchling", "hatch-vcs"]
-build-backend = "hatchling.build"
-
 [project]
 name = "radiosim"
-dynamic = ["version"]
 description = "Simulation of radio skies to create astrophysical data sets"
 readme = "README.rst"
-
+requires-python = ">=3.11"
+license = { text = "MIT" }
 authors = [
   { name = "radionets Developers" },
 ]
@@ -15,8 +11,6 @@ maintainers = [
   { name = "Kevin Schmitz", email = "kevin2.schmiz@tu-dortmund.de" },
   { name = "Christian Arauner", email = "christian.arauner@tu-dortmund.de" },
 ]
-
-license = { text = "MIT" }
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Science/Research",
@@ -24,14 +18,11 @@ classifiers = [
   "Natural Language :: English",
   "Operating System :: OS Independent",
   "Programming Language :: Python",
-  "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.9",
   "Topic :: Scientific/Engineering :: Astronomy",
   "Topic :: Scientific/Engineering :: Physics",
 ]
-
-requires-python = ">=3.11"
-
 dependencies = [
   "astropy",
   "click",
@@ -46,20 +37,25 @@ dependencies = [
   "toml",
   "tqdm",
 ]
+dynamic = ["version"]
+
+[project.urls]
+Repository = "https://github.com/radionets-project/radiosim"
+
+[project.scripts]
+radiosim = "radiosim.tools.cli:main"
 
 [project.optional-dependencies]
 torch = ["torch", "torchvision"]
 
 [dependency-groups]
-tests = [
-  "coverage!=6.3.0",
-  "h5py",
-  "pytest >= 7.0",
-  "pytest-cov",
-  "pytest-xdist",
-  "restructuredtext-lint",
+dev = [
+  "ipython",
+  "jupyter",
+  "pre-commit",
+  { include-group = "docs" },
+  { include-group = "tests" },
 ]
-
 docs = [
   "graphviz",
   "ipython",
@@ -73,31 +69,37 @@ docs = [
   "pydata_sphinx_theme",
   "sphinx",
   "sphinx-autobuild>=2024.10.3",
+  "sphinx_automodapi",
   "sphinx-changelog",
   "sphinx-copybutton",
   "sphinx-design",
   "sphinx-gallery >= 0.16.0",
   "sphinx-tippy>=0.4.3",
   "sphinx-togglebutton>=0.3.2",
-  "sphinx_automodapi",
   "sphinxcontrib-bibtex",
 ]
-
-dev = [
-  "ipython",
-  "jupyter",
-  "pre-commit",
-  {include-group = "docs"},
-  {include-group = "tests"},
+tests = [
+  "coverage!=6.3.0",
+  "h5py",
+  "pytest-cov",
+  "pytest-xdist",
+  "pytest >= 7.0",
+  "restructuredtext-lint",
 ]
 
-[project.urls]
-Repository = "https://github.com/radionets-project/radiosim"
+[build-system]
+requires = ["hatch-vcs", "hatchling"]
+build-backend = "hatchling.build"
 
-[project.scripts]
-radiosim-simulate = "radiosim.tools.start_simulation:main"
-radiosim-ppdisk = "radiosim.tools.simulate_ppdisks:main"
-radiosim-quickstart = "radiosim.tools.quickstart:quickstart"
+[tool.coverage.run]
+omit = [
+  "docs/*",
+  "src/radiosim/_version.py",
+  "src/radiosim/version.py",
+]
+
+[tool.coverage.xml]
+output = "coverage.xml"
 
 [tool.hatch.version]
 source = "vcs"
@@ -114,17 +116,6 @@ include = ["src/radiosim"]
 [tool.hatch.build.targets.wheel.shared-data]
 "rc" = "share/configs"
 
-[tool.coverage.run]
-omit = [
-  "docs/*",
-  "src/radiosim/_version.py",
-  "src/radiosim/version.py",
-]
-
-[tool.coverage.xml]
-output = "coverage.xml"
-
-
 [tool.ruff]
 target-version = "py311"
 line-length = 88
@@ -133,16 +124,18 @@ extend-exclude = ["tests"]
 [tool.ruff.lint]
 extend-select = [
   "I",  # isort
-  "E", # pycodestyle
-  "F", # Pyflakes
-  "UP", # pyupgrade
-  "B", # flake8-bugbear
-  "SIM", # flake8-simplify
+  "E",  # pycodestyle
+  "F",  # Pyflakes
+  "UP",  # pyupgrade
+  "B",  # flake8-bugbear
+  "SIM",  # flake8-simplify
 ]
 ignore = ["B905", "UP038"]
-
 fixable = ["ALL"]
 unfixable = []
+
+[tool.ruff.lint.isort]
+known-first-party = ["radiosim"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -151,42 +144,38 @@ line-ending = "auto"
 skip-magic-trailing-comma = false
 docstring-code-format = true
 
-[tool.ruff.lint.isort]
-known-first-party = ["radiosim"]
-
-
 [tool.towncrier]
-    package = "radiosim"
-    directory = "docs/changes"
-    filename = "CHANGES.rst"
-    template = "docs/changes/template.rst"
-    # let towncrier create proper links to the merged PR
-    issue_format = "`#{issue} <https://github.com/radionets-project/radiosim/pull/{issue}>`__"
+package = "radiosim"
+directory = "docs/changes"
+filename = "CHANGES.rst"
+template = "docs/changes/template.rst"
+# let towncrier create proper links to the merged PR
+issue_format = "`#{issue} <https://github.com/radionets-project/radiosim/pull/{issue}>`__"
 
-    [tool.towncrier.fragment.feature]
-        name = "New Features"
-        showcontent = true
+[tool.towncrier.fragment.feature]
+name = "New Features"
+showcontent = true
 
-    [tool.towncrier.fragment.bugfix]
-        name = "Bug Fixes"
-        showcontent = true
+[tool.towncrier.fragment.bugfix]
+name = "Bug Fixes"
+showcontent = true
 
-    [tool.towncrier.fragment.api]
-        name = "API Changes"
-        showcontent = true
+[tool.towncrier.fragment.api]
+name = "API Changes"
+showcontent = true
 
-    [tool.towncrier.fragment.datamodel]
-        name = "Data Model Changes"
-        showcontent = true
+[tool.towncrier.fragment.datamodel]
+name = "Data Model Changes"
+showcontent = true
 
-    [tool.towncrier.fragment.optimization]
-        name = "Refactoring and Optimization"
-        showcontent = true
+[tool.towncrier.fragment.optimization]
+name = "Refactoring and Optimization"
+showcontent = true
 
-    [tool.towncrier.fragment.maintenance]
-        name = "Maintenance"
-        showcontent = true
+[tool.towncrier.fragment.maintenance]
+name = "Maintenance"
+showcontent = true
 
-    [[tool.towncrier.section]]
-        name = ""
-        path = ""
+[[tool.towncrier.section]]
+name = ""
+path = ""
