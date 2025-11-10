@@ -41,7 +41,7 @@ def create_jet(grid, conf):
         array which stores all (seven) properties of each component,
         shape: [n, c*2-1, 7]
     """
-    num_comps = conf["num_jet_components"]
+    num_comps = conf.jet.num_jet_components
 
     if len(grid.shape) == 3:
         grid = grid[None]
@@ -116,7 +116,7 @@ def create_jet(grid, conf):
         center_shift_x = np.random.uniform(-img_size / 20, img_size / 20)
         center_shift_y = np.random.uniform(-img_size / 20, img_size / 20)
 
-        if conf["scaling"] == "mojave":
+        if conf.jet.scaling == "mojave":
             amp *= get_start_amp("mojave")
 
         # mirror the data for the counter jet
@@ -174,7 +174,7 @@ def create_jet(grid, conf):
             sy *= zoom_out_factor
 
         # normalisation
-        if conf["scaling"] == "normalize":
+        if conf.jet.scaling == "normalize":
             jet_max = jet_img.max()
             jet_img /= jet_max
             jet_comp /= jet_max
@@ -185,7 +185,9 @@ def create_jet(grid, conf):
         jet_comp = np.concatenate((jet_comp, (1 - jet_img)[None, :, :]))
         source_list = np.array([amp, x, y, sx, sy, rotation, z_rotation, beta]).T
 
-        target = apply_train_type(conf["training_type"], jet_img, jet_comp, source_list)
+        target = apply_train_type(
+            conf.jet.training_type, jet_img, jet_comp, source_list
+        )
 
         targets.append(target)
 

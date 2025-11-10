@@ -9,12 +9,12 @@ from rich.progress import (
     TimeElapsedColumn,
 )
 
-from radiosim.jet import create_jet
+from radiosim.io import Config
+from radiosim.jets import create_jet
 from radiosim.mojave import create_mojave
 from radiosim.survey import create_survey
 from radiosim.utils import (
     add_noise,
-    adjust_outpath,
     create_grid,
     save_sky_distribution_bundle,
     setup_logger,
@@ -43,29 +43,34 @@ PROGRESS_GROUP = Group(
 )
 
 
-def simulate_sky_distributions(conf):
-    if conf["mode"] == "mojave":
-        seed = conf["seed"]
-        if seed == "none":
-            rng = default_rng()
-        elif isinstance(seed, int):
-            rng = default_rng(seed)
-        else:
-            raise TypeError('seed has to be int or "none"')
-    else:
-        rng = None
+def simulate_sky_distributions(conf, mode):
+    seed = conf.general.seed
+    if not seed:
+        rng = default_rng()
+    elif isinstance(seed, int):
+        rng = default_rng(seed)
+
+    bundles = [
+        conf.dataset.bundles_train,
+        conf.dataset.bundles_valid,
+        conf.dataset.bundles_test,
+    ]
 
     # Add task_id for overall progress, i.e. train, valid,
     # and test dataset tracking for a total of 3.
     overall_task_id = OVERALL_PROGRESS.add_task("", total=3)
 
     with Live(PROGRESS_GROUP):
-        for idx, opt in enumerate(["train", "valid", "test"]):
+        for idx, (opt, num_bundles) in enumerate(
+            zip(["train", "valid", "test"], bundles)
+        ):
             simulation_task_id = SIMULATION_PROGRESS.add_task(
-                "", total=conf["bundles_" + opt], name=opt
+                "", total=num_bundles, name=opt
             )
             create_sky_distribution(
                 conf=conf,
+                num_bundles=num_bundles,
+                mode=mode,
                 opt=opt,
                 simulation_task_id=simulation_task_id,
                 rng=rng,
@@ -74,39 +79,46 @@ def simulate_sky_distributions(conf):
             OVERALL_PROGRESS.update(overall_task_id, description=top_descr)
 
 
-def create_sky_distribution(conf, opt: str, simulation_task_id: int, rng=None) -> None:
-    for _ in range(conf["bundles_" + opt]):
-        path = adjust_outpath(conf["outpath"], f"/data_{conf['mode']}_" + opt)
-        grid = create_grid(conf["img_size"], conf["bundle_size"])
+def create_sky_distribution(
+    conf: Config,
+    num_bundles: int,
+    mode: str,
+    opt: str,
+    simulation_task_id: int,
+    rng=None,
+) -> None:
+    for _ in range(num_bundles):
+        path = conf.paths.outpath / f"data_{mode}_{opt}"
+        grid = create_grid(conf.dataset.img_size, conf.dataset.bundle_size)
 
-        if conf["mode"] == "jet":
+        if mode == "jet":
             sky, target = create_jet(grid, conf)
-        elif conf["mode"] == "survey":
+        elif mode == "survey":
             sky, target = create_survey(grid, conf)
-        elif conf["mode"] == "mojave":
+        elif mode == "mojave":
             data, data_name = create_mojave(conf, rng)
             sky_bundle = data[0].copy()
-            if conf["noise"]:
+            if conf.dataset.noise:
                 sky_bundle = np.squeeze(
-                    add_noise(np.expand_dims(sky_bundle, axis=1), conf["noise_level"]),
+                    add_noise(
+                        np.expand_dims(sky_bundle, axis=1),
+                        conf.dataset.noise_level,
+                    ),
                     axis=1,
                 )
-                # for img in data:
-                #     img -= img.min()
-                #     img /= img.max()
+
             _save_mojave_bundle(path, data=[sky_bundle, *data[1:]], data_name=data_name)
-            SIMULATION_PROGRESS.update(simulation_task_id, advance=1)
             continue
         else:
-            LOGGER.warning(
-                "Given mode not found. Choose 'survey', "
+            raise ValueError(
+                f"Mode {mode} not found. Choose 'survey', "
                 "'jet' or 'mojave' in config file"
             )
 
         sky_bundle = sky.copy()
         target_bundle = target.copy()
-        if conf["noise"] and conf["noise_level"] > 0:
-            sky_bundle = add_noise(sky_bundle, conf["noise_level"])
+        if conf.dataset.noise and conf.dataset.noise_level > 0:
+            sky_bundle = add_noise(sky_bundle, conf.dataset.noise_level)
             for img in sky_bundle:
                 img -= img.min()
                 img /= img.max()

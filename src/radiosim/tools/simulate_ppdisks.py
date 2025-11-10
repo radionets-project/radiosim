@@ -3,10 +3,10 @@ from pathlib import Path
 import click
 import h5py
 import numpy as np
-import toml
 from tqdm import tqdm
 
-from radiosim.ppdisks import generate_proto_set
+from radiosim.io import Config
+from radiosim.ppdisks.ppdisks import generate_proto_set
 
 
 @click.command()
@@ -15,26 +15,28 @@ from radiosim.ppdisks import generate_proto_set
     type=click.Path(exists=True, dir_okay=False),
 )
 def main(configuration_path) -> None:
-    config = toml.load(configuration_path)
-    rng = np.random.default_rng(seed=config["metadata"]["seed"])
+    config = Config.from_toml(configuration_path)
+    metadata_params = config.metadata
+    dataset_params = config.dataset
 
-    outpath = Path(config["dataset"]["outpath"])
+    rng = np.random.default_rng(seed=config.ppdisk.general.seed)
+
+    outpath = Path(config.paths.outpath)
 
     if not outpath.is_dir():
         outpath.mkdir()
 
-    file_prefix = config["dataset"]["file_prefix"]
+    file_prefix = dataset_params.file_prefix
 
-    metadata_params = config["metadata"]
-    device = config["simulation"]["device"]
-    verbose = config["simulation"]["verbose"]
+    device = config.general.device
+    verbose = config.general.verbose
 
-    batch_num = config["dataset"]["batches"]
-    batch_size = config["dataset"]["batch_size"]
+    batch_num = dataset_params.batches
+    batch_size = dataset_params.batch_size
     batches = {
-        "train": int(batch_num * config["dataset"]["batches_train_ratio"]),
-        "valid": int(batch_num * config["dataset"]["batches_valid_ratio"]),
-        "test": int(batch_num * config["dataset"]["batches_test_ratio"]),
+        "train": int(batch_num * dataset_params.batches_train_ratio),
+        "valid": int(batch_num * dataset_params.batches_valid_ratio),
+        "test": int(batch_num * dataset_params.batches_test_ratio),
     }
 
     # resolution and pointings taken from FITS headers of DSHARP dataset
@@ -66,11 +68,11 @@ def main(configuration_path) -> None:
     for batch_type, num in batches.items():
         for i in tqdm(np.arange(num), desc=f"Generating {batch_type}"):
             protos, params = generate_proto_set(
-                img_size=metadata_params["img_size"],
+                img_size=metadata_params.img_size,
                 size=batch_size,
-                alpha_range=metadata_params["alpha_range"],
-                ratio_range=metadata_params["ratio_range"],
-                size_ratio_range=metadata_params["size_ratio_range"],
+                alpha_range=metadata_params.alpha_range,
+                ratio_range=metadata_params.ratio_range,
+                size_ratio_range=metadata_params.size_ratio_range,
                 device=device,
                 seed=rng.integers(low=0, high=2**32 - 1),
                 verbose=verbose,
