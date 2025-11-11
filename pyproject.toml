@@ -31,6 +31,7 @@ dependencies = [
   "numpy",
   "opencv-python",
   "pathlib",
+  "pydantic>=2.12.4",
   "rich",
   "scikit-image",
   "scipy",
