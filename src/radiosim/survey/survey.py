@@ -1,7 +1,7 @@
 import numpy as np
 
-from radiosim.gauss import twodgaussian
 from radiosim.jets import create_jet
+from radiosim.utils.gauss import twodgaussian
 
 __all__ = ["create_survey"]
 

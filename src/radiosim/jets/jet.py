@@ -1,8 +1,8 @@
 import numpy as np
 
-from radiosim.flux_scaling import get_start_amp
-from radiosim.gauss import twodgaussian
+from radiosim.jets.flux_scaling import get_start_amp
 from radiosim.utils import pol2cart, relativistic_boosting, zoom_on_source, zoom_out
+from radiosim.utils.gauss import twodgaussian
 
 __all__ = [
     "apply_train_type",

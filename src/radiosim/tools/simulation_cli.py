@@ -4,7 +4,7 @@ from rich.pretty import pretty_repr
 
 from radiosim.io import Config
 from radiosim.logging import setup_logger
-from radiosim.simulations import simulate_sky_distributions
+from radiosim.simulations import simulate_ppdisks, simulate_sky_distributions
 from radiosim.utils import check_outpath
 
 LOGGER = setup_logger(namespace=__name__, tracebacks_suppress=[click])
@@ -47,7 +47,8 @@ def main(configuration_path, mode) -> None:
 
     if mode in ["mojave", "jet", "survey"] and sim_sources:
         simulate_sky_distributions(config, mode)
-    # elif mode == "ppdisk":
+    elif mode == "ppdisk":
+        simulate_ppdisks(config)
 
 
 if __name__ == "__main__":

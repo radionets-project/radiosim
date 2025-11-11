@@ -1,21 +1,13 @@
 from pathlib import Path
 
-import click
 import h5py
 import numpy as np
 from tqdm import tqdm
 
-from radiosim.io import Config
-from radiosim.ppdisks.ppdisks import generate_proto_set
+from radiosim.ppdisks import generate_proto_set
 
 
-@click.command()
-@click.argument(
-    "configuration_path",
-    type=click.Path(exists=True, dir_okay=False),
-)
-def main(configuration_path) -> None:
-    config = Config.from_toml(configuration_path)
+def simulate_ppdisks(config) -> None:
     metadata_params = config.metadata
     dataset_params = config.dataset
 
@@ -95,7 +87,3 @@ def main(configuration_path) -> None:
                     "metadata", data=str(metadata), dtype=h5py.string_dtype()
                 )
                 hf.create_dataset("params", data=str(params), dtype=h5py.string_dtype())
-
-
-if __name__ == "__main__":
-    main()

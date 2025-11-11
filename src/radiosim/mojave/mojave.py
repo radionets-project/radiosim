@@ -3,8 +3,8 @@ from joblib import Parallel, delayed
 from scipy.stats import expon, skewnorm
 from skimage.transform import rotate, swirl
 
-from radiosim.gauss import skewed_gauss, twodgaussian
 from radiosim.utils import setup_logger
+from radiosim.utils.gauss import skewed_gauss, twodgaussian
 from radiosim.utils.utils import _gen_date, _gen_vlba_obs_position
 
 __all__ = [
