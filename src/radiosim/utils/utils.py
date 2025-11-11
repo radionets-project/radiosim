@@ -10,6 +10,7 @@ import numpy as np
 import toml
 from astropy.convolution import Gaussian2DKernel
 from numpy.typing import ArrayLike
+from scipy.signal import fftconvolve
 
 from radiosim.logging import setup_logger
 
@@ -281,7 +282,7 @@ def add_noise(image, noise_level):
             np.random.normal(mean, std, size=img_shape) * max_noise[:, None, None, None]
         )
         g_kernel = Gaussian2DKernel(kernel / 2).array[None, None, :]
-        return signal.fftconvolve(noise, g_kernel, mode="same")
+        return fftconvolve(noise, g_kernel, mode="same")
 
     def call_noise(kernels, strengths):
         """
