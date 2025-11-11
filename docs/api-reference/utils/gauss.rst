@@ -4,7 +4,7 @@
 Gauss (:mod:`radiosim.gauss`)
 *****************************
 
-.. currentmodule:: radiosim.gauss
+.. currentmodule:: radiosim.utils.gauss
 
 Gauss module.
 
@@ -12,5 +12,5 @@ Gauss module.
 Reference/API
 =============
 
-.. automodapi:: radiosim.gauss
+.. automodapi:: radiosim.utils.gauss
     :inherited-members:

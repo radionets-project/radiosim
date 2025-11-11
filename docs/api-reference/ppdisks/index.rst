@@ -6,11 +6,23 @@ Protoplanetary Disks (:mod:`radiosim.ppdisks`)
 
 .. currentmodule:: radiosim.ppdisks
 
-Protoplanetary disks module.
 
+Introduction
+============
+
+:mod:`radiosim.io` contains methods for the simulation of protoplanetary disks.
+
+Submodules
+==========
+
+.. toctree::
+  :maxdepth: 1
+  :glob:
+
+  ppdisks
 
 Reference/API
 =============
 
 .. automodapi:: radiosim.ppdisks
-    :inherited-members:
+    :no-inheritance-diagram:
