@@ -1,7 +1,7 @@
 import numpy as np
 
-from radiosim.gauss import twodgaussian
-from radiosim.jet import create_jet
+from radiosim.jets import create_jet
+from radiosim.utils.gauss import twodgaussian
 
 __all__ = ["create_survey"]
 
@@ -34,8 +34,8 @@ def create_survey(grid, conf):
         array which stores all properties of each component, shape: [n, 1, 6]
         for each image the class label and its properties.
     """
-    class_distribution = conf["class_distribution"]
-    scale_sources = conf["scale_sources"]
+    class_distribution = conf.survey.class_distribution
+    scale_sources = conf.survey.scale_sources
 
     if len(grid.shape) == 3:
         grid = grid[None]
@@ -47,7 +47,7 @@ def create_survey(grid, conf):
     )
     # source_list = []
     for i_img, img in enumerate(grid):
-        for _ in range(conf["num_sources"]):
+        for _ in range(conf.survey.num_sources):
             rand_class = np.random.uniform(0, sum(class_distribution))
 
             # create first class (jet)

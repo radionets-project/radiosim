@@ -10,7 +10,7 @@ import numpy as np
 import toml
 from astropy.convolution import Gaussian2DKernel
 from numpy.typing import ArrayLike
-from scipy import signal
+from scipy.signal import fftconvolve
 
 from radiosim.logging import setup_logger
 
@@ -177,7 +177,7 @@ def zoom_out(img, comp=None, pad_value=0):
     return img
 
 
-def check_outpath(outpath, quiet=False):
+def check_outpath(outpath, verbose=True):
     """
     Check if outpath exists. Check for existing source_bundle files.
     Ask to overwrite or reuse existing files.
@@ -186,8 +186,9 @@ def check_outpath(outpath, quiet=False):
     ----------
     outpath : str
         path to out directory
-    quiet : bool
-        activate quiet mode, overwrite existing files
+    verbose : bool, optional
+        Activate or deactive verbose mode. Automatically overwrites
+        existing files if set to False. Default: True
 
     Returns
     -------
@@ -200,7 +201,7 @@ def check_outpath(outpath, quiet=False):
         source = {p for p in path.rglob("*data*.h5") if p.is_file()}
         if source:
             LOGGER.warning("Found existing source simulations!")
-            if quiet or click.confirm(
+            if not verbose or click.confirm(
                 "Do you really want to overwrite existing files?", abort=False
             ):
                 LOGGER.warning("Overwriting existing source simulations!")
@@ -281,7 +282,7 @@ def add_noise(image, noise_level):
             np.random.normal(mean, std, size=img_shape) * max_noise[:, None, None, None]
         )
         g_kernel = Gaussian2DKernel(kernel / 2).array[None, None, :]
-        return signal.fftconvolve(noise, g_kernel, mode="same")
+        return fftconvolve(noise, g_kernel, mode="same")
 
     def call_noise(kernels, strengths):
         """

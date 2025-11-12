@@ -3,8 +3,8 @@ from joblib import Parallel, delayed
 from scipy.stats import expon, skewnorm
 from skimage.transform import rotate, swirl
 
-from radiosim.gauss import skewed_gauss, twodgaussian
 from radiosim.utils import setup_logger
+from radiosim.utils.gauss import skewed_gauss, twodgaussian
 from radiosim.utils.utils import _gen_date, _gen_vlba_obs_position
 
 __all__ = [
@@ -35,17 +35,17 @@ def create_mojave(conf, rng):
         generated sources
     """
 
-    threads = conf["threads"]
-    if threads == "none":
+    threads = conf.general.threads
+    if not threads:
         threads = 1
     elif not isinstance(threads, int) or threads <= 0:
-        raise ValueError("threads has to be int >0 or 'none'")
+        raise ValueError("threads has to be int > 0 or None")
 
-    size = conf["img_size"]
+    size = conf.dataset.img_size
 
     # calculate amount of each class to generate per bundle
-    bundle_size = conf["bundle_size"]
-    ratio = np.array(conf["class_ratio"])
+    bundle_size = conf.dataset.bundle_size
+    ratio = np.array(conf.mojave.class_ratio)
 
     # amount = np.array([n_comact, n_one_jet, n_two_jet]])
     amount = np.array((ratio / ratio.sum()) * bundle_size).astype(int)

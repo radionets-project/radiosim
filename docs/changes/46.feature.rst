@@ -1,0 +1,3 @@
+Added new pydantic-based configuration system
+
+Merged configuration of protoplanetary disks and other simulations
