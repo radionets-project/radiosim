@@ -95,8 +95,9 @@ dev = [
 Repository = "https://github.com/radionets-project/radiosim"
 
 [project.scripts]
-radiosim-simulate = "radiosim.scripts.start_simulation:main"
-radiosim-ppdisk = "radiosim.scripts.simulate_ppdisks:main"
+radiosim-simulate = "radiosim.tools.start_simulation:main"
+radiosim-ppdisk = "radiosim.tools.simulate_ppdisks:main"
+radiosim-quickstart = "radiosim.tools.quickstart:quickstart"
 
 [tool.hatch.version]
 source = "vcs"
@@ -110,6 +111,8 @@ include = ["src/radiosim"]
 [tool.hatch.build.targets.wheel.sources]
 "src/radiosim" = "radiosim"
 
+[tool.hatch.build.targets.wheel.shared-data]
+"rc" = "share/configs"
 
 [tool.coverage.run]
 omit = [
@@ -136,7 +139,7 @@ extend-select = [
   "B", # flake8-bugbear
   "SIM", # flake8-simplify
 ]
-ignore = ["B905"]
+ignore = ["B905", "UP038"]
 
 fixable = ["ALL"]
 unfixable = []

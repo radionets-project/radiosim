@@ -1,9 +1,13 @@
 import click
 import numpy as np
 import toml
+from rich.pretty import pretty_repr
 
+from radiosim.logging import setup_logger
 from radiosim.simulations import simulate_sky_distributions
 from radiosim.utils import check_outpath, read_config
+
+LOGGER = setup_logger(namespace=__name__, tracebacks_suppress=[click])
 
 
 @click.command()
@@ -22,10 +26,12 @@ from radiosim.utils import check_outpath, read_config
 def main(configuration_path, mode) -> None:
     config = toml.load(configuration_path)
     conf = read_config(config)
-    print(conf, "\n")
+
+    LOGGER.info("Starting simulation of radio sky distributions:")
+    LOGGER.info(pretty_repr(conf))
 
     if conf["seed"] != "none":
-        click.echo(f"Using numpy random seed {conf['seed']}. \n")
+        LOGGER.info(f"Using numpy random seed {conf['seed']}.")
         np.random.seed(conf["seed"])
 
     outpath = config["paths"]["outpath"]

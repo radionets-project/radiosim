@@ -93,7 +93,6 @@ def main(configuration_path) -> None:
                     "metadata", data=str(metadata), dtype=h5py.string_dtype()
                 )
                 hf.create_dataset("params", data=str(params), dtype=h5py.string_dtype())
-                hf.close()
 
 
 if __name__ == "__main__":

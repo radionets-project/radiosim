@@ -5,7 +5,7 @@ title = "Simulation configuration"
 [general]
 quiet = true
 seed = "none"  # "none" or int
-mode = "jet"   # jet or survey or mojave
+mode = "mojave"   # jet or survey or mojave
 threads = "none" # "none" or int > 0
 
 [paths]
@@ -23,13 +23,13 @@ class_distribution = [2, 1, 2]   # average share of each source in the images
 scale_sources = true
 
 [mojave]
-class_ratio = [5, 5, 1] # rel. amount of each class [compact, one_jet, two_jets]
+class_ratio = [1, 1, 1] # rel. amount of each class [compact, one_jet, two_jets]
 
 [image_options]
-bundles_train = 1
-bundles_valid = 1
-bundles_test = 1
-bundle_size = 100
+bundles_train = 40
+bundles_valid = 10
+bundles_test = 10
+bundle_size = 10
 img_size = 256
 noise = true
 noise_level = [0, 15]    # range of the intensity of noise in percent, relative to peak flux in image
