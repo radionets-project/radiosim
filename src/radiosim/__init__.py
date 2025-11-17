@@ -1,3 +1,17 @@
+import rich_click as click
+
 from .version import __version__
 
 __all__ = ["__version__"]
+
+
+click.rich_click.MAX_WIDTH = 100
+click.rich_click.STYLE_COMMANDS_TABLE_COLUMN_WIDTH_RATIO = (1, 7)
+click.rich_click.TEXT_MARKUP = "rich"
+click.rich_click.SHOW_ARGUMENTS = True
+click.rich_click.GROUP_ARGUMENTS_OPTIONS = True
+click.rich_click.STYLE_ERRORS_SUGGESTION = "magenta italic"
+click.rich_click.ERRORS_SUGGESTION = (
+    "Try running the '--help' flag for more information."
+)
+click.rich_click.ERRORS_EPILOGUE = "To find out more, visit [link=https://radiosim.readthedocs.io]https://radiosim.readthedocs.io[/link]"
