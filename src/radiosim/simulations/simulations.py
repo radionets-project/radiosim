@@ -88,7 +88,7 @@ def create_sky_distribution(
     rng=None,
 ) -> None:
     for _ in range(num_bundles):
-        path = conf.paths.outpath / f"data_{mode}_{opt}"
+        path = conf.paths.outpath / f"data_{mode}_{opt}.h5"
         grid = create_grid(conf.dataset.img_size, conf.dataset.bundle_size)
 
         if mode == "jet":
@@ -108,6 +108,7 @@ def create_sky_distribution(
                 )
 
             _save_mojave_bundle(path, data=[sky_bundle, *data[1:]], data_name=data_name)
+            SIMULATION_PROGRESS.update(simulation_task_id, advance=1)
             continue
         else:
             raise ValueError(
