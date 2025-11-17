@@ -33,6 +33,7 @@ dependencies = [
   "pathlib",
   "pydantic>=2.12.4",
   "rich",
+  "rich-click>=1.9.4",
   "scikit-image",
   "scipy",
   "toml",
