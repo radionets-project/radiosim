@@ -1,35 +1,46 @@
-# This is a TOML document.
-
 title = "Simulation configuration"
 
 [general]
 quiet = true
-seed = "none"  # "none" or int
-mode = "mojave"   # jet or survey or mojave
-threads = "none" # "none" or int > 0
+seed = "none"
+threads = "none"
+decive = "cuda"  # only for ppdisks simulation
 
 [paths]
-outpath = "./build/example_data/"
+outpath = "./testdata/radiosim/128"
+
+[dataset]
+bundles_train = 20
+bundles_valid = 10
+bundles_test = 10
+bundle_size = 20
+img_size = 128
+noise = false
+noise_level = [0, 15]
 
 [jet]
-training_type = "list"  # gauss or list or clean
+training_type = "list"
 num_jet_components = [3, 10]
 scaling = "normalize"
 
 [survey]
 num_sources = 20
-# classes are: jet, gaussian, pointlike
-class_distribution = [2, 1, 2]   # average share of each source in the images
+class_distribution = [2, 1, 2]
 scale_sources = true
 
 [mojave]
-class_ratio = [1, 1, 1] # rel. amount of each class [compact, one_jet, two_jets]
+class_ratio = [1, 1, 1]
 
-[image_options]
-bundles_train = 40
-bundles_valid = 10
-bundles_test = 10
-bundle_size = 10
-img_size = 256
-noise = true
-noise_level = [0, 15]    # range of the intensity of noise in percent, relative to peak flux in image
+[ppdisks]
+[ppdisks.metadata]
+alpha_range = [0.0, 180.0]
+ratio_range = [3.0, 15.0]
+size_ratio_range = [0.1, 1.0]
+
+[ppdisks.dataset]
+file_prefix = "ppdisks"
+batch_size = 5
+batches = 10
+batches_train_ratio = 0.7
+batches_valid_ratio = 0.2
+batches_test_ratio = 0.1
