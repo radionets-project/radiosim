@@ -4,9 +4,7 @@ description = "Simulation of radio skies to create astrophysical data sets"
 readme = "README.rst"
 requires-python = ">=3.11"
 license = { text = "MIT" }
-authors = [
-  { name = "radionets Developers" },
-]
+authors = [{ name = "radionets Developers" }]
 maintainers = [
   { name = "Kevin Schmitz", email = "kevin2.schmiz@tu-dortmund.de" },
   { name = "Christian Arauner", email = "christian.arauner@tu-dortmund.de" },
@@ -49,6 +47,7 @@ radiosim = "radiosim.tools.cli:main"
 
 [project.optional-dependencies]
 torch = ["torch", "torchvision"]
+ppdisks = ["fargopy", "tomllib", "tomli-w"]
 
 [dependency-groups]
 dev = [
@@ -94,11 +93,7 @@ requires = ["hatch-vcs", "hatchling"]
 build-backend = "hatchling.build"
 
 [tool.coverage.run]
-omit = [
-  "docs/*",
-  "src/radiosim/_version.py",
-  "src/radiosim/version.py",
-]
+omit = ["docs/*", "src/radiosim/_version.py", "src/radiosim/version.py"]
 
 [tool.coverage.xml]
 output = "coverage.xml"
@@ -125,12 +120,12 @@ extend-exclude = ["tests"]
 
 [tool.ruff.lint]
 extend-select = [
-  "I",  # isort
-  "E",  # pycodestyle
-  "F",  # Pyflakes
+  "I",   # isort
+  "E",   # pycodestyle
+  "F",   # Pyflakes
   "UP",  # pyupgrade
-  "B",  # flake8-bugbear
-  "SIM",  # flake8-simplify
+  "B",   # flake8-bugbear
+  "SIM", # flake8-simplify
 ]
 ignore = ["B905", "UP038"]
 fixable = ["ALL"]
