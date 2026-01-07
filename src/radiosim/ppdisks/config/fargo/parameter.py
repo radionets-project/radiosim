@@ -1,6 +1,5 @@
 import warnings
 from dataclasses import dataclass
-from enum import Enum
 from pathlib import Path
 
 import numpy as np
@@ -9,14 +8,12 @@ from radiosim.ppdisks.config import Parser, Variables
 
 __all__ = [
     "FargoParameterConfig",
-    "FargoParameterEntry",
-    "FargoOptionConfig",
-    "FargoOptionEntry",
+    "ParameterEntry",
 ]
 
 
 @dataclass
-class FargoParameterEntry:
+class ParameterEntry:
     key: str
     value: object
     comment: str
@@ -36,7 +33,7 @@ class FargoParameterConfig:
         if not self._path.exists():
             raise NameError(f"The given setup '{setup}' does not exist!")
 
-        self._parameters: dict[str, FargoParameterEntry] = dict()
+        self._parameters: dict[str, ParameterEntry] = dict()
 
         self.load()
         if self._parameters["Setup"].value != setup:
@@ -47,7 +44,7 @@ class FargoParameterConfig:
                 stacklevel=1,
             )
 
-    def _get_entries(self) -> list[FargoParameterEntry]:
+    def _get_entries(self) -> list[ParameterEntry]:
         values = []
         for _key, value in self._parameters.items():
             if isinstance(value, dict):
@@ -78,7 +75,7 @@ class FargoParameterConfig:
                 if len(components) < 2:
                     continue
 
-                entry = FargoParameterEntry(
+                entry = ParameterEntry(
                     key=components[0],
                     value=Parser().parse(components[1]),
                     comment=None if len(components) == 2 else " ".join(components[2:]),
@@ -133,7 +130,7 @@ class FargoParameterConfig:
                 file.write(old_content)
                 raise e
 
-    def __getitem__(self, key: str) -> FargoParameterEntry:
+    def __getitem__(self, key: str) -> ParameterEntry:
         key_components = key.split(".")
 
         match len(key_components):
@@ -155,28 +152,26 @@ class FargoParameterConfig:
                 if isinstance(value, dict):
                     self._parameters[key_components[0]] = value
                     return None
-                if isinstance(value, FargoParameterEntry):
+                if isinstance(value, ParameterEntry):
                     self._parameters[key_components[0]] = value
-                elif isinstance(
-                    self._parameters[key_components[0]], FargoParameterEntry
-                ):
+                elif isinstance(self._parameters[key_components[0]], ParameterEntry):
                     self._parameters[key_components[0]].value = value
                 else:
                     raise TypeError(
                         "Values at root level must either be a dict or a valid entry!"
                     )
             case 2:
-                if isinstance(value, FargoParameterEntry):
+                if isinstance(value, ParameterEntry):
                     self._parameters[key_components[0]][key_components[1]] = value
                 elif isinstance(
                     self._parameters[key_components[0]][key_components[1]],
-                    FargoParameterEntry,
+                    ParameterEntry,
                 ):
                     self._parameters[key_components[0]][key_components[1]].value = value
                 else:
                     raise TypeError(
                         "This key does not point to a valid entry! Enter an instance "
-                        "of a 'FargoParameterEntry'"
+                        "of a 'ParameterEntry'"
                     )
 
             case _:
@@ -187,108 +182,3 @@ class FargoParameterConfig:
 
         if self._autosave:
             self.save()
-
-
-class OptionType(Enum):
-    VARIABLE = 1
-    LIST = 2
-    OPTION = 3
-
-
-@dataclass
-class FargoOptionEntry:
-    value: object | None
-    option_type: OptionType
-    enabled: bool = True
-    cuda_only: bool = False
-
-    def enable(self) -> None:
-        self.enabled = True
-
-    def disable(self) -> None:
-        self.enabled = False
-
-    @classmethod
-    def option(
-        enabled: bool, value: object | None = None, cuda_only: bool = False
-    ) -> "FargoOptionEntry":
-        return FargoOptionEntry(
-            value=value,
-            option_type=OptionType.OPTION,
-            enabled=enabled,
-            cuda_only=cuda_only,
-        )
-
-
-class FargoOptionConfig:
-    def __init__(self):
-        self._parameters = {
-            "fluids": {
-                # This parameter automatically implies the list variable FLUIDS
-                # and the option NFLUIDS
-                "NFLUIDS": FargoOptionEntry(value="2", option_type=OptionType.VALUE),
-                "DRAGFORCE": FargoOptionEntry.option(enabled=True),
-                "STOKESNUMBER": FargoOptionEntry.option(enabled=True),
-                "DUSTDIFFUSION": FargoOptionEntry.option(enabled=True),
-                "COLLISIONPREDICTOR": FargoOptionEntry.option(enabled=False),
-            },
-            "performance": {"FLOAT": FargoOptionEntry.option(enabled=True)},
-            "dimensions": {
-                "X": FargoOptionEntry.option(enabled=True),
-                "Y": FargoOptionEntry.option(enabled=True),
-                "Z": FargoOptionEntry.option(enabled=False),
-            },
-            "coordinates": {
-                "CARTESIAN": FargoOptionEntry.option(enabled=False),
-                "CYLINDRICAL": FargoOptionEntry.option(enabled=True),
-                "SPHERICAL": FargoOptionEntry.option(enabled=False),
-            },
-            "planetary_system": {
-                "NODEFAULTSTAR": FargoOptionEntry.option(enabled=False),
-            },
-            "equation_of_state": {
-                "ADIABATIC": FargoOptionEntry.option(enabled=False),
-                "ISOTHERMAL": FargoOptionEntry.option(enabled=True),
-            },
-            "additional_physics": {
-                "MHD": FargoOptionEntry.option(enabled=False),
-                "STRICTSYM": FargoOptionEntry.option(enabled=False),
-                "OHMICDIFFUSION": FargoOptionEntry.option(enabled=False),
-                "AMBIPOLARDIFFUSION": FargoOptionEntry.option(enabled=False),
-                "HALLEFFECT": FargoOptionEntry.option(enabled=False),
-                "VISCOSITY": FargoOptionEntry.option(enabled=False),
-                "ALPHAVISCOSITY": FargoOptionEntry.option(enabled=True),
-                "POTENTIAL": FargoOptionEntry.option(enabled=True),
-                "STOCKHOLM": FargoOptionEntry.option(enabled=True),
-                "HILLCUT": FargoOptionEntry.option(enabled=False),
-            },
-            "shearing_box": {
-                "SHEARINGBOX": FargoOptionEntry.option(enabled=False),
-                "SHEARINGBC": FargoOptionEntry.option(enabled=False),
-            },
-            "transport": {
-                "RAM": FargoOptionEntry.option(enabled=False),
-                "STANDARD": FargoOptionEntry.option(enabled=False),
-            },
-            "slopes": {
-                "DONOR": FargoOptionEntry.option(enabled=False),
-            },
-            "artificial_viscosity": {
-                "NOSUBSTEP2": FargoOptionEntry.option(enabled=False),
-                "STRONG_SHOCK": FargoOptionEntry.option(enabled=False),
-            },
-            "boundaries": {
-                "HARDBOUNDARIES": FargoOptionEntry.option(enabled=False),
-            },
-            "cuda_blocks": {
-                "BLOCK_X": FargoOptionEntry.option(
-                    value=16, enabled=True, cuda_only=True
-                ),
-                "BLOCK_Y": FargoOptionEntry.option(
-                    value=16, enabled=True, cuda_only=True
-                ),
-                "BLOCK_Z": FargoOptionEntry.option(
-                    value=1, enabled=True, cuda_only=True
-                ),
-            },
-        }
