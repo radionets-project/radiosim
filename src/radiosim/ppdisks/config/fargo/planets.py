@@ -4,6 +4,8 @@ from pathlib import Path
 
 from radiosim.ppdisks.config import Variables
 
+__all__ = ["Planet", "PlanetConfig"]
+
 
 @dataclass
 class Planet:
@@ -50,6 +52,11 @@ class PlanetConfig:
 
                 try:
                     vals = line.split()
+                    if not vals[0][0].isnumeric():
+                        raise ValueError(
+                            "A planet's name must begin with an alphanumeric character!"
+                        )
+
                     planets.append(
                         Planet(
                             name=vals[0],

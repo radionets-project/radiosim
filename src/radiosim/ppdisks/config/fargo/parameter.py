@@ -18,6 +18,9 @@ class ParameterEntry:
     value: object
     comment: str
 
+    def __repr__(self) -> str:
+        return f"(value={self.value}, comment={self.comment})"
+
     def get_line(self, max_key_len: int, max_value_len: int):
         return (
             f"{self.key:<{max_key_len + 2}}{self.value:<{max_value_len + 2}}"
@@ -141,7 +144,7 @@ class FargoParameterConfig:
             case _:
                 if len(key_components) > 2:
                     raise KeyError(
-                        "The maximum depth of a config key is 2 (catgeory -> entry)!"
+                        "The maximum depth of a config key is 2 (categeory -> entry)!"
                     )
 
     def __setitem__(self, key: str, value: object) -> None:
@@ -177,7 +180,7 @@ class FargoParameterConfig:
             case _:
                 if len(key_components) > 2:
                     raise KeyError(
-                        "The maximum depth of a config key is 2 (catgeory -> entry)!"
+                        "The maximum depth of a config key is 2 (categeory -> entry)!"
                     )
 
         if self._autosave:

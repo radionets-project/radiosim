@@ -10,7 +10,10 @@ class Parser:
             TypeParser(parse_type=str),
         ]
 
-    def parse(self, value: str):
+    def parse(self, value: str | None):
+        if value is None:
+            return None
+
         for parser in self._type_parsers:
             try:
                 return parser.parse(value=value)

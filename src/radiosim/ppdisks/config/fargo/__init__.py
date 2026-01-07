@@ -1,9 +1,12 @@
 from .option import FargoOptionConfig, OptionEntry
-from .parameter import FargoParameterConfig, FargoParameterEntry
+from .parameter import FargoParameterConfig, ParameterEntry
+from .planets import Planet, PlanetConfig
 
 __all__ = [
     "FargoParameterConfig",
-    "FargoParameterEntry",
+    "ParameterEntry",
     "FargoOptionConfig",
     "OptionEntry",
+    "PlanetConfig",
+    "Planet",
 ]
