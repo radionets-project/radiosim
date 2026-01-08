@@ -1,8 +1,10 @@
+import warnings
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
 import sympy
+from astropy import constants
 from astropy import units as un
 
 from ..variables import Variables
@@ -37,7 +39,7 @@ class UnitSystem(UnitSystemData, Enum):
         un.dimensionless_unscaled,
     )
     MKS = "MKS", un.kilogram, un.meter, un.second, un.Kelvin, un.ampere
-    CGS = "CGS", un.gram, un.centimeter, un.second, un.Kelvin, 10 * un.ampere
+    CGS = "CGS", un.gram, un.centimeter, un.second, un.Kelvin, un.cgs.abA
 
     def get_unit(self, constant: str):
         match constant:
@@ -59,7 +61,7 @@ class UnitSystem(UnitSystemData, Enum):
 
 
 class Constants:
-    def __init__(self, unit_system: UnitSystem = UnitSystem.SCALE_FREE):
+    def __init__(self, unit_system: UnitSystem = UnitSystem.MKS):
         self._path: Path = Variables.get("FARGO_ROOT") / "src/fondam.h"
         self._unit_system: UnitSystem = unit_system
         self._constants: ConstantSet = ConstantSet()
@@ -72,6 +74,46 @@ class Constants:
             )
 
         self.load()
+
+    def save(self):
+        with open(self._path) as file:
+            lines = file.readlines()
+
+        original_content = lines.copy()
+
+        max_key_length = 6 + len(self._unit_system.suffix)
+
+        with open(self._path, "w") as file:
+            try:
+                for i in range(len(lines)):
+                    line = lines[i]
+
+                    if not line.startswith("#define"):
+                        continue
+
+                    line = line.replace("#define", "").strip()
+
+                    components = line.split("//")[0].split()
+
+                    if not components[0].endswith(self._unit_system.suffix):
+                        continue
+
+                    key, _ = components
+                    value = getattr(
+                        self._constants,
+                        key.removesuffix(f"_{self._unit_system.suffix}"),
+                    ).value
+
+                    lines[i] = f"#define  {key:>{max_key_length}}  {value}\n"
+
+                file.writelines(lines)
+            except Exception as e:
+                warnings.warn(
+                    "An error occured while saving. Rolling back configuration files.",
+                    stacklevel=1,
+                )
+                file.writelines(original_content)
+                raise e
 
     def load(self):
         with open(self._path) as file:
@@ -98,3 +140,50 @@ class Constants:
                     attribute,
                     value * self._unit_system.get_unit(constant=attribute),
                 )
+
+    def __setitem__(self, key: str, value: float | un.Quantity):
+        constant = self[key]
+        if isinstance(value, float):
+            setattr(self._constants, key, value * constant.unit)
+        elif isinstance(value, un.Quantity):
+            setattr(self._constants, key, value.to(constant.unit))
+        else:
+            raise TypeError(
+                "The constant must either be a float value "
+                "or an astropy.units.Quantity!"
+            )
+
+    def __getitem__(self, key: str) -> un.Quantity:
+        return getattr(self._constants, key)
+
+    @classmethod
+    def default(cls, unit_system: UnitSystem):
+        instance = cls(unit_system=unit_system)
+        match instance._unit_system:
+            case UnitSystem.SCALE_FREE:
+                instance._constants = ConstantSet()
+            case UnitSystem.MKS:
+                instance._constants = ConstantSet(
+                    G=constants.G.value * instance._unit_system.get_unit(constant="G"),
+                    MSTAR=constants.M_sun.value
+                    * instance._unit_system.get_unit(constant="MSTAR"),
+                    R0=constants.au.value
+                    * instance._unit_system.get_unit(constant="R0"),
+                    R_MU=3460.0 * instance._unit_system.get_unit(constant="R_MU"),
+                    MU0=constants.mu0.value
+                    * instance._unit_system.get_unit(constant="MU0"),
+                )
+            case UnitSystem.CGS:
+                instance._constants = ConstantSet(
+                    G=constants.G.cgs.value
+                    * instance._unit_system.get_unit(constant="G"),
+                    MSTAR=constants.M_sun.cgs.value
+                    * instance._unit_system.get_unit(constant="MSTAR"),
+                    R0=constants.au.cgs.value
+                    * instance._unit_system.get_unit(constant="R0"),
+                    R_MU=36149835.0 * instance._unit_system.get_unit(constant="R_MU"),
+                    MU0=12.5663706143591
+                    * instance._unit_system.get_unit(constant="MU0"),
+                )
+
+        return instance

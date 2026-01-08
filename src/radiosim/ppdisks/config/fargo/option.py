@@ -5,7 +5,8 @@ from pathlib import Path
 
 import numpy as np
 
-from radiosim.ppdisks.config import Parser, Variables
+from ..parser import Parser
+from ..variables import Variables
 
 __all__ = [
     "FargoOptionConfig",
@@ -24,7 +25,7 @@ class OptionType(Enum):
     def __repr__(self) -> str:
         return str(self)
 
-    def split_line(self, line: str) -> tuple[str]:
+    def split_line(self, line: str) -> tuple[str, None | str]:
         if line.endswith("\n"):
             line = line.replace("\n", "")
 

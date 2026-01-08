@@ -4,7 +4,8 @@ from pathlib import Path
 
 import numpy as np
 
-from radiosim.ppdisks.config import Parser, Variables
+from ..parser import Parser
+from ..variables import Variables
 
 __all__ = [
     "FargoParameterConfig",
