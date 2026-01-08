@@ -94,7 +94,7 @@ class FargoOptionConfig:
         self._path: Path = Variables.get("FARGO_ROOT") / f"setups/{setup}/{setup}.opt"
         self._autosave: bool = autosave
 
-        if not self._path.exists():
+        if not self._path.parent.exists():
             raise NameError(f"The given setup '{setup}' does not exist!")
 
         # initialize default parameters
@@ -165,6 +165,11 @@ class FargoOptionConfig:
                 "BLOCK_Z": OptionEntry.option(value=1, enabled=True),
             },
         }
+
+        if not self._path.exists():
+            self.save()
+        else:
+            self.load()
 
     def disable_all(self):
         for _category, category_dict in self._parameters.items():

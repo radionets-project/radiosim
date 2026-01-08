@@ -5,11 +5,11 @@ from .toml import TOMLConfiguration
 from .variables import Variables
 
 __all__ = [
+    "PlanetConfig",
     "TOMLConfiguration",
     "FargopyConfiguration",
     "Variables",
     "Parser",
     "FargoParameterConfig",
     "FargoOptionConfig",
-    "PlanetConfig",
 ]

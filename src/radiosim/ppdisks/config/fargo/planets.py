@@ -1,8 +1,9 @@
 import shutil
+import warnings
 from dataclasses import dataclass
 from pathlib import Path
 
-from radiosim.ppdisks.config import Variables
+from ..variables import Variables
 
 __all__ = ["Planet", "PlanetConfig"]
 
@@ -47,14 +48,15 @@ class PlanetConfig:
 
             planets = []
             for line in lines:
-                if line.startswith("#") or line == "\n":
+                if line.startswith("#") or line.strip() == "":
                     continue
 
                 try:
                     vals = line.split()
-                    if not vals[0][0].isnumeric():
-                        raise ValueError(
-                            "A planet's name must begin with an alphanumeric character!"
+                    if not vals[0][0].isalpha():
+                        warnings.warn(
+                            "A planet's name must begin with analphanumeric character!",
+                            stacklevel=1,
                         )
 
                     planets.append(

@@ -47,7 +47,7 @@ radiosim = "radiosim.tools.cli:main"
 
 [project.optional-dependencies]
 torch = ["torch", "torchvision"]
-ppdisks = ["fargopy", "tomllib", "tomli-w"]
+ppdisks = ["fargopy", "tomli-w", "sympy"]
 
 [dependency-groups]
 dev = [
