@@ -104,6 +104,11 @@ class Constants:
                         key.removesuffix(f"_{self._unit_system.suffix}"),
                     ).value
 
+                    value = str(value)
+                    if "e" in value:
+                        num, exp = value.split("e")
+                        value = f"{float(num)}e{int(exp)}"
+
                     lines[i] = f"#define  {key:>{max_key_length}}  {value}\n"
 
                 file.writelines(lines)
@@ -141,6 +146,14 @@ class Constants:
                     value * self._unit_system.get_unit(constant=attribute),
                 )
 
+    def __repr__(self):
+        return "\n".join(
+            [f"{key} = {const}" for key, const in self._constants.__dict__.items()]
+        )
+
+    def __str__(self):
+        return self.__repr__()
+
     def __setitem__(self, key: str, value: float | un.Quantity):
         constant = self[key]
         if isinstance(value, float):
@@ -161,7 +174,13 @@ class Constants:
         instance = cls(unit_system=unit_system)
         match instance._unit_system:
             case UnitSystem.SCALE_FREE:
-                instance._constants = ConstantSet()
+                instance._constants = ConstantSet(
+                    G=1.0 * instance._unit_system.get_unit(constant="G"),
+                    MSTAR=1.0 * instance._unit_system.get_unit(constant="MSTAR"),
+                    R0=1.0 * instance._unit_system.get_unit(constant="R0"),
+                    R_MU=1.0 * instance._unit_system.get_unit(constant="R_MU"),
+                    MU0=1.0 * instance._unit_system.get_unit(constant="MU0"),
+                )
             case UnitSystem.MKS:
                 instance._constants = ConstantSet(
                     G=constants.G.value * instance._unit_system.get_unit(constant="G"),

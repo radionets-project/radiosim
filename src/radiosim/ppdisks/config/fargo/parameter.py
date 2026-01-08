@@ -20,13 +20,26 @@ class ParameterEntry:
     comment: str
 
     def __repr__(self) -> str:
-        return f"(value={self.value}, comment={self.comment})"
+        comment_val = f"'{self.comment}'" if self.comment is not None else self.comment
+        return f"(value={self.value}, comment={comment_val})"
 
     def get_line(self, max_key_len: int, max_value_len: int):
+        match self.value:
+            case float():
+                value = str(self.value)
+                if "e" in value:
+                    num, exp = value.split("e")
+                    value = f"{float(num)}e{int(exp)}"
+
+            case bool():
+                value = "Yes" if self.value else "No"
+            case _:
+                value = self.value
+
         return (
-            f"{self.key:<{max_key_len + 2}}{self.value:<{max_value_len + 2}}"
-            f"{self.comment if self.comment is not None else ''}\n"
-        )
+            f"{self.key:<{max_key_len + 2}}{value:<{max_value_len + 2}}"
+            f"{self.comment if self.comment is not None else ''}"
+        ).strip() + "\n"
 
 
 class FargoParameterConfig:
@@ -133,6 +146,23 @@ class FargoParameterConfig:
                 )
                 file.write(old_content)
                 raise e
+
+    def __repr__(self):
+        def dict2str(d: dict, indent: int = 0, increase: int = 4):
+            out = ""
+            for key, value in d.items():
+                if isinstance(value, dict):
+                    out += f"{key}:\n"
+                    out += dict2str(value, indent=indent + increase, increase=increase)
+                else:
+                    out += " " * indent + f"'{key}': {value}\n"
+
+            return out
+
+        return dict2str(d=self._parameters)
+
+    def __str__(self):
+        return self.__repr__()
 
     def __getitem__(self, key: str) -> ParameterEntry:
         key_components = key.split(".")

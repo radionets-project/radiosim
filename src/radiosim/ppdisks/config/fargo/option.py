@@ -273,6 +273,27 @@ class FargoOptionConfig:
                 entry.value = Parser().parse(value)
                 entry.enable()
 
+    def info(self, enabled: bool = False):
+        def dict2str(d: dict, indent: int = 0, increase: int = 4):
+            out = ""
+            for key, value in d.items():
+                if isinstance(value, dict):
+                    out += f"{key}:\n"
+                    out += dict2str(value, indent=indent + increase, increase=increase)
+                else:
+                    if value.enabled or not enabled:
+                        out += " " * indent + f"'{key}': {value}\n"
+
+            return out
+
+        return dict2str(d=self._parameters)
+
+    def __repr__(self):
+        return self.info(enabled=False)
+
+    def __str__(self):
+        return self.__repr__()
+
     def __getitem__(self, key: str) -> OptionEntry | dict:
         key_components = key.split(".")
 
