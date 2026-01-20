@@ -22,6 +22,7 @@ class ConstantSet:
 @dataclass
 class UnitSystemData:
     suffix: str
+    key: str
     mass: un.Unit
     length: un.Unit
     time: un.Unit
@@ -32,14 +33,15 @@ class UnitSystemData:
 class UnitSystem(UnitSystemData, Enum):
     SCALE_FREE = (
         "SF",
+        "0",
         un.dimensionless_unscaled,
         un.dimensionless_unscaled,
         un.dimensionless_unscaled,
         un.dimensionless_unscaled,
         un.dimensionless_unscaled,
     )
-    MKS = "MKS", un.kilogram, un.meter, un.second, un.Kelvin, un.ampere
-    CGS = "CGS", un.gram, un.centimeter, un.second, un.Kelvin, un.cgs.abA
+    MKS = "MKS", "MKS", un.kilogram, un.meter, un.second, un.Kelvin, un.ampere
+    CGS = "CGS", "CGS", un.gram, un.centimeter, un.second, un.Kelvin, un.cgs.abA
 
     def get_unit(self, constant: str):
         match constant:

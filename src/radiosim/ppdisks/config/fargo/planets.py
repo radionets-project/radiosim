@@ -19,6 +19,7 @@ class Planet:
         feels_disk: bool,
         feels_others: bool,
         unit_system: UnitSystem = UnitSystem.MKS,
+        rescale: bool = False,
         accretion: float = 0.0,
     ):
         constants = Constants(unit_system=unit_system)
@@ -27,12 +28,12 @@ class Planet:
         self.distance: float = (
             distance
             if isinstance(distance, float)
-            else (distance / constants["R0"]).decompose().value
+            else (distance / (constants["R0"] if rescale else 1)).decompose().value
         )
         self.mass: float = (
             mass
             if isinstance(mass, float)
-            else (mass / constants["MSTAR"]).decompose().value
+            else (mass / (constants["MSTAR"] if rescale else 1)).decompose().value
         )
         self.feels_disk: bool = feels_disk
         self.feels_others: bool = feels_others

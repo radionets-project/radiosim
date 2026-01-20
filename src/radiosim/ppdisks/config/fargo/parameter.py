@@ -15,15 +15,14 @@ __all__ = [
 
 @dataclass
 class ParameterEntry:
-    key: str
     value: object
-    comment: str
+    comment: str | None = None
 
     def __repr__(self) -> str:
         comment_val = f"'{self.comment}'" if self.comment is not None else self.comment
         return f"(value={self.value}, comment={comment_val})"
 
-    def get_line(self, max_key_len: int, max_value_len: int):
+    def get_line(self, key: str, max_key_len: int, max_value_len: int):
         match self.value:
             case float():
                 value = str(self.value)
@@ -37,7 +36,7 @@ class ParameterEntry:
                 value = self.value
 
         return (
-            f"{self.key:<{max_key_len + 2}}{value:<{max_value_len + 2}}"
+            f"{key:<{max_key_len + 2}}{value:<{max_value_len + 2}}"
             f"{self.comment if self.comment is not None else ''}"
         ).strip() + "\n"
 
@@ -50,9 +49,68 @@ class FargoParameterConfig:
         if not self._path.exists():
             raise NameError(f"The given setup '{setup}' does not exist!")
 
-        self._parameters: dict[str, ParameterEntry] = dict()
+        self._parameters: dict[str, ParameterEntry] = {
+            "setup": setup,
+            "disk_parameters": {
+                "aspectRatio": ParameterEntry(
+                    value=0.06, comment="Thickness over Radius in the disc"
+                ),
+                "sigma0": ParameterEntry(value=20.0, comment="Surface Density at r=R0"),
+                "sigmaSlope": ParameterEntry(
+                    value=0.1, comment="Slope of the Surface Density"
+                ),
+                "flaringIndex": ParameterEntry(
+                    value=0.0, comment="Flaring of the disk"
+                ),
+                "alpha": ParameterEntry(
+                    value=0.005, comment="Shakura-Sunyaev viscosity parameter"
+                ),
+            },
+            "dust_parameters": {
+                "invstokes1": ParameterEntry(
+                    value=10.0, comment="Inverse of the Stokes Number for DUST1"
+                ),
+                "epsilon": ParameterEntry(value=0.01, comment="Dust-to-Gas mass ratio"),
+            },
+            "planet_parameters": {
+                "planetConfig": ParameterEntry(value="planets/test.cfg"),
+                "thicknessSmoothing": ParameterEntry(value=0.6),
+                "eccentricity": ParameterEntry(value=0.0),
+                "indirectTerm": ParameterEntry(value=True),
+            },
+            "mesh_parameters": {
+                "nx": ParameterEntry(value=800, comment="Number of Azimuthal Zones"),
+                "ny": ParameterEntry(value=300, comment="Number of Radial Zones"),
+                "xmin": ParameterEntry(
+                    value=-np.round(np.pi, 15), comment="Minimum Azimuthal Angle"
+                ),
+                "xmax": ParameterEntry(
+                    value=np.round(np.pi, 15), comment="Maximum Azimuthal Angle"
+                ),
+                "ymin": ParameterEntry(value=0.0, comment="Inner Radius"),
+                "ymax": ParameterEntry(value=1.0, comment="Outer Radius"),
+            },
+            "frame_of_reference_parameters": {
+                "omegaFrame": ParameterEntry(
+                    value=0.0, comment="Angular velocity of the reference frame"
+                ),
+                "frame": ParameterEntry(value="F", comment="Reference frame behavior"),
+            },
+            "output_parameters": {
+                "dt": ParameterEntry(value=1.0, comment="Time step length"),
+                "ninterm": ParameterEntry(
+                    value=1, comment="Time steps between outputs"
+                ),
+                "ntot": ParameterEntry(value=1, comment="Total number of timesteps"),
+                "outputDir": ParameterEntry(value=f"@outputs/{setup}"),
+            },
+        }
 
-        self.load()
+        if not self._path.exists():
+            self.save()
+        else:
+            self.load()
+
         if self._parameters["Setup"].value != setup:
             warnings.warn(
                 "The given setup name exists but the 'Setup' parameter in the"
@@ -93,7 +151,6 @@ class FargoParameterConfig:
                     continue
 
                 entry = ParameterEntry(
-                    key=components[0],
                     value=Parser().parse(components[1]),
                     comment=None if len(components) == 2 else " ".join(components[2:]),
                 )
@@ -125,16 +182,20 @@ class FargoParameterConfig:
                         lines.append(f"### [{key}]\n")
                         lines.append("\n")
 
-                        for _subkey, subentry in self._parameters[key].items():
+                        for subkey, subentry in self._parameters[key].items():
                             lines.append(
                                 subentry.get_line(
-                                    max_key_len=max_key_len, max_value_len=max_value_len
+                                    key=subkey,
+                                    max_key_len=max_key_len,
+                                    max_value_len=max_value_len,
                                 )
                             )
                     else:
                         lines.append(
                             entry.get_line(
-                                max_key_len=max_key_len, max_value_len=max_value_len
+                                key=key,
+                                max_key_len=max_key_len,
+                                max_value_len=max_value_len,
                             )
                         )
 
