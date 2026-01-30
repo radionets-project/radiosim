@@ -172,6 +172,29 @@ class FargoOptionConfig:
         else:
             self.load()
 
+    def get_toml_dict(self) -> dict:
+        dump = {}
+        for key, value in self._parameters.items():
+            subdump = {}
+            if isinstance(value, dict):
+                for subkey, subvalue in value.items():
+                    if (
+                        subvalue.option_type == OptionType.OPTION
+                        and subvalue.value is None
+                    ):
+                        subdump[subkey] = subvalue.enabled
+                    elif subvalue.enabled:
+                        subdump[subkey] = subvalue.value
+
+                dump[key] = subdump
+            else:
+                if value.option_type == OptionType.OPTION:
+                    dump[key] = value.enabled
+                elif value.enabled:
+                    dump[key] = value.value
+
+        return dump
+
     def disable_all(self):
         for _category, category_dict in self._parameters.items():
             for _key, value in category_dict.items():

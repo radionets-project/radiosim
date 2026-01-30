@@ -39,6 +39,9 @@ class Planet:
         self.feels_others: bool = feels_others
         self.accretion: float = accretion
 
+        self._unit_system: UnitSystem = unit_system
+        self._rescaled: bool = rescale
+
     def __repr__(self):
         return (
             f"Planet(name={self.name}, distance={self.distance}, mass={self.mass}, "
@@ -48,6 +51,17 @@ class Planet:
 
     def __str__(self):
         return self.__repr__()
+
+    def get_dict(self) -> dict:
+        return {
+            "distance": self.distance,
+            "mass": self.mass,
+            "feels_disk": self.feels_disk,
+            "feels_others": self.feels_others,
+            "accretion": self.accretion,
+            "unit_system": self._unit_system.name,
+            "rescaled": self._rescaled,
+        }
 
     def get_config_line(self) -> str:
         return (
@@ -72,6 +86,12 @@ class PlanetConfig:
 
         if self._path.is_file():
             self.load()
+
+    def get_toml_dict(self) -> dict:
+        dump = {}
+        for key, value in self.planets.items():
+            dump[key] = value.get_dict()
+        return dump
 
     def add_planet(self, planet: Planet):
         self.planets[planet.name] = planet

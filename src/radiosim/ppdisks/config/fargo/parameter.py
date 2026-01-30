@@ -50,7 +50,7 @@ class FargoParameterConfig:
             raise NameError(f"The given setup '{setup}' does not exist!")
 
         self._parameters: dict[str, ParameterEntry] = {
-            "setup": setup,
+            "setup": ParameterEntry(value=setup, comment="Name of the Setup"),
             "disk_parameters": {
                 "aspectRatio": ParameterEntry(
                     value=0.06, comment="Thickness over Radius in the disc"
@@ -111,7 +111,7 @@ class FargoParameterConfig:
         else:
             self.load()
 
-        if self._parameters["Setup"].value != setup:
+        if self._parameters["setup"].value != setup:
             warnings.warn(
                 "The given setup name exists but the 'Setup' parameter in the"
                 " config gives a different name. A missmatch might lead to "
@@ -119,15 +119,31 @@ class FargoParameterConfig:
                 stacklevel=1,
             )
 
-    def _get_entries(self) -> list[ParameterEntry]:
+    def _get_entries(self) -> tuple[list[str], list[ParameterEntry]]:
+        keys = []
         values = []
-        for _key, value in self._parameters.items():
+        for key, value in self._parameters.items():
             if isinstance(value, dict):
+                keys.extend(list(value.keys()))
                 values.extend(list(value.values()))
             else:
+                keys.append(key)
                 values.append(value)
 
-        return values
+        return keys, values
+
+    def get_toml_dict(self) -> dict:
+        dump = {}
+        for key, value in self._parameters.items():
+            subdump = {}
+            if isinstance(value, dict):
+                for subkey, subvalue in value.items():
+                    subdump[subkey] = subvalue.value
+                dump[key] = subdump
+            else:
+                dump[key] = value.value
+
+        return dump
 
     def load(self) -> None:
         with open(self._path) as file:
@@ -167,8 +183,10 @@ class FargoParameterConfig:
             try:
                 key_lens = []
                 value_lens = []
-                for entry in self._get_entries():
-                    key_lens.append(len(str(entry.key)))
+                keys, values = self._get_entries()
+                for key in keys:
+                    key_lens.append(len(key))
+                for entry in values:
                     value_lens.append(len(str(entry.value)))
 
                 max_key_len = np.max(key_lens)

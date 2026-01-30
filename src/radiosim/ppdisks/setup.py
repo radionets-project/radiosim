@@ -1,5 +1,4 @@
 import subprocess
-from os import PathLike
 from pathlib import Path
 
 from radiosim.ppdisks.config.fargo import (
@@ -7,26 +6,28 @@ from radiosim.ppdisks.config.fargo import (
     FargoParameterConfig,
     UnitSystem,
 )
-from radiosim.ppdisks.config.toml import TOMLConfiguration
 from radiosim.ppdisks.config.variables import Variables
 
 
 class Setup:
-    def __init__(self, name: str, config: PathLike, autosave: bool = True):
+    def __init__(
+        self,
+        name: str,
+        autosave: bool = True,
+    ):
         self._name: str = name
         self._autosave: bool = autosave
         self._path: Path = Variables.get("FARGO_ROOT") / f"setups/{name}"
-        self._config: TOMLConfiguration = TOMLConfiguration(path=config)
+
+        if not self._path.exists():
+            raise NotADirectoryError("The given setup does not exist.")
+
         self._option_config: FargoOptionConfig = FargoOptionConfig(
             setup=self._name, autosave=self._autosave
         )
         self._param_config: FargoParameterConfig = FargoParameterConfig(
             setup=self._name, autosave=self._autosave
         )
-        self._planet_config: FargoParameterConfig | None = None
-
-    def exists(self) -> bool:
-        return self._path.exists()
 
     def compile(
         self,
@@ -70,3 +71,12 @@ class Setup:
         )
 
         print("============ FINISH COMPILATION ============")
+
+    def run(
+        self,
+        seed: int | None,
+        resume_at_idx: int | None = None,
+        timer: bool = True,
+        cuda_device_id: int = 0,
+    ) -> None:
+        pass
