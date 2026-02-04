@@ -63,10 +63,13 @@ class UnitSystem(UnitSystemData, Enum):
 
 
 class Constants:
-    def __init__(self, unit_system: UnitSystem = UnitSystem.MKS):
+    def __init__(
+        self, unit_system: UnitSystem = UnitSystem.MKS, autosave: bool = False
+    ):
         self._path: Path = Variables.get("FARGO_ROOT") / "src/fondam.h"
         self._unit_system: UnitSystem = unit_system
         self._constants: ConstantSet = ConstantSet()
+        self._autosave: bool = autosave
 
         if not self._path.exists():
             raise FileNotFoundError(
@@ -168,8 +171,14 @@ class Constants:
                 "or an astropy.units.Quantity!"
             )
 
+        if self._autosave:
+            self.save()
+
     def __getitem__(self, key: str) -> un.Quantity:
         return getattr(self._constants, key)
+
+    def reset(self) -> None:
+        self = self.default(unit_system=self._unit_system)
 
     @classmethod
     def default(cls, unit_system: UnitSystem):

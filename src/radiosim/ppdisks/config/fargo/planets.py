@@ -2,6 +2,7 @@ import shutil
 import warnings
 from pathlib import Path
 
+import numpy as np
 from astropy import units as un
 
 from ..variables import Variables
@@ -93,19 +94,23 @@ class PlanetConfig:
             dump[key] = value.get_dict()
         return dump
 
-    def add_planet(self, planet: Planet):
+    def add_planet(self, planet: Planet) -> None:
         self.planets[planet.name] = planet
 
         if self._autosave:
             self.save()
 
-    def remove_planet(self, name: str):
+    def remove_planet(self, name: str) -> None:
         del self.planets[name]
 
         if self._autosave:
             self.save()
 
-    def load(self):
+    def clear(self) -> None:
+        for key in self.planets:
+            self.remove_planet(name=key)
+
+    def load(self) -> None:
         if not self._path.is_file():
             raise FileNotFoundError(
                 f"The Planet configuration '{self.name}' could not be found!"
@@ -141,7 +146,7 @@ class PlanetConfig:
             for planet in planets:
                 self.add_planet(planet)
 
-    def save(self):
+    def save(self) -> None:
         with open(self._path, "w") as file:
             file.writelines(self._get_content())
 
@@ -172,8 +177,12 @@ class PlanetConfig:
     def __repr__(self):
         return f"PlanetConfig(name={self.name}, planets={list(self.planets.keys())})"
 
+    def get_max_distance(self) -> None:
+        distances = [planet.distance for planet in self.planets.values()]
+        return np.max(distances) * self._unit_system.length
+
     @classmethod
-    def get_configs(cls):
+    def get_configs(cls) -> list["PlanetConfig"]:
         return [
             PlanetConfig(name=file.stem)
             for file in (Variables.get("FARGO_ROOT") / "planets").glob("*.cfg")

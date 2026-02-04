@@ -13,20 +13,18 @@ class Setup:
     def __init__(
         self,
         name: str,
-        autosave: bool = True,
     ):
         self._name: str = name
-        self._autosave: bool = autosave
         self._path: Path = Variables.get("FARGO_ROOT") / f"setups/{name}"
 
         if not self._path.exists():
             raise NotADirectoryError("The given setup does not exist.")
 
         self._option_config: FargoOptionConfig = FargoOptionConfig(
-            setup=self._name, autosave=self._autosave
+            setup=self._name, autosave=True
         )
         self._param_config: FargoParameterConfig = FargoParameterConfig(
-            setup=self._name, autosave=self._autosave
+            setup=self._name, autosave=True
         )
 
     def compile(
