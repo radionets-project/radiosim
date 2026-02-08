@@ -9,6 +9,7 @@ from astropy import units as un
 
 from radiosim.ppdisks.config import TOMLConfiguration
 
+from .config import Variables
 from .config.fargo import Constants, Planet, PlanetConfig, UnitSystem
 from .setup import Setup
 
@@ -127,7 +128,9 @@ class Simulation:
         run_id: int | None = None,
         resume: bool = True,
         gpu: bool = True,
+        cuda_device_id: int = 0,
         parallel: bool = False,
+        show_progress: bool = True,
         verbose: bool = False,
         overwrite: bool = False,
     ) -> None:
@@ -258,13 +261,14 @@ class Simulation:
             mesh_parameters = samples["mesh_parameters"]
 
             param_config["mesh_parameters.ymin"] = (
-                mesh_parameters["y_min"] * un.AU
-            ).to(self._unit_system.length)
+                (mesh_parameters["y_min"] * un.AU).to(self._unit_system.length).value
+            )
 
             max_orbit_radius = self._planet_config.get_max_distance()
-            param_config["mesh_parameters.ymax"] = mesh_parameters[
-                "y_max_ratio"
-            ] * max_orbit_radius.to(self._unit_system.length)
+            param_config["mesh_parameters.ymax"] = (
+                mesh_parameters["y_max_ratio"]
+                * max_orbit_radius.to(self._unit_system.length).value
+            )
 
             param_config["mesh_parameters.nx"] = run.get_polar_img_size()[1]
             param_config["mesh_parameters.ny"] = run.get_polar_img_size()[0]
@@ -288,11 +292,16 @@ class Simulation:
             N_tot = int(total_time / step_size)
             N_interm = int(N_tot / run.get_num_outputs())
 
-            param_config["output_parameters.dt"] = step_size.to(self._unit_system.time)
+            param_config["output_parameters.dt"] = step_size.to(
+                self._unit_system.time
+            ).value
             param_config["output_parameters.ninterm"] = N_interm
             param_config["output_parameters.ntot"] = N_tot
+
+            # Set output to fargo output directory
+            # (to avoid overflow of OUTPUTDIR variable in C)
             param_config["output_parameters.outputDir"] = str(
-                model.get_data_directory()
+                model.get_fargo_output_path()
             )
 
             # Additional Parameters
@@ -313,16 +322,53 @@ class Simulation:
             option_config.save()
             option_config._autosave = True
 
+            # Dump samples to TOML file
+
+            sample_dump = samples.copy()
+
+            def toml_serialize_dict(read_dict):
+                write_dict = dict()
+                for key, value in read_dict.items():
+                    if isinstance(value, dict):
+                        write_dict[key] = toml_serialize_dict(read_dict=value)
+                    elif isinstance(value, np.ndarray):
+                        write_dict[key] = list(value)
+                    elif isinstance(value, np.int64):
+                        write_dict[key] = int(value)
+                    else:
+                        write_dict[key] = value
+                return write_dict
+
+            sample_config = model.get_sample_config()
+            sample_config.create()
+            sample_config.dump_dict(content=toml_serialize_dict(read_dict=sample_dump))
+
             # Recompile and Run Setup
             self._setup.compile(
                 gpu=gpu,
                 parallel=parallel,
                 unit_system=self._unit_system,
                 rescale=False,
+                model_id=model._id,
+                show_progress=show_progress,
                 verbose=verbose,
             )
 
-            self._setup.run()
+            self._setup.run(
+                model_id=model._id,
+                show_progress=show_progress,
+                cuda_device_id=cuda_device_id,
+            )
+
+            # Move the data files to the correct directory
+            model.get_data_directory(temp_fargo=False).mkdir()
+            shutil.move(
+                src=Variables.get("FARGO_ROOT") / model.get_fargo_output_path(),
+                dst=model.get_data_directory(),
+            )
+            shutil.rmtree(
+                path=Variables.get("FARGO_ROOT") / model.get_fargo_output_path()
+            )
 
     @classmethod
     def new(
@@ -377,6 +423,7 @@ class Simulation:
             root_directory=root_directory,
             setup=setup,
             float_type=float_type,
+            polar_img_size=polar_img_size,
             unit_system=unit_system,
         )
 
@@ -607,8 +654,14 @@ class DiskModel:
         self._directory: Path = run._directory / f"model_{id}"
         self._run: SimulationRun = run
 
+    def get_sample_config(self) -> TOMLConfiguration:
+        return TOMLConfiguration(self._directory / "samples.toml")
+
     def get_data_directory(self) -> Path:
-        return self._directory / "data"
+        return self._directory.resolve() / "data"
+
+    def get_fargo_output_path(self) -> str:
+        return f"outputs/sim_{self._run._sim.name}/run_{self._run._id}/model_{self._id}"
 
     def delete(self) -> None:
         shutil.rmtree(self._directory)

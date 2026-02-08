@@ -107,8 +107,8 @@ class PlanetConfig:
             self.save()
 
     def clear(self) -> None:
-        for key in self.planets:
-            self.remove_planet(name=key)
+        self.planets = {}
+        self.save()
 
     def load(self) -> None:
         if not self._path.is_file():
