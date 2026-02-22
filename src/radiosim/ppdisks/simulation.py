@@ -42,7 +42,7 @@ def get_default_sampling_config():
             "eccentricity": [0.0, 0.9],  # 0 = Circle, 0 < e < 1 = Ellipse
         },
         "mesh_parameters": {
-            "y_min": [4.0, 6.0],  # Astronomical Units
+            "y_min": [6.0, 8.0],  # Astronomical Units
             "y_max_ratio": [1.2, 3],  # Multiple of max(orbital_radius)
         },
         "output_parameters": {
@@ -130,6 +130,7 @@ class Simulation:
         gpu: bool = True,
         cuda_device_id: int = 0,
         parallel: bool = False,
+        num_nodes: int = 1,
         show_progress: bool = True,
         verbose: bool = False,
         overwrite: bool = False,
@@ -352,16 +353,19 @@ class Simulation:
                 model_id=model._id,
                 show_progress=show_progress,
                 verbose=verbose,
+                show_fargo_output=True,
             )
 
             self._setup.run(
                 model_id=model._id,
+                num_nodes=num_nodes,
+                parallel=parallel,
                 show_progress=show_progress,
                 cuda_device_id=cuda_device_id,
             )
 
             # Move the data files to the correct directory
-            model.get_data_directory(temp_fargo=False).mkdir()
+            model.get_data_directory().mkdir()
             shutil.move(
                 src=Variables.get("FARGO_ROOT") / model.get_fargo_output_path(),
                 dst=model.get_data_directory(),

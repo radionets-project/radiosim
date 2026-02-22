@@ -90,12 +90,26 @@ class Setup:
         self,
         show_progress: bool = True,
         model_id: int | None = None,
+        parallel: bool = False,
+        num_nodes: int = 1,
         cuda_device_id: int = 0,
     ) -> None:
         total_steps = self._param_config["output_parameters.ntot"].value
         steps_between_outputs = self._param_config["output_parameters.ninterm"].value
 
         model_desc = f" | Model {model_id}" if model_id is not None else ""
+
+        processes = []
+
+        if parallel:
+            processes.append(f"mpirun -np {num_nodes} ")
+
+        processes.extend(
+            [
+                f"./fargo3d -D {cuda_device_id} "
+                f"setups/{self._name}/{self._param_config._path.name}"
+            ]
+        )
 
         # >>> BEGIN
         with (
@@ -105,10 +119,7 @@ class Setup:
                 disable=not show_progress,
             ) as progress,
             subprocess.Popen(
-                [
-                    f"./fargo3d -D {cuda_device_id} "
-                    f"setups/{self._name}/{self._param_config._path.name}"
-                ],
+                processes,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.DEVNULL,
                 bufsize=1,
