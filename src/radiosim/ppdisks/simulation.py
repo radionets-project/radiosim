@@ -132,6 +132,7 @@ class Simulation:
         parallel: bool = False,
         num_nodes: int = 1,
         show_progress: bool = True,
+        show_fargo_output: bool = False,
         verbose: bool = False,
         overwrite: bool = False,
     ) -> None:
@@ -353,7 +354,7 @@ class Simulation:
                 model_id=model._id,
                 show_progress=show_progress,
                 verbose=verbose,
-                show_fargo_output=True,
+                show_fargo_output=show_fargo_output,
             )
 
             self._setup.run(
