@@ -36,6 +36,7 @@ def get_default_sampling_config():
             "binary_period": [6.04800e5, 3e9],  # Seconds (logarithmic sampling)
             "binary_eccentricity": [0.0, 0.4],  # 0 = Circle, 0 < e < 1 = Ellipse
             "stellar_mass": [0.5, 5],  # Solar Masses
+            "stellar_temperature": [2000.0, 3000.0],  # Kelvin
             "num_planets": [1, 5],
             "planet_mass": [1.0e-6, 5.0e-3],  # Solar Masses
             "planet_orbit_radius": [7.0, 30.0],  # Astronomical Units
@@ -263,6 +264,11 @@ class Simulation:
             mesh_parameters = samples["mesh_parameters"]
 
             distances = self._planet_config.get_distances()
+
+            # If binary: distance -> binary eccentricity || binary period != distance
+            # for the two stars in the planet file
+            if planet_parameters["binary_system"]:
+                distances = distances[2:]
 
             param_config["mesh_parameters.ymin"] = (
                 (np.min([mesh_parameters["y_min"], distances.min()]) * un.AU)
@@ -590,6 +596,12 @@ class SimulationRun:
         planet_parameters["stellar_mass"] = rng.uniform(
             low=planet_sampling["stellar_mass"][0],
             high=planet_sampling["stellar_mass"][1],
+            size=num_stars,
+        )
+
+        planet_parameters["stellar_temperature"] = rng.uniform(
+            low=planet_sampling["stellar_temperature"][0],
+            high=planet_sampling["stellar_temperature"][1],
             size=num_stars,
         )
 
