@@ -177,9 +177,8 @@ class PlanetConfig:
     def __repr__(self):
         return f"PlanetConfig(name={self.name}, planets={list(self.planets.keys())})"
 
-    def get_max_distance(self) -> None:
-        distances = [planet.distance for planet in self.planets.values()]
-        return np.max(distances) * self._unit_system.length
+    def get_distances(self) -> np.ndarray:
+        return np.array([planet.distance for planet in self.planets.values()])
 
     @classmethod
     def get_configs(cls) -> list["PlanetConfig"]:

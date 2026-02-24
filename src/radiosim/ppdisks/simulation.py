@@ -262,11 +262,15 @@ class Simulation:
             ## Mesh Parameters
             mesh_parameters = samples["mesh_parameters"]
 
+            distances = self._planet_config.get_distances()
+
             param_config["mesh_parameters.ymin"] = (
-                (mesh_parameters["y_min"] * un.AU).to(self._unit_system.length).value
+                (np.min([mesh_parameters["y_min"], distances.min()]) * un.AU)
+                .to(self._unit_system.length)
+                .value
             )
 
-            max_orbit_radius = self._planet_config.get_max_distance()
+            max_orbit_radius = distances.max()
             param_config["mesh_parameters.ymax"] = (
                 mesh_parameters["y_max_ratio"]
                 * max_orbit_radius.to(self._unit_system.length).value
