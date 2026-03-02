@@ -120,6 +120,9 @@ class Simulation:
         run_ids = [int(str(d.name).removeprefix("run_")) for d in dirs]
         return [SimulationRun(id=run_id, sim=self) for run_id in run_ids]
 
+    def get_run(self, run_id: int) -> "SimulationRun":
+        return SimulationRun(id=run_id, sim=self)
+
     def simulate(
         self,
         num_models: int,
@@ -133,7 +136,6 @@ class Simulation:
         parallel: bool = False,
         num_nodes: int = 1,
         show_progress: bool = True,
-        show_fargo_output: bool = False,
         verbose: bool = False,
         overwrite: bool = False,
     ) -> None:
@@ -147,6 +149,8 @@ class Simulation:
             )
         else:
             run = SimulationRun(id=run_id, sim=self, resume_rng=resume)
+
+        print(f"------ STARTING RUN {run._id} ------")
 
         start_idx = 0 if not resume else run.get_next_model_id()
         for i in np.arange(start_idx, num_models):
@@ -278,8 +282,7 @@ class Simulation:
 
             max_orbit_radius = distances.max()
             param_config["mesh_parameters.ymax"] = (
-                mesh_parameters["y_max_ratio"]
-                * max_orbit_radius.to(self._unit_system.length).value
+                mesh_parameters["y_max_ratio"] * max_orbit_radius
             )
 
             param_config["mesh_parameters.nx"] = run.get_polar_img_size()[1]
@@ -295,7 +298,9 @@ class Simulation:
                 return np.sqrt((4 * np.pi**2 * radius**3) / (mass * G))
 
             period = orbital_period(
-                mass=m_star, radius=max_orbit_radius, G=self._constants["G"]
+                mass=m_star,
+                radius=max_orbit_radius * self._unit_system.length,
+                G=self._constants["G"],
             )
 
             total_time = num_orbits * period
@@ -364,7 +369,7 @@ class Simulation:
                 model_id=model._id,
                 show_progress=show_progress,
                 verbose=verbose,
-                show_fargo_output=show_fargo_output,
+                show_fargo_output=verbose,
             )
 
             self._setup.run(
@@ -373,14 +378,18 @@ class Simulation:
                 parallel=parallel,
                 show_progress=show_progress,
                 cuda_device_id=cuda_device_id,
+                verbose=verbose,
             )
 
             # Move the data files to the correct directory
             model.get_data_directory().mkdir()
-            shutil.move(
-                src=Variables.get("FARGO_ROOT") / model.get_fargo_output_path(),
-                dst=model.get_data_directory(),
-            )
+            for file in (
+                Variables.get("FARGO_ROOT") / model.get_fargo_output_path()
+            ).glob("*.*"):
+                shutil.move(
+                    src=file,
+                    dst=model.get_data_directory(),
+                )
             shutil.rmtree(
                 path=Variables.get("FARGO_ROOT") / model.get_fargo_output_path()
             )

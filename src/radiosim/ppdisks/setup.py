@@ -54,8 +54,13 @@ class Setup:
                 )
                 print("Cleaning up make process ...")
 
+            clean_cmd = ["make mrproper"]
+
+            if verbose:
+                print(f"CMD @ {Variables.get('FARGO_ROOT')}  $ " + " ".join(clean_cmd))
+
             subprocess.run(
-                ["make mrproper"],
+                clean_cmd,
                 cwd=Variables.get("FARGO_ROOT"),
                 stdout=subprocess.DEVNULL if not show_fargo_output else None,
                 stderr=subprocess.DEVNULL if not show_fargo_output else None,
@@ -65,14 +70,18 @@ class Setup:
             if verbose:
                 print("Starting compilation ...")
 
+            run_cmd = [
+                f"make SETUP={self._name} "
+                f"GPU={1 if gpu else 0} "
+                f"PARALLEL={1 if parallel else 0} "
+                f"UNITS={unit_system.key} "
+                f"RESCALE={1 if rescale else 0}"
+            ]
+            if verbose:
+                print(f"CMD @ {Variables.get('FARGO_ROOT')}  $ " + " ".join(run_cmd))
+
             subprocess.run(
-                [
-                    f"make SETUP={self._name} "
-                    f"GPU={1 if gpu else 0} "
-                    f"PARALLEL={1 if parallel else 0} "
-                    f"UNITS={unit_system.key} "
-                    f"RESCALE={1 if rescale else 0}"
-                ],
+                run_cmd,
                 cwd=Variables.get("FARGO_ROOT"),
                 stdout=subprocess.DEVNULL if not show_fargo_output else None,
                 stderr=subprocess.DEVNULL if not show_fargo_output else None,
@@ -93,6 +102,7 @@ class Setup:
         parallel: bool = False,
         num_nodes: int = 1,
         cuda_device_id: int = 0,
+        verbose: bool = False,
     ) -> None:
         total_steps = self._param_config["output_parameters.ntot"].value
         steps_between_outputs = self._param_config["output_parameters.ninterm"].value
@@ -111,6 +121,9 @@ class Setup:
             ]
         )
 
+        if verbose:
+            print(f"CMD @ {Variables.get('FARGO_ROOT')}  $ " + " ".join(processes))
+
         # >>> BEGIN
         with (
             tqdm(
@@ -121,7 +134,7 @@ class Setup:
             subprocess.Popen(
                 processes,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
+                stderr=None if verbose else subprocess.DEVNULL,
                 bufsize=1,
                 universal_newlines=True,
                 shell=True,
