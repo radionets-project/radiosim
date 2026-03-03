@@ -19,9 +19,9 @@ __all__ = ["Simulation", "SimulationRun", "DiskModel"]
 def get_default_sampling_config():
     return {
         "disk_parameters": {
-            "aspect_ratio": [0.01, 0.1],
-            "sigma0": [1.0, 200.0],
-            "sigma_slope": [0.05, 0.3],
+            "aspect_ratio": [0.01, 0.1],  # Disk aspect ratio @ r=R0 (default R0 = 1AU)
+            "sigma0": [15000.0, 30000.0],  # Surface density (kg/m^2) @ r=R0
+            "sigma_slope": [0.05, 0.3],  # Exponent of the density profile
             "flaring_index": [0.0, 0.0],
             "alpha": [0.001, 0.01],  # Shakura-Sunyaev viscosity parameter
         },
@@ -32,22 +32,22 @@ def get_default_sampling_config():
             "epsilon": [0.05, 0.2],
         },
         "planet_parameters": {
-            "binary_ratio": 0.667,  # Ratio of binary systems to single systems
+            "binary_ratio": 0.334,  # Ratio of binary systems to single systems
             "binary_period": [6.04800e5, 3e9],  # Seconds (logarithmic sampling)
             "binary_eccentricity": [0.0, 0.4],  # 0 = Circle, 0 < e < 1 = Ellipse
             "stellar_mass": [0.5, 5],  # Solar Masses
             "stellar_temperature": [2000.0, 3000.0],  # Kelvin
             "num_planets": [1, 5],
             "planet_mass": [1.0e-6, 5.0e-3],  # Solar Masses
-            "planet_orbit_radius": [7.0, 30.0],  # Astronomical Units
+            "planet_orbit_radius": [6.0, 15.0],  # Astronomical Units
             "eccentricity": [0.0, 0.9],  # 0 = Circle, 0 < e < 1 = Ellipse
         },
         "mesh_parameters": {
-            "y_min": [6.0, 8.0],  # Astronomical Units
-            "y_max_ratio": [1.2, 3],  # Multiple of max(orbital_radius)
+            "y_min": [3.0, 5.0],  # Astronomical Units
+            "y_max_ratio": [1.5, 3],  # Multiple of max(orbital_radius)
         },
         "output_parameters": {
-            "num_largest_orbits": [600, 800],
+            "num_largest_orbits": [100, 200],
         },
     }
 
@@ -136,6 +136,7 @@ class Simulation:
         parallel: bool = False,
         num_nodes: int = 1,
         show_progress: bool = True,
+        record_execution_time: bool = True,
         verbose: bool = False,
         overwrite: bool = False,
     ) -> None:
@@ -361,7 +362,8 @@ class Simulation:
             sample_config.dump_dict(content=toml_serialize_dict(read_dict=sample_dump))
 
             # Recompile and Run Setup
-            self._setup.compile(
+
+            compile_time = self._setup.compile(
                 gpu=gpu,
                 parallel=parallel,
                 unit_system=self._unit_system,
@@ -370,15 +372,17 @@ class Simulation:
                 show_progress=show_progress,
                 verbose=verbose,
                 show_fargo_output=verbose,
+                return_execution_time=record_execution_time,
             )
 
-            self._setup.run(
+            run_time = self._setup.run(
                 model_id=model._id,
                 num_nodes=num_nodes,
                 parallel=parallel,
                 show_progress=show_progress,
                 cuda_device_id=cuda_device_id,
                 verbose=verbose,
+                return_execution_time=record_execution_time,
             )
 
             # Move the data files to the correct directory
@@ -393,6 +397,19 @@ class Simulation:
             shutil.rmtree(
                 path=Variables.get("FARGO_ROOT") / model.get_fargo_output_path()
             )
+
+            if record_execution_time:
+                record_toml = TOMLConfiguration(
+                    path=model.get_data_directory() / "execution_time.toml",
+                    create_if_not_exists=True,
+                )
+                record_toml.dump_dict(
+                    {
+                        "compile_time": compile_time,
+                        "run_time": run_time[0],
+                        "output_times": run_time[1],
+                    }
+                )
 
     @classmethod
     def new(
@@ -448,7 +465,7 @@ class Simulation:
             setup=setup,
             float_type=float_type,
             polar_img_size=polar_img_size,
-            unit_system=unit_system,
+            unit_system=unit_system.default(),
         )
 
         instance.save_config()
@@ -701,6 +718,18 @@ class DiskModel:
 
         with open(rng_dump, "rb") as pkl:
             return pickle.load(pkl)
+
+    def get_execution_times(self) -> dict:
+        record_toml = TOMLConfiguration(
+            self.get_data_directory() / "execution_time.toml"
+        )
+
+        if not record_toml.is_valid():
+            raise FileNotFoundError(
+                "The execution times were not recored for this model."
+            )
+
+        return record_toml.as_dict()
 
     @classmethod
     def new(cls, id: int, run: SimulationRun):

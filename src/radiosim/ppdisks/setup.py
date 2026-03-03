@@ -1,4 +1,5 @@
 import subprocess
+import time
 from pathlib import Path
 
 from tqdm.auto import tqdm
@@ -37,9 +38,10 @@ class Setup:
         rescale: bool = False,
         show_progress: bool = True,
         model_id: int | None = None,
+        return_execution_time: bool = False,
         verbose: bool = False,
         show_fargo_output: bool = False,
-    ) -> None:
+    ) -> int | None:
         model_desc = f" | Model {model_id}" if model_id is not None else ""
         with tqdm(
             desc="Compiling" + model_desc, total=1, disable=not show_progress
@@ -58,6 +60,8 @@ class Setup:
 
             if verbose:
                 print(f"CMD @ {Variables.get('FARGO_ROOT')}  $ " + " ".join(clean_cmd))
+
+            starting_time = time.time_ns()
 
             subprocess.run(
                 clean_cmd,
@@ -88,10 +92,17 @@ class Setup:
                 shell=True,
             )
 
+            compile_time = time.time_ns() - starting_time
+
             if verbose:
                 print("============ FINISH COMPILATION ============")
 
             progress.update(n=1)
+
+            if return_execution_time:
+                return compile_time
+            else:
+                return None
 
     # Subprocess output capture adapted from https://stackoverflow.com/a/28319191
     # Marked code (inside >>> BEGIN / <<< END) is licensed under CC BY-SA 3.0
@@ -102,8 +113,9 @@ class Setup:
         parallel: bool = False,
         num_nodes: int = 1,
         cuda_device_id: int = 0,
+        return_execution_time: bool = False,
         verbose: bool = False,
-    ) -> None:
+    ) -> tuple[float, list[float]] | None:
         total_steps = self._param_config["output_parameters.ntot"].value
         steps_between_outputs = self._param_config["output_parameters.ninterm"].value
 
@@ -123,6 +135,9 @@ class Setup:
 
         if verbose:
             print(f"CMD @ {Variables.get('FARGO_ROOT')}  $ " + " ".join(processes))
+
+        starting_time = time.time_ns()
+        output_times = []
 
         # >>> BEGIN
         with (
@@ -145,6 +160,13 @@ class Setup:
                 if not line.startswith("OUTPUT"):
                     continue
 
+                output_times.append(time.time_ns() - starting_time)
                 progress.update(n=steps_between_outputs)
-
         # <<< END
+
+        run_time = time.time_ns() - starting_time
+
+        if return_execution_time:
+            return run_time, output_times
+        else:
+            return None
