@@ -3,11 +3,16 @@ import shutil
 from os import PathLike
 from pathlib import Path
 
+import matplotlib
+import matplotlib.animation as animation
+import matplotlib.pyplot as plt
 import numpy as np
 from astropy import constants as const
 from astropy import units as un
+from tqdm.auto import tqdm
 
 from radiosim.ppdisks.config import TOMLConfiguration
+from radiosim.ppdisks.plotting.plotting import plot_polar_image
 
 from .config import Variables
 from .config.fargo import Constants, Planet, PlanetConfig, UnitSystem
@@ -27,19 +32,21 @@ def get_default_sampling_config():
         },
         "dust_parameters": {
             "invstokes": {
-                "1": [8.0, 20.0],
+                "1": [10.0, 20.0],
             },
-            "epsilon": [0.05, 0.2],
+            "epsilon": [0.05, 0.2],  # dust-to-gas ratio,
         },
         "planet_parameters": {
-            "binary_ratio": 0.334,  # Ratio of binary systems to single systems
-            "binary_period": [6.04800e5, 3e9],  # Seconds (logarithmic sampling)
-            "binary_eccentricity": [0.0, 0.4],  # 0 = Circle, 0 < e < 1 = Ellipse
-            "stellar_mass": [0.5, 5],  # Solar Masses
+            "binary_ratio": 0.0,  # Ratio of binary systems to single systems
+            "binary_period": [6.04800e5, 3e7],  # Seconds (logarithmic sampling)
+            "binary_eccentricity": [0.0, 0.2],  # 0 = Circle, 0 < e < 1 = Ellipse
+            "stellar_mass": [0.5, 2],  # Solar Masses
             "stellar_temperature": [2000.0, 3000.0],  # Kelvin
-            "num_planets": [1, 5],
+            "num_planets": [1, 4],
             "planet_mass": [1.0e-6, 5.0e-3],  # Solar Masses
             "planet_orbit_radius": [6.0, 15.0],  # Astronomical Units
+            # short: PEF -> no other planets allowed closer than R_orbit * PEF
+            "planet_exclusion_factor": 0.2,
             "eccentricity": [0.0, 0.9],  # 0 = Circle, 0 < e < 1 = Ellipse
         },
         "mesh_parameters": {
@@ -643,11 +650,32 @@ class SimulationRun:
             high=planet_sampling["planet_mass"][1],
             size=num_planets,
         )
-        planet_parameters["planet_orbit_radius"] = rng.uniform(
-            low=planet_sampling["planet_orbit_radius"][0],
-            high=planet_sampling["planet_orbit_radius"][1],
-            size=num_planets,
-        )
+
+        planet_orbits = np.zeros(num_planets)
+
+        # This makes sure that planets are not too close to each other
+        for i_planet in range(num_planets):
+            valid = False
+
+            while not valid:
+                orbit = rng.uniform(
+                    low=planet_sampling["planet_orbit_radius"][0],
+                    high=planet_sampling["planet_orbit_radius"][1],
+                )
+
+                # if new orbit violates planet exclusion zones around other planets
+                if np.any(
+                    np.abs(planet_orbits[:i_planet] - orbit) / planet_orbits[:i_planet]
+                    > planet_sampling["planet_exclusion_factor"]
+                ):
+                    continue
+                else:
+                    valid = True
+
+            planet_orbits[i_planet] = orbit
+
+        planet_parameters["planet_orbit_radius"] = planet_orbits
+
         planet_parameters["eccentricity"] = rng.uniform(
             low=planet_sampling["eccentricity"][0],
             high=planet_sampling["eccentricity"][1],
@@ -700,6 +728,136 @@ class DiskModel:
         self._id: int = id
         self._directory: Path = run._directory / f"model_{id}"
         self._run: SimulationRun = run
+
+    def get_num_outputs(self) -> int:
+        files = {
+            f
+            for f in Path(self.get_data_directory()).glob("gasdens*.dat")
+            if f.is_file() and "2d" not in f.name
+        }
+        return len(files)
+
+    def get_dust_density(self, output_idx: int = -1, dust_idx: int = 1) -> np.ndarray:
+        if output_idx < 0:
+            output_idx = np.arange(0, self.get_num_outputs())[output_idx]
+
+        return np.fromfile(
+            self.get_data_directory() / f"dust{dust_idx}dens{output_idx}.dat",
+            dtype=self._run.get_float_type(),
+        ).reshape(self._run.get_polar_img_size())
+
+    def plot_dust_density(
+        self,
+        grid_shape: tuple,
+        output_idx: int = -1,
+        dust_idx: int = 1,
+        xy_unit: un.Unit = un.AU,
+        save_to: str | None = None,
+        save_args: dict = None,
+        **kwargs,
+    ) -> tuple[
+        matplotlib.image.AxesImage, matplotlib.figure.Figure, matplotlib.axes.Axes
+    ]:
+        r_min, r_max = self.get_radius_lims()
+        r_min = (r_min * un.AU).to(xy_unit).value
+        r_max = (r_max * un.AU).to(xy_unit).value
+
+        unit_system = self._run._sim._unit_system
+
+        return plot_polar_image(
+            polar_intensities=self.get_dust_density(
+                output_idx=output_idx, dust_idx=dust_idx
+            ),
+            grid_shape=grid_shape,
+            r_lims=[r_min, r_max],
+            intensity_unit=(
+                "Dust density / "
+                f"{
+                    (unit_system.mass / unit_system.length**2).to_string(format='latex')
+                }"
+            ),
+            dtype=self._run.get_float_type(),
+            save_to=save_to,
+            save_args=save_args,
+            **kwargs,
+        )
+
+    def animate_dust_density(
+        self,
+        grid_shape: tuple,
+        save_to: str | PathLike,
+        step_size: int,
+        dust_idx: int = 1,
+        xy_unit: un.Unit = un.AU,
+        save_args: dict = None,
+        fps: int = 30,
+        dpi: int | str = "figure",
+        blit: bool = True,
+        show_progress: bool = True,
+        **kwargs,
+    ) -> None:
+        save_to = Path(save_to)
+
+        ims = []
+
+        fig, ax = plt.subplots()
+
+        print(
+            "Animation length will be: "
+            f"{np.round(self.get_num_outputs() // step_size / fps, 2)} seconds"
+        )
+
+        for i in tqdm(
+            np.arange(start=0, stop=self.get_num_outputs(), step=step_size),
+            desc="Plotting densities",
+            disable=not show_progress,
+        ):
+            im, _, _ = self.plot_dust_density(
+                grid_shape=grid_shape,
+                output_idx=i,
+                dust_idx=dust_idx,
+                xy_unit=xy_unit,
+                fig=fig,
+                ax=ax,
+                **kwargs,
+            )
+            ims.append([im])
+            if hasattr(im, "colorbar") and im.colorbar is not None:
+                im.colorbar.ax.remove()
+
+        anim = animation.ArtistAnimation(fig, ims, blit=blit, interval=1e3 / fps)
+
+        writer = None
+        if save_to.suffix.lower() == ".gif":
+            writer = animation.PillowWriter(
+                fps=fps,
+                bitrate=-1,
+            )
+            writer.setup(fig=fig, outfile=save_to, dpi=dpi)
+
+        def _progress_func(_i, _n):
+            progress_bar.update(1)
+
+        with tqdm(
+            total=len(ims), desc="Saving animation", disable=not show_progress
+        ) as progress_bar:
+            if writer is None:
+                anim.save(save_to, progress_callback=_progress_func, dpi=dpi)
+            else:
+                anim.save(
+                    save_to, progress_callback=_progress_func, writer=writer, dpi=dpi
+                )
+
+    def get_radius_lims(self) -> tuple[float]:
+        sample_config = self.get_sample_config()
+
+        r_min = sample_config["mesh_parameters.y_min"]
+        r_max = (
+            np.max(sample_config["planet_parameters.planet_orbit_radius"])
+            * sample_config["mesh_parameters.y_max_ratio"]
+        )
+
+        return r_min, r_max
 
     def get_sample_config(self) -> TOMLConfiguration:
         return TOMLConfiguration(self._directory / "samples.toml")

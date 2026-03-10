@@ -47,7 +47,7 @@ def configure_axes(
     return fig, ax
 
 
-def _get_norm(
+def get_norm(
     norm: str,
     vmax: float | None = None,
     vmin: float | None = None,
@@ -194,13 +194,13 @@ def xy2pix(
     shape: tuple[int],
     xy_lims: tuple[list[float]] = ([-1, 1], [-1, 1]),
 ):
-    xy_lims = np.ndarray(xy_lims)
+    xy_lims = np.array(xy_lims)
 
     delta_x = (np.abs(np.diff(xy_lims[0])) / shape[1])[0]
     delta_y = (np.abs(np.diff(xy_lims[1])) / shape[0])[0]
 
-    col_idx = np.floor((x - xy_lims[0, 0]) // delta_x).int()
-    row_idx = np.floor((y - xy_lims[1, 0]) // delta_y).int()
+    col_idx = np.int64(np.floor((x - xy_lims[0, 0]) // delta_x))
+    row_idx = np.int64(np.floor((y - xy_lims[1, 0]) // delta_y))
 
     return row_idx, col_idx
 
@@ -213,7 +213,7 @@ def ellipse_img2cartesian_img(
     a: float,
     b: float,
     alpha: float,
-    dtype: type,
+    dtype: type = np.float64,
     xy_lims: tuple[list[float]] = ([-1, 1], [-1, 1]),
 ):
     image = np.zeros(grid_shape, dtype=dtype)
