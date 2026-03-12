@@ -2,17 +2,20 @@ import pickle
 import shutil
 from os import PathLike
 from pathlib import Path
+from time import time
 
 import matplotlib
 import matplotlib.animation as animation
-import matplotlib.pyplot as plt
 import numpy as np
 from astropy import constants as const
 from astropy import units as un
+from astropy.time import Time
+from numpy.typing import ArrayLike
 from tqdm.auto import tqdm
 
 from radiosim.ppdisks.config import TOMLConfiguration
-from radiosim.ppdisks.plotting.plotting import plot_polar_image
+from radiosim.ppdisks.plotting.plotting import plot_image
+from radiosim.ppdisks.plotting.utils import ellipse_img2cartesian_img
 
 from .config import Variables
 from .config.fargo import Constants, Planet, PlanetConfig, UnitSystem
@@ -746,36 +749,95 @@ class DiskModel:
             dtype=self._run.get_float_type(),
         ).reshape(self._run.get_polar_img_size())
 
+    def get_polar_dust_density(
+        self,
+        grid_shape: tuple[int],
+        output_idx: int = -1,
+        dust_idx: int = 1,
+        a_maj: float = 1.0,
+        b_min: float = 1.0,
+        rot_angle: float = 0.0,
+        xy_lims: ArrayLike | None = None,
+        xy_unit: un.Unit = un.AU,
+    ) -> tuple[np.ndarray, float, float]:
+        polar_intensities = self.get_dust_density(
+            output_idx=output_idx, dust_idx=dust_idx
+        )
+
+        r_min, r_max = self.get_radius_lims()
+        r_min = (r_min * un.AU).to(xy_unit).value
+        r_max = (r_max * un.AU).to(xy_unit).value
+
+        r = np.linspace(
+            r_min,
+            r_max,
+            polar_intensities.shape[0],
+        )
+        phi = np.linspace(0, 2 * np.pi, polar_intensities.shape[1])
+
+        rs, phis = np.meshgrid(r, phi)
+        rs = rs.T
+        phis = phis.T
+
+        return (
+            ellipse_img2cartesian_img(
+                r=rs,
+                phi=phis,
+                intensities=polar_intensities,
+                grid_shape=grid_shape,
+                a=a_maj,
+                b=b_min,
+                alpha=rot_angle,
+                xy_lims=xy_lims
+                if xy_lims is not None
+                else [[-r_max, r_max], [-r_max, r_max]],
+            ),
+            r_min,
+            r_max,
+        )
+
     def plot_dust_density(
         self,
         grid_shape: tuple,
         output_idx: int = -1,
         dust_idx: int = 1,
+        a_maj: float = 1.0,
+        b_min: float = 1.0,
+        rot_angle: float = 0.0,
+        xy_lims: ArrayLike | None = None,
         xy_unit: un.Unit = un.AU,
+        intensity_limits: ArrayLike | None = None,
         save_to: str | None = None,
         save_args: dict = None,
         **kwargs,
     ) -> tuple[
         matplotlib.image.AxesImage, matplotlib.figure.Figure, matplotlib.axes.Axes
     ]:
-        r_min, r_max = self.get_radius_lims()
-        r_min = (r_min * un.AU).to(xy_unit).value
-        r_max = (r_max * un.AU).to(xy_unit).value
-
         unit_system = self._run._sim._unit_system
 
-        return plot_polar_image(
-            polar_intensities=self.get_dust_density(
-                output_idx=output_idx, dust_idx=dust_idx
-            ),
+        polar_intensities, _, r_max = self.get_polar_dust_density(
             grid_shape=grid_shape,
-            r_lims=[r_min, r_max],
-            intensity_unit=(
+            output_idx=output_idx,
+            dust_idx=dust_idx,
+            a_maj=a_maj,
+            b_min=b_min,
+            rot_angle=rot_angle,
+            xy_lims=xy_lims,
+            xy_unit=xy_unit,
+        )
+
+        xy_lims = xy_lims if xy_lims is not None else [[-r_max, r_max], [-r_max, r_max]]
+
+        return plot_image(
+            data=polar_intensities,
+            xy_lims=xy_lims,
+            intensity_label=(
                 "Dust density / "
                 f"{
                     (unit_system.mass / unit_system.length**2).to_string(format='latex')
                 }"
             ),
+            intensity_limits=intensity_limits,
             dtype=self._run.get_float_type(),
             save_to=save_to,
             save_args=save_args,
@@ -785,9 +847,17 @@ class DiskModel:
     def animate_dust_density(
         self,
         grid_shape: tuple,
-        save_to: str | PathLike,
         step_size: int,
+        output_fmt: str = "mp4",
+        output_dir: str | PathLike | None = None,
+        save_to: str | PathLike | None = None,
+        save_with_timestamp: bool = False,
         dust_idx: int = 1,
+        start_idx: int = 0,
+        a_maj: float = 1.0,
+        b_min: float = 1.0,
+        rot_angle: float = 0.0,
+        end_idx: int | None = None,
         xy_unit: un.Unit = un.AU,
         save_args: dict = None,
         fps: int = 30,
@@ -796,36 +866,60 @@ class DiskModel:
         show_progress: bool = True,
         **kwargs,
     ) -> None:
-        save_to = Path(save_to)
-
-        ims = []
-
-        fig, ax = plt.subplots()
+        if save_to is not None:
+            save_to = Path(save_to)
+        else:
+            output_dir = Path(output_dir)
+            save_to = (
+                output_dir / f"{self._run._sim.name}-run_{self._run._id}-"
+                f"model_{self._id}.{output_fmt}"
+            )
 
         print(
             "Animation length will be: "
             f"{np.round(self.get_num_outputs() // step_size / fps, 2)} seconds"
         )
 
-        for i in tqdm(
-            np.arange(start=0, stop=self.get_num_outputs(), step=step_size),
-            desc="Plotting densities",
-            disable=not show_progress,
-        ):
-            im, _, _ = self.plot_dust_density(
-                grid_shape=grid_shape,
-                output_idx=i,
-                dust_idx=dust_idx,
-                xy_unit=xy_unit,
-                fig=fig,
-                ax=ax,
-                **kwargs,
-            )
-            ims.append([im])
-            if hasattr(im, "colorbar") and im.colorbar is not None:
-                im.colorbar.ax.remove()
+        end_idx = self.get_num_outputs() if end_idx is None else end_idx
+        num_outputs = (end_idx - start_idx) // step_size
 
-        anim = animation.ArtistAnimation(fig, ims, blit=blit, interval=1e3 / fps)
+        data = np.zeros((num_outputs, *grid_shape))
+
+        output_idcs = np.arange(start_idx, end_idx + step_size, step=step_size)
+
+        for i in np.arange(0, num_outputs):
+            img, _, _ = self.get_polar_dust_density(
+                grid_shape=grid_shape,
+                output_idx=output_idcs[i],
+                dust_idx=dust_idx,
+                a_maj=a_maj,
+                b_min=b_min,
+                rot_angle=rot_angle,
+                xy_unit=xy_unit,
+            )
+            data[i] = img
+
+        print(f"{[data[data > 0].min(), data.max()]}")
+
+        im, fig, ax = self.plot_dust_density(
+            grid_shape=grid_shape,
+            output_idx=start_idx,
+            dust_idx=dust_idx,
+            xy_unit=xy_unit,
+            a_maj=a_maj,
+            b_min=b_min,
+            rot_angle=rot_angle,
+            intensity_limits=[data[data > 0].min(), data.max()],
+            **kwargs,
+        )
+
+        def update(frame: int):
+            im.set_data(data[frame + 1])
+            return [im]
+
+        anim = animation.FuncAnimation(
+            fig=fig, func=update, frames=num_outputs - 1, blit=blit, interval=1e3 / fps
+        )
 
         writer = None
         if save_to.suffix.lower() == ".gif":
@@ -839,8 +933,12 @@ class DiskModel:
             progress_bar.update(1)
 
         with tqdm(
-            total=len(ims), desc="Saving animation", disable=not show_progress
+            total=num_outputs - 1, desc="Saving animation", disable=not show_progress
         ) as progress_bar:
+            if save_with_timestamp:
+                save_to = save_to.with_name(
+                    f"{save_to.stem}-{Time(time(), format='unix').isot}"
+                )
             if writer is None:
                 anim.save(save_to, progress_callback=_progress_func, dpi=dpi)
             else:
