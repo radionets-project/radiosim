@@ -29,9 +29,9 @@ def get_default_sampling_config():
     return {
         "disk_parameters": {
             "aspect_ratio": [0.01, 0.1],  # Disk aspect ratio @ r=R0 (default R0 = 1AU)
-            "disk_mass_ref_radius": 1000,  # Reference radius R_ref in AU
-            "disk_mass": [0.001, 0.01],  # Cumulative disk mask @ r=R_ref
-            "sigma_slope": [0.05, 0.3],  # Exponent of the density profile
+            "disk_mass_ref_radius": 150,  # Reference radius R_ref in AU
+            "disk_mass": [0.01, 0.03],  # Cumulative disk mask in M_sun @ r=R_ref
+            "sigma_slope": [0.1, 0.3],  # Exponent of the density profile
             "flaring_index": [0.0, 0.0],
             "alpha": [0.001, 0.01],  # Shakura-Sunyaev viscosity parameter
         },
@@ -113,6 +113,7 @@ class Simulation:
         float_type: type,
         polar_img_size: tuple[int],
         unit_system: UnitSystem,
+        use_default_constants: bool,
     ):
         self.name: str = name
         self._root_directory: Path = Path(root_directory)
@@ -135,7 +136,16 @@ class Simulation:
         self._polar_img_size: tuple[int] = polar_img_size
 
         self._unit_system: UnitSystem = unit_system
-        self._constants: Constants = Constants(unit_system=unit_system, autosave=True)
+        self._use_default_constants: bool = use_default_constants
+
+        if use_default_constants:
+            self._constants: Constants = Constants.default(unit_system=unit_system)
+            self._constants._autosave = True
+            self._constants.save()
+        else:
+            self._constants: Constants = Constants(
+                unit_system=unit_system, autosave=True
+            )
 
         self._planet_config: PlanetConfig = PlanetConfig(
             name=f"radiosim_{self.name}", autosave=True, unit_system=self._unit_system
@@ -152,6 +162,7 @@ class Simulation:
                 else "FLOAT32",
                 "polar_img_size": list(self._polar_img_size),
                 "unit_system": self._unit_system.name,
+                "use_default_constants": self._use_default_constants,
             }
         }
         self._config.dump_dict(content)
@@ -304,9 +315,13 @@ class Simulation:
             ]
 
             param_config["disk_parameters.sigma0"] = sigma0(
-                ref_radius=disk_parameters["disk_mass_ref_radius"],
-                R0=self._constants["R0"],
-                mass=disk_parameters["disk_mass"],
+                ref_radius=(disk_parameters["disk_mass_ref_radius"] * un.AU)
+                .to(self._unit_system.length)
+                .value,
+                R0=self._constants["R0"].value,
+                mass=(disk_parameters["disk_mass"] * const.M_sun)
+                .to(self._unit_system.mass)
+                .value,
                 sigma_slope=disk_parameters["sigma_slope"],
             )
 
@@ -480,6 +495,7 @@ class Simulation:
         float_type: type = np.float64,
         polar_img_size: tuple[int] = (300, 800),
         unit_system: UnitSystem | str = UnitSystem.MKS,
+        use_default_constants: bool = True,
     ) -> "Simulation":
         if parent_directory is None:
             parent_directory = Path.cwd()
@@ -524,7 +540,8 @@ class Simulation:
             setup=setup,
             float_type=float_type,
             polar_img_size=polar_img_size,
-            unit_system=unit_system.default(),
+            unit_system=unit_system,
+            use_default_constants=use_default_constants,
         )
 
         instance.save_config()
@@ -548,6 +565,7 @@ class Simulation:
             else np.float32,
             polar_img_size=tuple(config["general.polar_img_size"]),
             unit_system=UnitSystem.__members__[config["general.unit_system"]],
+            use_default_constants=config["general.use_default_constants"],
         )
 
         return instance
@@ -856,6 +874,8 @@ class DiskModel:
         show_formula: bool = False,
         r_min: float | None = None,
         r_max: float | None = None,
+        x_norm: str | None = None,
+        y_norm: str | None = None,
         plot_args: dict | None = None,
         fig: matplotlib.figure.Figure | None = None,
         fig_args: dict | None = None,
@@ -881,10 +901,23 @@ class DiskModel:
         sample_config = self.get_sample_config()
         unit_system = self._run._sim._unit_system
 
+        s0 = sigma0(
+            ref_radius=(sample_config["disk_parameters.disk_mass_ref_radius"] * un.AU)
+            .to(unit_system.length)
+            .value,
+            R0=self._run._sim._constants["R0"].value,
+            mass=(sample_config["disk_parameters.disk_mass"] * const.M_sun)
+            .to(unit_system.mass)
+            .value,
+            sigma_slope=sample_config["disk_parameters.sigma_slope"],
+        )
+
+        print(s0)
+
         density = surface_density(
             radii,
             R0=self._run._sim._constants["R0"].value,
-            sigma0=sample_config["disk_parameters.sigma0"],
+            sigma0=s0,
             sigma_slope=sample_config["disk_parameters.sigma_slope"],
         ) * (unit_system.mass / unit_system.length**2).to(density_unit)
 
@@ -893,7 +926,7 @@ class DiskModel:
         ax.plot(
             radii,
             density,
-            label="$\\Sigma(R)=\\Sigma_0 \cdot (\\frac{R}{R_0})^{-p}$"
+            label="$\\Sigma(R)=\\Sigma_0 \\cdot (\\frac{R}{R_0})^{-p}$"
             if show_formula
             else None,
             **plot_args,
@@ -916,6 +949,13 @@ class DiskModel:
         ax.set_ylabel(
             f"Density Profile $\\Sigma$ in {density_unit.to_string(format='latex')}"
         )
+
+        if x_norm is not None:
+            ax.set_xscale(x_norm)
+
+        if y_norm is not None:
+            ax.set_yscale(y_norm)
+
         ax.legend()
 
         if save_to is not None:
