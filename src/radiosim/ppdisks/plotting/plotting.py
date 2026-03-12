@@ -29,14 +29,14 @@ def plot_image(
     fig: matplotlib.figure.Figure | None = None,
     ax: matplotlib.axes.Axes | None = None,
 ) -> tuple[matplotlib.image.AxesImage, matplotlib.figure.Figure, matplotlib.axes.Axes]:
-    norm = get_norm(norm) if isinstance(norm, str) else norm
-
     intensity_label = "Intensity / a.u." if intensity_label is None else intensity_label
 
     save_args = {} if save_args is None else save_args
 
     plot_args = {} if plot_args is None else plot_args
     fig_args = {} if fig_args is None else fig_args
+
+    intensity_limits = [None, None] if intensity_limits is None else intensity_limits
 
     fig, ax = configure_axes(fig=fig, ax=ax, fig_args=fig_args)
 
@@ -45,9 +45,7 @@ def plot_image(
         origin="lower",
         cmap=cmap,
         interpolation="none",
-        norm=get_norm(norm=norm)
-        if intensity_limits is None
-        else get_norm(norm=norm, vmin=intensity_limits[0], vmax=intensity_limits[1]),
+        norm=get_norm(norm=norm, vmin=intensity_limits[0], vmax=intensity_limits[1]),
         extent=np.ravel(xy_lims) if xy_lims is not None else None,
         **plot_args,
     )

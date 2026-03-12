@@ -19,6 +19,7 @@ from radiosim.ppdisks.plotting.utils import ellipse_img2cartesian_img
 
 from .config import Variables
 from .config.fargo import Constants, Planet, PlanetConfig, UnitSystem
+from .plotting.utils import configure_axes
 from .setup import Setup
 
 __all__ = ["Simulation", "SimulationRun", "DiskModel"]
@@ -28,7 +29,8 @@ def get_default_sampling_config():
     return {
         "disk_parameters": {
             "aspect_ratio": [0.01, 0.1],  # Disk aspect ratio @ r=R0 (default R0 = 1AU)
-            "sigma0": [15000.0, 30000.0],  # Surface density (kg/m^2) @ r=R0
+            "disk_mass_ref_radius": 1000,  # Reference radius R_ref in AU
+            "disk_mass": [0.001, 0.01],  # Cumulative disk mask @ r=R_ref
             "sigma_slope": [0.05, 0.3],  # Exponent of the density profile
             "flaring_index": [0.0, 0.0],
             "alpha": [0.001, 0.01],  # Shakura-Sunyaev viscosity parameter
@@ -60,6 +62,46 @@ def get_default_sampling_config():
             "num_largest_orbits": [100, 200],
         },
     }
+
+
+# See https://fargo3d.github.io/documentation/def_setups.html#parameters
+def surface_density(
+    radius: float | ArrayLike, R0: float, sigma0: float, sigma_slope: float
+):
+    return sigma0 * (radius / R0) ** (-sigma_slope)
+
+
+# From https://doi.org/10.1093/mnrasl/slv105 p.75
+def sigma0(
+    ref_radius: float | ArrayLike, R0: float, mass: float, sigma_slope: float
+) -> float | ArrayLike:
+    return (
+        (2 - sigma_slope)
+        / (2 * np.pi * R0**2)
+        * mass
+        * ((ref_radius / R0) ** (2 - sigma_slope) - 1) ** (-1)
+    )
+
+
+# From https://fargo3d.github.io/documentation/def_setups.html#parameters
+def aspect_ratio(
+    radius: float | ArrayLike, R0: float, ref_aspect_ratio: float, flaring_index: float
+) -> float | ArrayLike:
+    return ref_aspect_ratio * (radius / R0) ** flaring_index
+
+
+# From https://fargo3d.github.io/documentation/def_setups.html#parameters
+def disk_height(
+    radius: float | ArrayLike, ref_aspect_ratio: float, flaring_index: float
+) -> float | ArrayLike:
+    return (
+        aspect_ratio(
+            radius=radius,
+            ref_aspect_ratio=ref_aspect_ratio,
+            flaring_index=flaring_index,
+        )
+        * radius
+    )
 
 
 class Simulation:
@@ -260,7 +302,14 @@ class Simulation:
             param_config["disk_parameters.aspectRatio"] = disk_parameters[
                 "aspect_ratio"
             ]
-            param_config["disk_parameters.sigma0"] = disk_parameters["sigma0"]
+
+            param_config["disk_parameters.sigma0"] = sigma0(
+                ref_radius=disk_parameters["disk_mass_ref_radius"],
+                R0=self._constants["R0"],
+                mass=disk_parameters["disk_mass"],
+                sigma_slope=disk_parameters["sigma_slope"],
+            )
+
             param_config["disk_parameters.sigmaSlope"] = disk_parameters["sigma_slope"]
             param_config["disk_parameters.flaringIndex"] = disk_parameters[
                 "flaring_index"
@@ -602,6 +651,8 @@ class SimulationRun:
                         write_dict[key] = rng.integers(low=value[0], high=value[1])
                     else:
                         write_dict[key] = rng.uniform(low=value[0], high=value[1])
+                elif np.isscalar(value):
+                    write_dict[key] = value
 
             return write_dict
 
@@ -796,6 +847,82 @@ class DiskModel:
             r_max,
         )
 
+    def plot_density_profile(
+        self,
+        save_to: str | PathLike | None = None,
+        save_args: dict | None = None,
+        r_unit: un.Unit = un.AU,
+        density_unit: un.Unit = un.kilogram / un.meter**2,
+        show_formula: bool = False,
+        r_min: float | None = None,
+        r_max: float | None = None,
+        plot_args: dict | None = None,
+        fig: matplotlib.figure.Figure | None = None,
+        fig_args: dict | None = None,
+        ax: matplotlib.axes.Axes | None = None,
+    ) -> tuple[matplotlib.axes.Axes, matplotlib.figure.Figure]:
+        save_args = {} if save_args is None else save_args
+        fig_args = {} if fig_args is None else fig_args
+        plot_args = {} if plot_args is None else plot_args
+
+        r_min = (
+            r_min
+            if r_min is not None
+            else (self.get_radius_lims()[0] * un.AU).to(r_unit).value
+        )
+        r_max = (
+            r_max
+            if r_max is not None
+            else (self.get_radius_lims()[1] * un.AU).to(r_unit).value
+        )
+
+        radii = np.linspace(r_min, r_max, 10000)
+
+        sample_config = self.get_sample_config()
+        unit_system = self._run._sim._unit_system
+
+        density = surface_density(
+            radii,
+            R0=self._run._sim._constants["R0"].value,
+            sigma0=sample_config["disk_parameters.sigma0"],
+            sigma_slope=sample_config["disk_parameters.sigma_slope"],
+        ) * (unit_system.mass / unit_system.length**2).to(density_unit)
+
+        fig, ax = configure_axes(fig=fig, ax=ax)
+
+        ax.plot(
+            radii,
+            density,
+            label="$\\Sigma(R)=\\Sigma_0 \cdot (\\frac{R}{R_0})^{-p}$"
+            if show_formula
+            else None,
+            **plot_args,
+        )
+        ax.axvline(
+            (self.get_radius_lims()[0] * un.AU).to(r_unit).value,
+            ls="dashed",
+            color="maroon",
+            alpha=0.4,
+            label="Inner Simulation Radius",
+        )
+        ax.axvline(
+            (self.get_radius_lims()[1] * un.AU).to(r_unit).value,
+            ls="dashed",
+            color="green",
+            alpha=0.4,
+            label="Outer Simulation Radius",
+        )
+        ax.set_xlabel(f"Radius $R$ in {r_unit.to_string(format='latex')}")
+        ax.set_ylabel(
+            f"Density Profile $\\Sigma$ in {density_unit.to_string(format='latex')}"
+        )
+        ax.legend()
+
+        if save_to is not None:
+            fig.savefig(save_to, **save_args)
+
+        return fig, ax
+
     def plot_dust_density(
         self,
         grid_shape: tuple,
@@ -898,8 +1025,6 @@ class DiskModel:
                 xy_unit=xy_unit,
             )
             data[i] = img
-
-        print(f"{[data[data > 0].min(), data.max()]}")
 
         im, fig, ax = self.plot_dust_density(
             grid_shape=grid_shape,
