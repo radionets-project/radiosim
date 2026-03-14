@@ -1,5 +1,6 @@
 import pickle
 import shutil
+import warnings
 from os import PathLike
 from pathlib import Path
 from time import time
@@ -47,12 +48,13 @@ def get_default_sampling_config():
             "binary_eccentricity": [0.0, 0.2],  # 0 = Circle, 0 < e < 1 = Ellipse
             "stellar_mass": [0.5, 2],  # Solar Masses
             "stellar_temperature": [2000.0, 3000.0],  # Kelvin
-            "num_planets": [1, 4],
+            "num_planets": [2, 5],
             "planet_mass": [1.0e-6, 5.0e-3],  # Solar Masses
             "planet_orbit_radius": [6.0, 15.0],  # Astronomical Units
             # short: PEF -> no other planets allowed closer than R_orbit * PEF
             "planet_exclusion_factor": 0.2,
-            "eccentricity": [0.0, 0.9],  # 0 = Circle, 0 < e < 1 = Ellipse
+            "planet_exclusion_max_iter": 100,  # max iterations to determine valid orbit
+            "eccentricity": [0.0, 0.1],  # 0 = Circle, 0 < e < 1 = Ellipse
         },
         "mesh_parameters": {
             "y_min": [3.0, 5.0],  # Astronomical Units
@@ -601,6 +603,68 @@ class SimulationRun:
 
             self._rng = self.get_rng(model_id=model_id)
 
+    def plot_times(
+        self,
+        mode: str = "total",
+        show_total_time: bool = True,
+        save_to: str | PathLike | None = None,
+        save_args: dict | None = None,
+        time_unit: un.Unit = un.second,
+        color: str = "maroon",
+        plot_args: dict | None = None,
+        fig: matplotlib.figure.Figure | None = None,
+        fig_args: dict | None = None,
+        ax: matplotlib.axes.Axes | None = None,
+    ) -> tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]:
+        fig_args = {} if fig_args is None else fig_args
+        plot_args = {} if plot_args is None else plot_args
+
+        fig, ax = configure_axes(fig=fig, ax=ax, fig_args=fig_args)
+
+        models = self.get_models()
+        ylabel = ""
+        match mode:
+            case "run":
+                times = np.array(
+                    [model.get_execution_times()["run_time"] for model in models]
+                )
+                ylabel = "Runtime"
+            case "compile":
+                times = np.array(
+                    [model.get_execution_times()["compile_time"] for model in models]
+                )
+                ylabel = "Compile Time"
+            case "total":
+                times = np.zeros(len(models))
+                for i in range(len(models)):
+                    execution_times = models[i].get_execution_times()
+                    times[i] = (
+                        execution_times["run_time"] + execution_times["compile_time"]
+                    )
+                ylabel = "Total Time"
+            case _:
+                raise ValueError("Valid modes are 'run', 'compile', 'total'.")
+
+        times *= un.nanosecond
+        times = times.to(time_unit)
+
+        if show_total_time:
+            plot_args["label"] = f"Total Time: {np.round(np.sum(times), 3)}"
+
+        model_ids = [model._id for model in models]
+        ax.scatter(model_ids, times.value, color=color, **plot_args)
+
+        ax.set_xlabel("Model ID")
+        ax.set_ylabel(f"{ylabel} / {time_unit.to_string(format='latex')}")
+
+        if show_total_time:
+            ax.legend()
+
+        if save_to is not None:
+            fig.savefig(save_to, **save_args)
+
+        return fig, ax
+
     def get_polar_img_size(self) -> tuple[int]:
         return tuple(self._sampling_config["polar_img_size"])
 
@@ -729,6 +793,8 @@ class SimulationRun:
         for i_planet in range(num_planets):
             valid = False
 
+            max_iter = 100
+            i = 0
             while not valid:
                 orbit = rng.uniform(
                     low=planet_sampling["planet_orbit_radius"][0],
@@ -736,13 +802,28 @@ class SimulationRun:
                 )
 
                 # if new orbit violates planet exclusion zones around other planets
-                if np.any(
-                    np.abs(planet_orbits[:i_planet] - orbit) / planet_orbits[:i_planet]
-                    > planet_sampling["planet_exclusion_factor"]
+                if (
+                    np.any(
+                        np.abs(planet_orbits[:i_planet] - orbit)
+                        / planet_orbits[:i_planet]
+                        < planet_sampling["planet_exclusion_factor"]
+                    )
+                    and i < max_iter
                 ):
+                    i += 1
                     continue
                 else:
                     valid = True
+
+                if i >= max_iter:
+                    warnings.warn(
+                        f"The maximum iteration number ({max_iter}) for "
+                        "determining a planet's orbit was exceeded! The generated orbit"
+                        " thus violates the exclusion zone. Consider reducing the "
+                        "number of planets, the exclusion factor or increase the "
+                        "maximum radius.",
+                        stacklevel=1,
+                    )
 
             planet_orbits[i_planet] = orbit
 
@@ -911,8 +992,6 @@ class DiskModel:
             .value,
             sigma_slope=sample_config["disk_parameters.sigma_slope"],
         )
-
-        print(s0)
 
         density = surface_density(
             radii,
@@ -1101,8 +1180,8 @@ class DiskModel:
             total=num_outputs - 1, desc="Saving animation", disable=not show_progress
         ) as progress_bar:
             if save_with_timestamp:
-                save_to = save_to.with_name(
-                    f"{save_to.stem}-{Time(time(), format='unix').isot}"
+                save_to = save_to.with_stem(
+                    f"{save_to.stem}-{Time(time(), format='unix').isot}."
                 )
             if writer is None:
                 anim.save(save_to, progress_callback=_progress_func, dpi=dpi)
