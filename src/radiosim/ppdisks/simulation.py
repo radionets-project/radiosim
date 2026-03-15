@@ -85,6 +85,12 @@ def sigma0(
     )
 
 
+def orbital_period(
+    mass: un.Quantity | float, radius: un.Quantity | float, G: un.Quantity | float
+):
+    return np.sqrt((4 * np.pi**2 * radius**3) / (mass * G))
+
+
 # From https://fargo3d.github.io/documentation/def_setups.html#parameters
 def aspect_ratio(
     radius: float | ArrayLike, R0: float, ref_aspect_ratio: float, flaring_index: float
@@ -618,6 +624,7 @@ class SimulationRun:
     ) -> tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]:
         fig_args = {} if fig_args is None else fig_args
         plot_args = {} if plot_args is None else plot_args
+        save_args = {"bbox_inches": "tight"} if save_args is None else save_args
 
         fig, ax = configure_axes(fig=fig, ax=ax, fig_args=fig_args)
 
@@ -881,6 +888,27 @@ class DiskModel:
         self._id: int = id
         self._directory: Path = run._directory / f"model_{id}"
         self._run: SimulationRun = run
+
+    def get_time_deltas(self) -> float:
+        sample_config = self.get_sample_config()
+        planet_parameters = sample_config["planet_parameters"]
+
+        distances = np.array(planet_parameters["planet_orbit_radius"]) * un.AU
+
+        num_orbits = sample_config["output_parameters.num_largest_orbits"]
+
+        period = orbital_period(
+            mass=np.sum(planet_parameters["stellar_mass"]) * const.M_sun,
+            radius=distances.max().to(self._run._sim._unit_system.length),
+            G=self._run._sim._constants["G"],
+        )
+
+        total_time = num_orbits * period
+
+        return (
+            period / self._run.get_steps_per_orbit(),
+            total_time / self.get_num_outputs(),
+        )
 
     def get_num_outputs(self) -> int:
         files = {
