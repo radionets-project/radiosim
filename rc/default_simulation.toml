@@ -4,7 +4,7 @@ title = "Simulation configuration"
 quiet = true
 seed = "none"
 threads = "none"
-decive = "cuda"  # only for ppdisks simulation
+device = "cuda"  # only for ppdisks simulation
 
 [paths]
 outpath = "./testdata/radiosim/128"
