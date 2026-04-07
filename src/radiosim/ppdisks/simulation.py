@@ -85,6 +85,20 @@ def sigma0(
     )
 
 
+# See https://doi.org/10.1093/mnrasl/slv105 p.75
+def mass_function(
+    radius: float | ArrayLike, sigma_slope: float, sigma0: float, R0: float
+):
+    return (
+        2
+        * np.pi
+        / (2 - sigma_slope)
+        * sigma0
+        * R0**2
+        * ((radius / R0) ** (2 - sigma_slope) - 1)
+    )
+
+
 def orbital_period(
     mass: un.Quantity | float, radius: un.Quantity | float, G: un.Quantity | float
 ):
@@ -100,13 +114,17 @@ def aspect_ratio(
 
 # From https://fargo3d.github.io/documentation/def_setups.html#parameters
 def disk_height(
-    radius: float | ArrayLike, ref_aspect_ratio: float, flaring_index: float
+    radius: float | ArrayLike,
+    ref_aspect_ratio: float,
+    flaring_index: float,
+    R0: float,
 ) -> float | ArrayLike:
     return (
         aspect_ratio(
             radius=radius,
             ref_aspect_ratio=ref_aspect_ratio,
             flaring_index=flaring_index,
+            R0=R0,
         )
         * radius
     )
@@ -974,6 +992,189 @@ class DiskModel:
             r_max,
         )
 
+    def get_cumulative_mass(
+        self, radius: float | ArrayLike | un.Quantity
+    ) -> un.Quantity:
+        sample_config = self.get_sample_config()
+        unit_system = self._run._sim._unit_system
+
+        if not hasattr(radius, "unit"):
+            radius = radius * unit_system.length
+        else:
+            radius = radius.to(unit_system.length)
+
+        s0 = sigma0(
+            ref_radius=(sample_config["disk_parameters.disk_mass_ref_radius"] * un.AU)
+            .to(unit_system.length)
+            .value,
+            R0=self._run._sim._constants["R0"].value,
+            mass=(sample_config["disk_parameters.disk_mass"] * const.M_sun)
+            .to(unit_system.mass)
+            .value,
+            sigma_slope=sample_config["disk_parameters.sigma_slope"],
+        )
+
+        return (
+            mass_function(
+                radius=radius.value,
+                sigma_slope=sample_config["disk_parameters.sigma_slope"],
+                sigma0=s0,
+                R0=self._run._sim._constants["R0"].value,
+            )
+            * unit_system.mass
+        )
+
+    def get_height(self, radius: float | ArrayLike | un.Quantity) -> un.Quantity:
+        sample_config = self.get_sample_config()
+        unit_system = self._run._sim._unit_system
+
+        if not hasattr(radius, "unit"):
+            radius = radius * unit_system.length
+        else:
+            radius = radius.to(unit_system.length)
+
+        return (
+            disk_height(
+                radius=radius.value,
+                ref_aspect_ratio=sample_config["disk_parameters.aspect_ratio"],
+                flaring_index=sample_config["disk_parameters.flaring_index"],
+                R0=self._run._sim._constants["R0"].value,
+            )
+            * unit_system.length
+        )
+
+    def plot_height_profile(
+        self,
+        save_to: str | PathLike | None = None,
+        save_args: dict | None = None,
+        r_unit: un.Unit = un.AU,
+        r_min: float | None = None,
+        r_max: float | None = None,
+        x_norm: str | None = None,
+        y_norm: str | None = None,
+        plot_args: dict | None = None,
+        fig: matplotlib.figure.Figure | None = None,
+        fig_args: dict | None = None,
+        ax: matplotlib.axes.Axes | None = None,
+    ) -> tuple[matplotlib.axes.Axes, matplotlib.figure.Figure]:
+        save_args = {} if save_args is None else save_args
+        fig_args = {} if fig_args is None else fig_args
+        plot_args = {} if plot_args is None else plot_args
+
+        r_min = r_min if r_min is not None else self.get_radius_lims()[0]
+        r_max = r_max if r_max is not None else self.get_radius_lims()[1]
+
+        radii = np.linspace(r_min, r_max, 10000)
+
+        height = self.get_height(radius=radii * un.AU)
+
+        fig, ax = configure_axes(fig=fig, ax=ax)
+        sample_config = self.get_sample_config()
+
+        ax.plot(
+            (radii * un.AU).to(r_unit).value,
+            height.to(r_unit).value,
+            label=f"Flaring Index = {sample_config['disk_parameters.flaring_index']}",
+        )
+
+        ax.axvline(
+            (self.get_radius_lims()[0] * un.AU).to(r_unit).value,
+            ls="dashed",
+            color="maroon",
+            alpha=0.4,
+            label="Inner Simulation Radius",
+        )
+        ax.axvline(
+            (self.get_radius_lims()[1] * un.AU).to(r_unit).value,
+            ls="dashed",
+            color="green",
+            alpha=0.4,
+            label="Outer Simulation Radius",
+        )
+        ax.set_xlabel(f"Radius $R$ / {r_unit.to_string(format='latex')}")
+        ax.set_ylabel(f"Height H(R) / {r_unit.to_string(format='latex')}")
+
+        if x_norm is not None:
+            ax.set_xscale(x_norm)
+
+        if y_norm is not None:
+            ax.set_yscale(y_norm)
+
+        ax.legend()
+
+        if save_to is not None:
+            fig.savefig(save_to, **save_args)
+
+        return fig, ax
+
+    def plot_cumulative_mass(
+        self,
+        save_to: str | PathLike | None = None,
+        save_args: dict | None = None,
+        r_unit: un.Unit = un.AU,
+        show_formula: bool = False,
+        r_min: float | None = None,
+        r_max: float | None = None,
+        x_norm: str | None = None,
+        y_norm: str | None = None,
+        plot_args: dict | None = None,
+        fig: matplotlib.figure.Figure | None = None,
+        fig_args: dict | None = None,
+        ax: matplotlib.axes.Axes | None = None,
+    ) -> tuple[matplotlib.axes.Axes, matplotlib.figure.Figure]:
+        save_args = {} if save_args is None else save_args
+        fig_args = {} if fig_args is None else fig_args
+        plot_args = {} if plot_args is None else plot_args
+
+        r_min = r_min if r_min is not None else self.get_radius_lims()[0]
+        r_max = r_max if r_max is not None else self.get_radius_lims()[1]
+
+        radii = np.linspace(r_min, r_max, 10000)
+        disk_mass = self.get_cumulative_mass(radius=radii * un.AU) / const.M_sun
+
+        fig, ax = configure_axes(fig=fig, ax=ax)
+
+        ax.plot(
+            (radii * un.AU).to(r_unit).value,
+            disk_mass,
+            label=(
+                "$M(<R) = \\frac{2\\pi}{2-p}\\Sigma_0 R_0^2 \\cdot"
+                "\\left[\\left(\\frac{R}{R_0}\\right)^{2-p}-1\\right]$"
+            )
+            if show_formula
+            else None,
+            **plot_args,
+        )
+        ax.axvline(
+            (self.get_radius_lims()[0] * un.AU).to(r_unit).value,
+            ls="dashed",
+            color="maroon",
+            alpha=0.4,
+            label="Inner Simulation Radius",
+        )
+        ax.axvline(
+            (self.get_radius_lims()[1] * un.AU).to(r_unit).value,
+            ls="dashed",
+            color="green",
+            alpha=0.4,
+            label="Outer Simulation Radius",
+        )
+        ax.set_xlabel(f"Radius $R$ / {r_unit.to_string(format='latex')}")
+        ax.set_ylabel("Cumulative Disk Mass $M(<R)$ / $M_{\\text{sun}}$")
+
+        if x_norm is not None:
+            ax.set_xscale(x_norm)
+
+        if y_norm is not None:
+            ax.set_yscale(y_norm)
+
+        ax.legend()
+
+        if save_to is not None:
+            fig.savefig(save_to, **save_args)
+
+        return fig, ax
+
     def plot_density_profile(
         self,
         save_to: str | PathLike | None = None,
@@ -994,16 +1195,8 @@ class DiskModel:
         fig_args = {} if fig_args is None else fig_args
         plot_args = {} if plot_args is None else plot_args
 
-        r_min = (
-            r_min
-            if r_min is not None
-            else (self.get_radius_lims()[0] * un.AU).to(r_unit).value
-        )
-        r_max = (
-            r_max
-            if r_max is not None
-            else (self.get_radius_lims()[1] * un.AU).to(r_unit).value
-        )
+        r_min = r_min if r_min is not None else self.get_radius_lims()[0]
+        r_max = r_max if r_max is not None else self.get_radius_lims()[1]
 
         radii = np.linspace(r_min, r_max, 10000)
 
@@ -1022,7 +1215,7 @@ class DiskModel:
         )
 
         density = surface_density(
-            radii,
+            (radii * un.AU).to(unit_system.length).value,
             R0=self._run._sim._constants["R0"].value,
             sigma0=s0,
             sigma_slope=sample_config["disk_parameters.sigma_slope"],
@@ -1031,7 +1224,7 @@ class DiskModel:
         fig, ax = configure_axes(fig=fig, ax=ax)
 
         ax.plot(
-            radii,
+            (radii * un.AU).to(r_unit).value,
             density,
             label="$\\Sigma(R)=\\Sigma_0 \\cdot (\\frac{R}{R_0})^{-p}$"
             if show_formula
@@ -1052,9 +1245,9 @@ class DiskModel:
             alpha=0.4,
             label="Outer Simulation Radius",
         )
-        ax.set_xlabel(f"Radius $R$ in {r_unit.to_string(format='latex')}")
+        ax.set_xlabel(f"Radius $R$ / {r_unit.to_string(format='latex')}")
         ax.set_ylabel(
-            f"Density Profile $\\Sigma$ in {density_unit.to_string(format='latex')}"
+            f"Density Profile $\\Sigma$ / {density_unit.to_string(format='latex')}"
         )
 
         if x_norm is not None:
