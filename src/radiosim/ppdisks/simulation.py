@@ -224,11 +224,30 @@ class Simulation:
         cuda_device_id: int = 0,
         parallel: bool = False,
         num_nodes: int = 1,
+        override_samples: dict | None = None,
+        force_manual_mode: bool = False,
         show_progress: bool = True,
         record_execution_time: bool = True,
         verbose: bool = False,
         overwrite: bool = False,
     ) -> None:
+        manual_run = False
+
+        if override_samples is not None:
+            if not force_manual_mode:
+                confirmation = input(
+                    "Are you sure you want to use a manual sampling? (y/N)"
+                )
+
+                if confirmation.lower() == "y":
+                    manual_run = True
+                else:
+                    print("Manual run canceled. Aborting.")
+                    return None
+            else:
+                print("Forcing manual run.")
+                manual_run = True
+
         if run_id is None:
             run = SimulationRun.new(
                 num_models=num_models,
@@ -241,6 +260,8 @@ class Simulation:
             run = SimulationRun(id=run_id, sim=self, resume_rng=resume)
 
         print(f"------ STARTING RUN {run._id} ------")
+        if manual_run:
+            print("----- ! MANUAL MODE ACTIVE ! -----")
 
         start_idx = 0 if not resume else run.get_next_model_id()
         for i in np.arange(start_idx, num_models):
@@ -264,8 +285,12 @@ class Simulation:
                 pass
 
             model = DiskModel.new(id=i, run=run)
-            samples = run.draw_samples()
-            run.save_rng(model_id=model._id)
+
+            if not manual_run:
+                samples = run.draw_samples()
+                run.save_rng(model_id=model._id)
+            else:
+                samples = override_samples
 
             option_config = self._setup._option_config
             option_config._autosave = False
@@ -1024,7 +1049,11 @@ class DiskModel:
             * unit_system.mass
         )
 
-    def get_height(self, radius: float | ArrayLike | un.Quantity) -> un.Quantity:
+    def get_height(
+        self,
+        radius: float | ArrayLike | un.Quantity,
+        flaring_index: None | float = None,
+    ) -> un.Quantity:
         sample_config = self.get_sample_config()
         unit_system = self._run._sim._unit_system
 
@@ -1033,11 +1062,14 @@ class DiskModel:
         else:
             radius = radius.to(unit_system.length)
 
+        if flaring_index is None:
+            flaring_index = sample_config["disk_parameters.flaring_index"]
+
         return (
             disk_height(
                 radius=radius.value,
                 ref_aspect_ratio=sample_config["disk_parameters.aspect_ratio"],
-                flaring_index=sample_config["disk_parameters.flaring_index"],
+                flaring_index=flaring_index,
                 R0=self._run._sim._constants["R0"].value,
             )
             * unit_system.length
@@ -1045,6 +1077,7 @@ class DiskModel:
 
     def plot_height_profile(
         self,
+        flaring_index: None | float = None,
         save_to: str | PathLike | None = None,
         save_args: dict | None = None,
         r_unit: un.Unit = un.AU,
@@ -1066,7 +1099,7 @@ class DiskModel:
 
         radii = np.linspace(r_min, r_max, 10000)
 
-        height = self.get_height(radius=radii * un.AU)
+        height = self.get_height(radius=radii * un.AU, flaring_index=flaring_index)
 
         fig, ax = configure_axes(fig=fig, ax=ax)
         sample_config = self.get_sample_config()
