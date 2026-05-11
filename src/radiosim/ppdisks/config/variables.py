@@ -1,13 +1,13 @@
 from pathlib import Path
 
-from radiosim.ppdisks.config.fargopy import FargopyConfiguration
+from radiosim.ppdisks.config.meta import MetaConfig
 
 
 class Variables:
     def __init__(self):
         self._variables = {
-            "FARGO_ROOT": Path(FargopyConfiguration()["FP_FARGO3D_BASEDIR"])
-            / FargopyConfiguration()["FP_FARGO3D_PACKDIR"]
+            "FARGO_ROOT": Path(MetaConfig().get_config()["FARGO_ROOT"]),
+            "RADMC3D_ROOT": Path(MetaConfig().get_config()["RADMC3D_ROOT"]),
         }
 
     @classmethod

@@ -81,6 +81,7 @@ class Simulation:
         setup: Setup,
         float_type: type,
         polar_img_size: tuple[int],
+        output_img_size: tuple[int],
         unit_system: UnitSystem,
         use_default_constants: bool,
     ):
@@ -103,6 +104,7 @@ class Simulation:
         self._float_type: type = float_type
 
         self._polar_img_size: tuple[int] = polar_img_size
+        self._output_img_size: tuple[int] = output_img_size
 
         self._unit_system: UnitSystem = unit_system
         self._use_default_constants: bool = use_default_constants
@@ -130,6 +132,7 @@ class Simulation:
                 if self._float_type == np.float64
                 else "FLOAT32",
                 "polar_img_size": list(self._polar_img_size),
+                "output_img_size": list(self._output_img_size),
                 "unit_system": self._unit_system.name,
                 "use_default_constants": self._use_default_constants,
             }
@@ -167,6 +170,7 @@ class Simulation:
         cuda_device_id: int = 0,
         parallel: bool = False,
         num_nodes: int = 1,
+        num_mc_threads: int = 1,
         override_samples: dict | None = None,
         force_manual_mode: bool = False,
         show_progress: bool = True,
@@ -488,6 +492,7 @@ class Simulation:
         parent_directory: PathLike | None = None,
         float_type: type = np.float64,
         polar_img_size: tuple[int] = (300, 800),
+        output_img_size: tuple[int] = (300, 300),
         unit_system: UnitSystem | str = UnitSystem.MKS,
         use_default_constants: bool = True,
     ) -> "Simulation":
@@ -558,6 +563,7 @@ class Simulation:
             if config["general.float_type"] == "FLOAT64"
             else np.float32,
             polar_img_size=tuple(config["general.polar_img_size"]),
+            output_img_size=tuple(config["general.output_img_size"]),
             unit_system=UnitSystem.__members__[config["general.unit_system"]],
             use_default_constants=config["general.use_default_constants"],
         )
@@ -1270,16 +1276,12 @@ class DiskModel:
         )
 
         xy_lims = xy_lims if xy_lims is not None else [[-r_max, r_max], [-r_max, r_max]]
+        dens_unit = unit_system.mass / unit_system.length**2
 
         return plot_image(
             data=polar_intensities,
             xy_lims=xy_lims,
-            intensity_label=(
-                "Dust density / "
-                f"{
-                    (unit_system.mass / unit_system.length**2).to_string(format='latex')
-                }"
-            ),
+            intensity_label=(f"Dust density / {dens_unit.to_string(format='latex')}",),
             intensity_limits=intensity_limits,
             dtype=self._run.get_float_type(),
             save_to=save_to,
