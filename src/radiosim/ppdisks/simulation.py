@@ -239,236 +239,21 @@ class Simulation:
             else:
                 samples = override_samples
 
-            option_config = self._setup._option_config
-            option_config._autosave = False
-            param_config = self._setup._param_config
-            param_config._autosave = False
-
-            # Update Planet Config
-
-            self._planet_config.clear()
-            self._planet_config._autosave = False
-
-            planet_parameters = samples["planet_parameters"]
-
-            # See https://fargo3d.github.io/documentation/nbody.html
-            if planet_parameters["binary_system"]:
-                # First star: distance -> binary period
-                self._planet_config.add_planet(
-                    planet=Planet(
-                        name="star1",
-                        distance=planet_parameters["binary_period"],
-                        mass=planet_parameters["stellar_mass"][0] * const.M_sun,
-                        feels_disk=False,
-                        feels_others=True,
-                        unit_system=self._unit_system,
-                    )
-                )
-                # Second star: distance -> binary eccentricity
-                self._planet_config.add_planet(
-                    planet=Planet(
-                        name="star2",
-                        distance=planet_parameters["binary_eccentricity"],
-                        mass=planet_parameters["stellar_mass"][1] * const.M_sun,
-                        feels_disk=False,
-                        feels_others=True,
-                        unit_system=self._unit_system,
-                    )
-                )
-
-                m_star = np.sum(planet_parameters["stellar_mass"]) * const.M_sun
-                self._constants["MSTAR"] = m_star
-                option_config["planetary_system.NODEFAULTSTAR"].enable()
-            else:
-                m_star = planet_parameters["stellar_mass"][0] * const.M_sun
-                self._constants["MSTAR"] = m_star
-                option_config["planetary_system.NODEFAULTSTAR"].disable()
-
-            for planet_idx in np.arange(0, planet_parameters["num_planets"]):
-                self._planet_config.add_planet(
-                    Planet(
-                        name=f"planet{planet_idx + 1}",
-                        distance=planet_parameters["planet_orbit_radius"][planet_idx]
-                        * un.AU,
-                        mass=planet_parameters["planet_mass"][planet_idx] * const.M_sun,
-                        feels_disk=True,
-                        feels_others=True,
-                        unit_system=self._unit_system,
-                    )
-                )
-
-            param_config["planet_parameters.planetConfig"] = "/".join(
-                self._planet_config._path.parts[-2:]
-            )
-            param_config["planet_parameters.eccentricity"] = planet_parameters[
-                "eccentricity"
-            ]
-
-            # Update Parameter Config
-            ## Disk Parameters
-            disk_parameters = samples["disk_parameters"]
-
-            param_config["disk_parameters.aspectRatio"] = disk_parameters[
-                "aspect_ratio"
-            ]
-
-            param_config["disk_parameters.sigma0"] = sigma0(
-                ref_radius=(disk_parameters["disk_mass_ref_radius"] * un.AU)
-                .to(self._unit_system.length)
-                .value,
-                R0=self._constants["R0"].value,
-                mass=(disk_parameters["disk_mass"] * const.M_sun)
-                .to(self._unit_system.mass)
-                .value,
-                sigma_slope=disk_parameters["sigma_slope"],
-            )
-
-            param_config["disk_parameters.sigmaSlope"] = disk_parameters["sigma_slope"]
-            param_config["disk_parameters.flaringIndex"] = disk_parameters[
-                "flaring_index"
-            ]
-            param_config["disk_parameters.alpha"] = disk_parameters["alpha"]
-
-            ## Dust Parameters
-            dust_parameters = samples["dust_parameters"]
-
-            param_config["dust_parameters.epsilon"] = dust_parameters["epsilon"]
-
-            for dust_idx, invstokes in dust_parameters["invstokes"].items():
-                param_config[f"dust_parameters.invstokes{dust_idx}"] = invstokes
-
-            ## Mesh Parameters
-            mesh_parameters = samples["mesh_parameters"]
-
-            distances = self._planet_config.get_distances()
-
-            # If binary: distance -> binary eccentricity || binary period != distance
-            # for the two stars in the planet file
-            if planet_parameters["binary_system"]:
-                distances = distances[2:]
-
-            param_config["mesh_parameters.ymin"] = (
-                (np.min([mesh_parameters["y_min"], distances.min()]) * un.AU)
-                .to(self._unit_system.length)
-                .value
-            )
-
-            max_orbit_radius = distances.max()
-            param_config["mesh_parameters.ymax"] = (
-                mesh_parameters["y_max_ratio"] * max_orbit_radius
-            )
-
-            param_config["mesh_parameters.nx"] = run.get_polar_img_size()[1]
-            param_config["mesh_parameters.ny"] = run.get_polar_img_size()[0]
-
-            ## Output Parameters
-
-            output_parameters = samples["output_parameters"]
-
-            num_orbits = output_parameters["num_largest_orbits"]
-
-            def orbital_period(mass, radius, G):
-                return np.sqrt((4 * np.pi**2 * radius**3) / (mass * G))
-
-            period = orbital_period(
-                mass=m_star,
-                radius=max_orbit_radius * self._unit_system.length,
-                G=self._constants["G"],
-            )
-
-            total_time = num_orbits * period
-            step_size = period / run.get_steps_per_orbit()
-
-            N_tot = int(total_time / step_size)
-            N_interm = int(N_tot / run.get_num_outputs())
-
-            param_config["output_parameters.dt"] = step_size.to(
-                self._unit_system.time
-            ).value
-            param_config["output_parameters.ninterm"] = N_interm
-            param_config["output_parameters.ntot"] = N_tot
-
-            # Set output to fargo output directory
-            # (to avoid overflow of OUTPUTDIR variable in C)
-            param_config["output_parameters.outputDir"] = str(
-                model.get_fargo_output_path()
-            )
-
-            # Additional Parameters
-
-            if run.get_float_type() == np.float64:
-                option_config["performance.FLOAT"].disable()
-            else:
-                option_config["performance.FLOAT"].enable()
-
-            # Save configurations
-
-            self._planet_config.save()
-            self._planet_config._autosave = True
-
-            param_config.save()
-            param_config._autosave = True
-
-            option_config.save()
-            option_config._autosave = True
-
-            # Dump samples to TOML file
-
-            sample_dump = samples.copy()
-
-            def toml_serialize_dict(read_dict):
-                write_dict = dict()
-                for key, value in read_dict.items():
-                    if isinstance(value, dict):
-                        write_dict[key] = toml_serialize_dict(read_dict=value)
-                    elif isinstance(value, np.ndarray):
-                        write_dict[key] = list(value)
-                    elif isinstance(value, np.int64):
-                        write_dict[key] = int(value)
-                    else:
-                        write_dict[key] = value
-                return write_dict
-
-            sample_config = model.get_sample_config()
-            sample_config.create()
-            sample_config.dump_dict(content=toml_serialize_dict(read_dict=sample_dump))
-
-            # Recompile and Run Setup
-
-            compile_time = self._setup.compile(
+            # Run FARGO3D Simulation
+            fargo_compile_time, fargo_runtime = self._simulate_fargo(
+                run=run,
+                model=model,
+                samples=samples,
                 gpu=gpu,
                 parallel=parallel,
-                unit_system=self._unit_system,
-                rescale=False,
-                model_id=model._id,
                 show_progress=show_progress,
                 verbose=verbose,
-                show_fargo_output=verbose,
                 return_execution_time=record_execution_time,
-            )
-
-            run_time = self._setup.run(
-                model_id=model._id,
                 num_nodes=num_nodes,
-                parallel=parallel,
-                show_progress=show_progress,
                 cuda_device_id=cuda_device_id,
-                verbose=verbose,
-                return_execution_time=record_execution_time,
             )
 
-            # Move the data files to the correct directory
-            model.get_data_directory().mkdir()
-            for file in (
-                Variables.get("FARGO_ROOT") / model.get_fargo_output_path()
-            ).glob("*.*"):
-                shutil.move(
-                    src=file,
-                    dst=model.get_data_directory(),
-                )
-            shutil.rmtree(
-                path=Variables.get("FARGO_ROOT") / model.get_fargo_output_path()
-            )
+            # Run RADMC3D Simulation
 
             if record_execution_time:
                 record_toml = TOMLConfiguration(
@@ -477,11 +262,248 @@ class Simulation:
                 )
                 record_toml.dump_dict(
                     {
-                        "compile_time": compile_time,
-                        "run_time": run_time[0],
-                        "output_times": run_time[1],
+                        "fargo_compile_time": fargo_compile_time,
+                        "fargo_run_time": fargo_runtime[0],
+                        "fargo_output_times": fargo_runtime[1],
                     }
                 )
+
+    def _simulate_fargo(
+        self,
+        run: "SimulationRun",
+        model: "DiskModel",
+        samples: dict,
+        **kwargs,
+    ) -> tuple[int, tuple[int]]:
+        option_config = self._setup._option_config
+        option_config._autosave = False
+        param_config = self._setup._param_config
+        param_config._autosave = False
+
+        # Update Planet Config
+
+        self._planet_config.clear()
+        self._planet_config._autosave = False
+
+        planet_parameters = samples["planet_parameters"]
+
+        # See https://fargo3d.github.io/documentation/nbody.html
+        if planet_parameters["binary_system"]:
+            # First star: distance -> binary period
+            self._planet_config.add_planet(
+                planet=Planet(
+                    name="star1",
+                    distance=planet_parameters["binary_period"],
+                    mass=planet_parameters["stellar_mass"][0] * const.M_sun,
+                    feels_disk=False,
+                    feels_others=True,
+                    unit_system=self._unit_system,
+                )
+            )
+            # Second star: distance -> binary eccentricity
+            self._planet_config.add_planet(
+                planet=Planet(
+                    name="star2",
+                    distance=planet_parameters["binary_eccentricity"],
+                    mass=planet_parameters["stellar_mass"][1] * const.M_sun,
+                    feels_disk=False,
+                    feels_others=True,
+                    unit_system=self._unit_system,
+                )
+            )
+
+            m_star = np.sum(planet_parameters["stellar_mass"]) * const.M_sun
+            self._constants["MSTAR"] = m_star
+            option_config["planetary_system.NODEFAULTSTAR"].enable()
+        else:
+            m_star = planet_parameters["stellar_mass"][0] * const.M_sun
+            self._constants["MSTAR"] = m_star
+            option_config["planetary_system.NODEFAULTSTAR"].disable()
+
+        for planet_idx in np.arange(0, planet_parameters["num_planets"]):
+            self._planet_config.add_planet(
+                Planet(
+                    name=f"planet{planet_idx + 1}",
+                    distance=planet_parameters["planet_orbit_radius"][planet_idx]
+                    * un.AU,
+                    mass=planet_parameters["planet_mass"][planet_idx] * const.M_sun,
+                    feels_disk=True,
+                    feels_others=True,
+                    unit_system=self._unit_system,
+                )
+            )
+
+        param_config["planet_parameters.planetConfig"] = "/".join(
+            self._planet_config._path.parts[-2:]
+        )
+        param_config["planet_parameters.eccentricity"] = planet_parameters[
+            "eccentricity"
+        ]
+
+        # Update Parameter Config
+        ## Disk Parameters
+        disk_parameters = samples["disk_parameters"]
+
+        param_config["disk_parameters.aspectRatio"] = disk_parameters["aspect_ratio"]
+
+        param_config["disk_parameters.sigma0"] = sigma0(
+            ref_radius=(disk_parameters["disk_mass_ref_radius"] * un.AU)
+            .to(self._unit_system.length)
+            .value,
+            R0=self._constants["R0"].value,
+            mass=(disk_parameters["disk_mass"] * const.M_sun)
+            .to(self._unit_system.mass)
+            .value,
+            sigma_slope=disk_parameters["sigma_slope"],
+        )
+
+        param_config["disk_parameters.sigmaSlope"] = disk_parameters["sigma_slope"]
+        param_config["disk_parameters.flaringIndex"] = disk_parameters["flaring_index"]
+        param_config["disk_parameters.alpha"] = disk_parameters["alpha"]
+
+        ## Dust Parameters
+        dust_parameters = samples["dust_parameters"]
+
+        param_config["dust_parameters.epsilon"] = dust_parameters["epsilon"]
+
+        for dust_idx, invstokes in dust_parameters["invstokes"].items():
+            param_config[f"dust_parameters.invstokes{dust_idx}"] = invstokes
+
+        ## Mesh Parameters
+        mesh_parameters = samples["mesh_parameters"]
+
+        distances = self._planet_config.get_distances()
+
+        # If binary: distance -> binary eccentricity || binary period != distance
+        # for the two stars in the planet file
+        if planet_parameters["binary_system"]:
+            distances = distances[2:]
+
+        param_config["mesh_parameters.ymin"] = (
+            (np.min([mesh_parameters["y_min"], distances.min()]) * un.AU)
+            .to(self._unit_system.length)
+            .value
+        )
+
+        max_orbit_radius = distances.max()
+        param_config["mesh_parameters.ymax"] = (
+            mesh_parameters["y_max_ratio"] * max_orbit_radius
+        )
+
+        param_config["mesh_parameters.nx"] = run.get_polar_img_size()[1]
+        param_config["mesh_parameters.ny"] = run.get_polar_img_size()[0]
+
+        ## Output Parameters
+
+        output_parameters = samples["output_parameters"]
+
+        num_orbits = output_parameters["num_largest_orbits"]
+
+        def orbital_period(mass, radius, G):
+            return np.sqrt((4 * np.pi**2 * radius**3) / (mass * G))
+
+        period = orbital_period(
+            mass=m_star,
+            radius=max_orbit_radius * self._unit_system.length,
+            G=self._constants["G"],
+        )
+
+        total_time = num_orbits * period
+        step_size = period / run.get_steps_per_orbit()
+
+        N_tot = int(total_time / step_size)
+        N_interm = int(N_tot / run.get_num_outputs())
+
+        param_config["output_parameters.dt"] = step_size.to(
+            self._unit_system.time
+        ).value
+        param_config["output_parameters.ninterm"] = N_interm
+        param_config["output_parameters.ntot"] = N_tot
+
+        # Set output to fargo output directory
+        # (to avoid overflow of OUTPUTDIR variable in C)
+        param_config["output_parameters.outputDir"] = str(model.get_fargo_output_path())
+
+        # Additional Parameters
+
+        if run.get_float_type() == np.float64:
+            option_config["performance.FLOAT"].disable()
+        else:
+            option_config["performance.FLOAT"].enable()
+
+        # Save configurations
+
+        self._planet_config.save()
+        self._planet_config._autosave = True
+
+        param_config.save()
+        param_config._autosave = True
+
+        option_config.save()
+        option_config._autosave = True
+
+        # Dump samples to TOML file
+
+        sample_dump = samples.copy()
+
+        def toml_serialize_dict(read_dict):
+            write_dict = dict()
+            for key, value in read_dict.items():
+                if isinstance(value, dict):
+                    write_dict[key] = toml_serialize_dict(read_dict=value)
+                elif isinstance(value, np.ndarray):
+                    write_dict[key] = list(value)
+                elif isinstance(value, np.int64):
+                    write_dict[key] = int(value)
+                else:
+                    write_dict[key] = value
+            return write_dict
+
+        sample_config = model.get_sample_config()
+        sample_config.create()
+        sample_config.dump_dict(content=toml_serialize_dict(read_dict=sample_dump))
+
+        # Recompile and Run Setup
+
+        compile_time = self._setup.compile(
+            gpu=kwargs["gpu"],
+            parallel=kwargs["parallel"],
+            unit_system=self._unit_system,
+            rescale=False,
+            model_id=model._id,
+            show_progress=kwargs["show_progress"],
+            verbose=kwargs["verbose"],
+            show_fargo_output=kwargs["verbose"],
+            return_execution_time=kwargs["record_execution_time"],
+        )
+
+        run_time = self._setup.run(
+            model_id=model._id,
+            num_nodes=kwargs["num_nodes"],
+            parallel=kwargs["parallel"],
+            show_progress=kwargs["show_progress"],
+            cuda_device_id=kwargs["cuda_device_id"],
+            verbose=kwargs["verbose"],
+            return_execution_time=kwargs["record_execution_time"],
+        )
+
+        # Move the data files to the correct directory
+        model.get_data_directory().mkdir()
+        for file in (Variables.get("FARGO_ROOT") / model.get_fargo_output_path()).glob(
+            "*.*"
+        ):
+            shutil.move(
+                src=file,
+                dst=model.get_data_directory(),
+            )
+        shutil.rmtree(path=Variables.get("FARGO_ROOT") / model.get_fargo_output_path())
+
+        return compile_time, run_time
+
+    def _simulate_radmc(
+        self, run: "SimulationRun", model: "DiskModel", samples: dict, **kwargs
+    ) -> None:
+        pass
 
     @classmethod
     def new(
