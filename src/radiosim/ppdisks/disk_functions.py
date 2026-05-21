@@ -1,6 +1,7 @@
 import astropy.units as un
 import numpy as np
 from numpy.typing import ArrayLike
+from scipy.optimize import curve_fit
 
 
 # See https://fargo3d.github.io/documentation/def_setups.html#parameters
@@ -65,3 +66,26 @@ def disk_height(
         )
         * radius
     )
+
+
+# Equation 14 in https://www.aanda.org/articles/aa/pdf/2010/05/aa13731-09.pdf
+def approximate_grain_size(
+    stokes_number: float,
+    solid_dust_density: un.Quantity,
+    gas_surface_density: un.Quantity,
+) -> un.Quantity:
+    return 2 * stokes_number * gas_surface_density / (np.pi * solid_dust_density)
+
+
+def schmidt_number(stokes_number: float) -> float:
+    # Fitted values according to https://doi.org/10.1051/0004-6361/200811220
+    schmidt_numbers = np.array([0.03, 0.4, 1.5])
+    stokes_scale = np.array([1e-4, 1e-3, 1e-2])
+
+    s_m, s_b = curve_fit(lambda x, m, b: m * x + b, stokes_scale, schmidt_numbers)[0]
+
+    return s_m * stokes_number + s_b
+
+
+def diffusion_coefficient(stokes_number: float, alpha_viscosity: float) -> float:
+    return alpha_viscosity / schmidt_number(stokes_number=stokes_number)

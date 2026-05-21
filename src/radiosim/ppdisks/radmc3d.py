@@ -10,7 +10,7 @@ from radiosim.ppdisks.simulation import DiskModel
 from .config.radmc3d import format_output_lines
 
 
-# FFT Convolution algorithmfrom https://stackoverflow.com/a/47979802
+# FFT Convolution algorithm from https://stackoverflow.com/a/47979802
 # Marked code (inside >>> BEGIN / <<< END) is licensed under CC BY-SA 3.0
 def _convolve2d(x: np.ndarray, y: np.ndarray):
     # >>> BEGIN
@@ -222,3 +222,23 @@ class RADMCSetup:
         )
 
         self.save_input_file(name="amr_grid", data=grid_output)
+
+    def create_dust_density_input(self) -> None:
+        dust_density_output = [
+            "1",  # iformat
+            str(self.grid.N_r * self.grid.N_theta * self.grid.N_phi),  # nrcells
+            str(self.model.get_num_species()),  # nspec (# of dust species)
+        ]
+
+        unit_system = self.model._run._sim._unit_system
+
+        density_unit = 1 * unit_system.mass / unit_system.length**3
+
+        for ispec in np.arange(1, self.model.get_num_species() + 1):
+            data = (
+                self.model.get_dust_density_3d(output_idx=-1, dust_idx=ispec)
+                * density_unit
+            ).cgs.value.ravel(order="F")
+            dust_density_output.extend(data.tolist())
+
+        self.save_input_file(name="dust_density", data=dust_density_output)

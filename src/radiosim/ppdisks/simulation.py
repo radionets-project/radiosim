@@ -12,6 +12,7 @@ from astropy import constants as const
 from astropy import units as un
 from astropy.time import Time
 from numpy.typing import ArrayLike
+from scipy import integrate
 from tqdm.auto import tqdm
 
 from radiosim.ppdisks.config import TOMLConfiguration
@@ -21,6 +22,7 @@ from radiosim.ppdisks.plotting.utils import ellipse_img2cartesian_img
 from .config import Variables
 from .config.fargo import Constants, Planet, PlanetConfig, UnitSystem
 from .disk_functions import (
+    diffusion_coefficient,
     disk_height,
     mass_function,
     orbital_period,
@@ -28,6 +30,7 @@ from .disk_functions import (
     surface_density,
 )
 from .plotting.utils import configure_axes
+from .radmc3d import Grid
 from .setup import Setup
 
 __all__ = ["Simulation", "SimulationRun", "DiskModel"]
@@ -903,6 +906,9 @@ class DiskModel:
         self._directory: Path = run._directory / f"model_{id}"
         self._run: SimulationRun = run
 
+    def get_num_species(self) -> int:
+        return len(self.get_sample_config()["dust_parameters.invstokes"])
+
     def get_time_deltas(self) -> float:
         sample_config = self.get_sample_config()
         planet_parameters = sample_config["planet_parameters"]
@@ -932,14 +938,86 @@ class DiskModel:
         }
         return len(files)
 
-    def get_dust_density(self, output_idx: int = -1, dust_idx: int = 1) -> np.ndarray:
+    def get_dust_density(
+        self,
+        output_idx: int = -1,
+        dust_idx: int = 1,
+        r_scale: str | None = None,
+        grid: Grid | None = None,
+    ) -> np.ndarray:
         if output_idx < 0:
             output_idx = np.arange(0, self.get_num_outputs())[output_idx]
 
-        return np.fromfile(
+        density_2d = np.fromfile(
             self.get_data_directory() / f"dust{dust_idx}dens{output_idx}.dat",
             dtype=self._run.get_float_type(),
         ).reshape(self._run.get_polar_img_size())
+
+        if r_scale == "log":
+            grid = (
+                Grid(model=self, theta_steps=1, r_scale="log") if grid is None else grid
+            )
+            # Logarithmic interpolation created with the help of GPT-5.2-Codex
+            r_centers = 0.5 * (grid._r_edges.log[1:] + grid._r_edges.log[:-1])
+
+            density_2d_log = np.empty((r_centers.size, density_2d.shape[1]))
+            for j in range(density_2d.shape[1]):
+                density_2d_log[:, j] = np.interp(
+                    r_centers.value, grid._radii.linear.value, density_2d[:, j]
+                )
+        else:
+            return density_2d
+
+    def get_dust_density_3d(
+        self, output_idx: int, r_scale: str | None, grid: Grid, dust_idx: int = 1
+    ) -> np.ndarray:
+        unit_system = self._run._sim._unit_system
+
+        density_2d = (
+            self.get_dust_density(
+                output_idx=output_idx, dust_idx=dust_idx, r_scale=r_scale, grid=grid
+            )
+            * unit_system.mass
+            / unit_system.length**2
+        ).si  # kg / m^2
+
+        # 2d -> 3d relations from https://www.aanda.org/articles/aa/pdf/2009/12/aa11220-08.pdf
+
+        zs = grid.radii[None].T @ np.cos(grid.thetas.value)[None]
+        height_ratios = zs**2 / (
+            2 * np.tile(grid.heights[:, None], (1, grid.N_theta)) ** 2
+        )
+
+        samples = self.get_sample_config()
+
+        stokes_number = 1 / samples[f"dust_parameters.invstokes.{dust_idx}"]
+
+        eps = -stokes_number / diffusion_coefficient(
+            stokes_number=stokes_number,
+            alpha_viscosity=samples["disk_parameters.alpha"],
+        )
+
+        exponent = np.exp(eps * (np.exp(height_ratios) - 1) - height_ratios)
+        density_3d = density_2d[:, :, None] * exponent[:, None, :] / un.meter
+        density_3d[density_3d.value < 1e-20] = 0
+        density_3d = density_3d.swapaxes(1, 2)
+
+        # Normalization code created with the help of Claude Sonnet 4.6
+        norm = np.zeros(grid.N_r)
+        for i in range(grid.N_r):
+            h = grid.heights[i].si.value
+            h2 = 2 * h**2
+
+            def integrand(z):
+                return np.exp(eps * (np.exp(z**2 / h2) - 1) - z**2 / h2)  # noqa U038
+
+            norm[i], _ = integrate.quad(
+                integrand, grid.heights.si.max().value, grid.heights.si.max().value
+            )
+
+        density_3d /= norm[:, None, None]
+
+        return density_3d
 
     def get_polar_dust_density(
         self,
