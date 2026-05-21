@@ -3,6 +3,7 @@ from pathlib import Path
 
 import astropy.units as un
 import numpy as np
+from astropy.constants import M_sun, R_sun, c
 from astropy.convolution import Gaussian2DKernel
 
 from radiosim.ppdisks.simulation import DiskModel
@@ -142,6 +143,8 @@ class RADMCSetup:
     def __init__(
         self,
         model: DiskModel,
+        ref_frequency: float | un.Quantity,
+        frequency_res: int,
         nphot_therm: int,
         nphot_scat: int,
         theta_steps: int,
@@ -155,6 +158,14 @@ class RADMCSetup:
         max_seed = np.iinfo(np.int32).max
 
         self.model: DiskModel = model
+        self.ref_frequency: un.Quantity = (
+            ref_frequency * un.hertz
+            if isinstance(ref_frequency, float)
+            else ref_frequency
+        )
+        self.ref_wavelength: un.Quantity = ((c / ref_frequency).decompose()).to(
+            un.micrometer
+        )
         self.nphot_therm: int = nphot_therm
         self.nphot_scat: int = nphot_scat
         self.num_threads: int = num_threads
@@ -242,3 +253,110 @@ class RADMCSetup:
             dust_density_output.extend(data.tolist())
 
         self.save_input_file(name="dust_density", data=dust_density_output)
+
+    def _get_wavelenghts(self) -> list[float]:
+        star_temps = self.model.get_sample_config()[
+            "planet_parameters.stellar_temperature"
+        ]
+        return np.logspace(
+            -0.95 if np.max(star_temps) <= 10000 else -1.5,
+            np.log10(self.ref_wavelength.to(un.micrometer).value),
+            self.frequency_res,
+        ).tolist()
+
+    def create_wavelength_micron_input(self) -> None:
+        output = [self.frequency_res]
+        output.extend(self._get_wavelenghts())
+
+        self.save_input_file(name="wavelength_micron", data=output)
+
+    def create_stars_input(self) -> None:
+        unit_system = self.model._run._sim._unit_system
+        sample_config = self.model.get_sample_config()
+
+        num_stars = (
+            2 if sample_config["planet_parameters.binary_system"] else 1
+        )  # nstars
+        output = [
+            "2",  # iformat
+            f"{num_stars} {self.frequency_res}",  # nstars (# stars) nlam (# wavelenght)
+        ]
+        # rstar[1] mstar[1] xstar[1] ystar[1] zstar[1]
+
+        if num_stars == 2:
+            for star_idx in range(num_stars):
+                star_data = np.genfromtxt(
+                    self.model.get_data_directory() / f"planet{star_idx}.dat"
+                )
+
+                r_star = (star_data[1] * unit_system.length).cgs().value
+                phi_star = star_data[2]
+
+                R_star = 1
+                m_star = (
+                    np.array(sample_config["planet_parameters.stellar_mass"]) * M_sun
+                ).cgs.value[star_idx]
+                x_star = r_star * np.cos(phi_star)
+                y_star = r_star * np.sin(phi_star)
+        else:
+            R_star = R_sun.to(un.centimeter).value  # TODO: Test value
+            m_star = (
+                np.array(sample_config["planet_parameters.stellar_mass"]) * M_sun
+            ).cgs.value[0]
+            x_star = 0
+            y_star = 0
+
+        output.append(f"{R_star} {m_star} {x_star} {y_star} {0}")
+        output.extend(self._get_wavelenghts())
+        output.extend(
+            (-np.array(sample_config["planet_parameters.stellar_temperature"])).tolist()
+        )  # black body temperatures -> negative sign
+
+        self.save_input_file(name="stars", data=output)
+
+    def create_camera_wavelength_micron_input(self) -> None:
+        output = ["1", str(self.ref_wavelength.to(un.micrometer).value)]
+        self.save_input_file(name="camera_wavelength_micron", data=output)
+
+    def create_dustopac_input(self) -> None:
+        output = [
+            2,
+            self.model.get_num_species(),
+            "-----------------------------",
+        ]
+
+        for ispec in range(self.model.get_num_species()):
+            output.extend([1, 0, f"dust{ispec}"])
+
+        self.save_input_file(name="dustopac", data=output)
+
+    def create_dustkappa_input(self) -> None:
+        wavelengths = self._get_wavelenghts()
+
+        for ispec in range(self.model.get_num_species()):
+            opac = self.model.get_opacities(
+                dust_idx=ispec, wavelengths=np.array(wavelengths)
+            )
+
+            output = [
+                3,  # lambda kappa_abs kappa_scat g
+                self.frequency_res,  # nlambda
+            ]
+            for i in range(len(wavelengths)):
+                output.append(
+                    f"{wavelengths[i]} {opac['k_abs'][0, i]} "
+                    f"{opac['k_sca'][0, i]} {opac['g'][0, i]}"
+                )
+
+            self.save_input_file(name=f"dustkappa_{'dust'}{ispec}", data=output)
+
+    # Subprocess output capture adapted from https://stackoverflow.com/a/28319191
+    # Marked code (inside >>> BEGIN / <<< END) is licensed under CC BY-SA 3.0
+    def run_mctherm(
+        self,
+        show_progress: bool = True,
+        return_execution_time: bool = True,
+        verbose: bool = False,
+    ) -> dict | None:
+        pass
+        # total_steps = self.nphot_scat

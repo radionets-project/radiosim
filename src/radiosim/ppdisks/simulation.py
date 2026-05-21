@@ -5,6 +5,7 @@ from os import PathLike
 from pathlib import Path
 from time import time
 
+import dsharp_opac as opacities
 import matplotlib
 import matplotlib.animation as animation
 import numpy as np
@@ -22,6 +23,7 @@ from radiosim.ppdisks.plotting.utils import ellipse_img2cartesian_img
 from .config import Variables
 from .config.fargo import Constants, Planet, PlanetConfig, UnitSystem
 from .disk_functions import (
+    approximate_grain_size,
     diffusion_coefficient,
     disk_height,
     mass_function,
@@ -1122,6 +1124,43 @@ class DiskModel:
                 R0=self._run._sim._constants["R0"].value,
             )
             * unit_system.length
+        )
+
+    def get_opacities(
+        self,
+        dust_idx: int,
+        wavelengths: np.ndarray | un.Quantity,
+        output_idx: int = -1,
+    ) -> dict:
+        unit_system = self._run._sim._unit_system
+        diel_const, rho_s = opacities.get_dsharp_mix()
+
+        # Average density of grains (solid_dust_density) for DSHARP taken from
+        # https://github.com/birnstiel/dsharp_opac/blob/2715ec5a1ebb892cca20737f54f8ccad317c8466/notebooks/opacity_examples.ipynb
+        grain_size = approximate_grain_size(
+            stokes_number=1
+            / self.get_sample_config()[f"dust_parameters.invstokes.{dust_idx}"],
+            solid_dust_density=1.6686 * un.gram / un.centimeter**3,
+            gas_surface_density=np.fromfile(
+                self.get_data_directory() / f"gasdens{output_idx}.dat",
+                dtype=self._run.get_float_type(),
+            )
+            * (1 * unit_system.mass / unit_system.length**2).si,
+        )
+
+        wavelengths = (
+            wavelengths * un.micrometer
+            if isinstance(wavelengths, np.ndarray)
+            else wavelengths
+        )
+
+        return opacities.get_opacities(
+            a=np.array([grain_size.to(un.centimeter).value]),
+            lam=wavelengths.to(un.centimeter).value,
+            diel_const=diel_const,
+            rho_s=rho_s,
+            extrapol=True,
+            extrapolate_large_grains=True,
         )
 
     def plot_height_profile(
