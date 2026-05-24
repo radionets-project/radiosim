@@ -1,14 +1,23 @@
+from __future__ import annotations
+
+import shutil
+import subprocess
+import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import astropy.units as un
 import numpy as np
 from astropy.constants import M_sun, R_sun, c
 from astropy.convolution import Gaussian2DKernel
+from tqdm.auto import tqdm
 
-from radiosim.ppdisks.simulation import DiskModel
-
+from .config import Variables
 from .config.radmc3d import format_output_lines
+
+if TYPE_CHECKING:
+    from radiosim.ppdisks.simulation import DiskModel
 
 
 # FFT Convolution algorithm from https://stackoverflow.com/a/47979802
@@ -51,6 +60,8 @@ class Grid:
         model: DiskModel,
         theta_steps: int,
         r_scale: str | None = "log",
+        theta_scale: str | None = "log",
+        theta_log_exp: float = -3,
         theta_tol: float = 0.1,
     ):
         N_r, N_phi = model._run.get_polar_img_size()
@@ -63,11 +74,11 @@ class Grid:
         self.r_max: un.Quantity = (r_max * un.AU).to(un.meter)
 
         self._radii: CoordinateScale = CoordinateScale(
-            linear=np.linspace(r_min.value, r_max.value, N_r) * un.meter,
+            linear=np.linspace(self.r_min.value, self.r_max.value, N_r) * un.meter,
             log=np.logspace(
-                np.log10(r_min.value),
+                np.log10(self.r_min.value),
                 np.log10(
-                    r_max.value,
+                    self.r_max.value,
                 ),
                 N_r,
             )
@@ -76,12 +87,14 @@ class Grid:
         self.radii = un.Quantity = self._radii.get_scale(mode=r_scale)
 
         self._r_edges: CoordinateScale = CoordinateScale(
-            linear=np.linspace(r_min.value, r_max.value, N_r + 1, dtype=np.float64)
+            linear=np.linspace(
+                self.r_min.value, self.r_max.value, N_r + 1, dtype=np.float64
+            )
             * un.meter,
             log=np.logspace(
-                np.log10(r_min.value),
+                np.log10(self.r_min.value),
                 np.log10(
-                    r_max.value,
+                    self.r_max.value,
                 ),
                 N_r + 1,
                 dtype=np.float64,
@@ -101,14 +114,34 @@ class Grid:
             linear=np.linspace(0, 2 * np.pi, N_phi + 1) * un.radian,
             log=None,
         )
-        self.phi_edges: un.Quantity = self._phi_edges(mode="linear")
+        self.phi_edges: un.Quantity = self._phi_edges.get_scale(mode="linear")
 
         self.heights: un.Quantity = model.get_height(radius=self.radii).to(un.meter)
+
+        symlog = (
+            np.concatenate(
+                [
+                    -np.logspace(theta_log_exp, 1, self.N_theta // 2 - 1)[::-1],
+                    np.zeros(1),
+                    np.logspace(theta_log_exp, 1, self.N_theta // 2),
+                ]
+            )
+            / 10
+        )
+        symlog_edges = (
+            np.concatenate(
+                [
+                    -np.logspace(theta_log_exp, 1, self.N_theta // 2)[::-1],
+                    np.zeros(1),
+                    np.logspace(theta_log_exp, 1, self.N_theta // 2),
+                ]
+            )
+            / 10
+        )
 
         theta_max = np.abs(
             np.arccos(self.heights[-1] / self.radii[-1]).value - np.pi / 2
         )
-        theta_tol = 0.1
 
         self._thetas: CoordinateScale = CoordinateScale(
             linear=np.linspace(
@@ -117,11 +150,9 @@ class Grid:
                 self.N_theta,
             )
             * un.radian,
-            log=None,
+            log=(symlog + np.pi / 2) * un.radian,
         )
-        self.thetas: un.Quantity = self._thetas.get_scale(
-            mode="linear"
-        )  # For now, only linear theta allowed
+        self.thetas: un.Quantity = self._thetas.get_scale(mode=theta_scale)
         self._theta_edges: CoordinateScale = CoordinateScale(
             linear=np.linspace(
                 np.pi / 2 - theta_max * (1 + theta_tol),
@@ -129,13 +160,15 @@ class Grid:
                 self.N_theta + 1,
             )
             * un.radian,
-            log=None,
+            log=(symlog_edges + np.pi / 2) * un.radian,
         )
-        self.theta_edges: un.Quantity = self._theta_edges(mode="linear")
+        self.theta_edges: un.Quantity = self._theta_edges.get_scale(mode="linear")
 
-    def get_polar_grid(self, mode: str | None = None) -> tuple[np.ndarray, np.ndarray]:
-        radii = self.radii if mode is None else self._radii.get_scale(mode=mode)
-        phis = self.phis if mode is None else self._phis.get_scale(mode=mode)
+    def get_polar_grid(
+        self, r_mode: str | None = None, phi_mode: str | None = None
+    ) -> tuple[np.ndarray, np.ndarray]:
+        radii = self.radii if r_mode is None else self._radii.get_scale(mode=r_mode)
+        phis = self.phis if phi_mode is None else self._phis.get_scale(mode=phi_mode)
         return np.meshgrid(radii.value, phis.value)
 
 
@@ -150,6 +183,8 @@ class RADMCSetup:
         theta_steps: int,
         num_threads: int,
         r_scale: str | None = "log",
+        theta_scale: str | None = "log",
+        theta_log_exp: float = -3.0,
         theta_tol: float = 0.1,
         fast_mode: int = 0,
         modified_random_walk: bool = True,
@@ -166,6 +201,7 @@ class RADMCSetup:
         self.ref_wavelength: un.Quantity = ((c / ref_frequency).decompose()).to(
             un.micrometer
         )
+        self.frequency_res: int = frequency_res
         self.nphot_therm: int = nphot_therm
         self.nphot_scat: int = nphot_scat
         self.num_threads: int = num_threads
@@ -180,13 +216,21 @@ class RADMCSetup:
             model=model,
             theta_steps=theta_steps,
             r_scale=r_scale,
+            theta_scale=theta_scale,
+            theta_log_exp=theta_log_exp,
             theta_tol=theta_tol,
         )
 
         self.get_file_directory().mkdir(exist_ok=True, parents=True)
 
     def get_file_directory(self) -> Path:
-        return self.model._directory / "radmc3d"
+        return self.model.get_radmc3d_directory()
+
+    def get_image_directory(self) -> Path:
+        return self.model.get_image_directory()
+
+    def get_command_prefix(self) -> str:
+        return Variables.get("RADMC3D_ROOT") / "radmc3d"
 
     def save_input_file(self, name: str, data: list, suffix="inp") -> None:
         with open(self.get_file_directory() / f"{name}.inp", "w") as file:
@@ -247,7 +291,9 @@ class RADMCSetup:
 
         for ispec in np.arange(1, self.model.get_num_species() + 1):
             data = (
-                self.model.get_dust_density_3d(output_idx=-1, dust_idx=ispec)
+                self.model.get_dust_density_3d(
+                    output_idx=-1, dust_idx=ispec, r_scale=None, grid=self.grid
+                )
                 * density_unit
             ).cgs.value.ravel(order="F")
             dust_density_output.extend(data.tolist())
@@ -299,7 +345,7 @@ class RADMCSetup:
                 x_star = r_star * np.cos(phi_star)
                 y_star = r_star * np.sin(phi_star)
         else:
-            R_star = R_sun.to(un.centimeter).value  # TODO: Test value
+            R_star = R_sun.to(un.centimeter).value
             m_star = (
                 np.array(sample_config["planet_parameters.stellar_mass"]) * M_sun
             ).cgs.value[0]
@@ -359,4 +405,160 @@ class RADMCSetup:
         verbose: bool = False,
     ) -> dict | None:
         pass
-        # total_steps = self.nphot_scat
+        total_steps = self.nphot_scat
+        model_desc = f" | Model {self.model._id}"
+
+        cmd = f"{self.get_command_prefix()} mctherm"
+
+        if verbose:
+            print(f"CMD @ {self.get_file_directory()}  $ {cmd}")
+
+        starting_time = time.time_ns()
+        execution_times = {
+            "mctherm_output_times": [],
+            "mctherm_runtime": 0,
+        }
+
+        # >>> BEGIN
+        with (
+            tqdm(
+                "Running Monte Carlo" + model_desc,
+                total=total_steps,
+                disable=not show_progress,
+            ) as progress,
+            subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=None if verbose else subprocess.DEVNULL,
+                bufsize=1,
+                universal_newlines=True,
+                shell=True,
+                cwd=self.get_file_directory(),
+            ) as p,
+        ):
+            for line in p.stdout:
+                if "photon nr:" not in line.lower():
+                    continue
+
+                execution_times["mctherm_output_times"].append(
+                    time.time_ns() - starting_time
+                )
+                progress.n = int(line.lower().split("photon nr:")[-1].strip())
+                progress.refresh()
+        # <<< END
+
+        execution_times["mctherm_runtime"] = time.time_ns() - starting_time
+
+        if return_execution_time:
+            return execution_times
+        else:
+            return None
+
+    # Subprocess output capture adapted from https://stackoverflow.com/a/28319191
+    # Marked code (inside >>> BEGIN / <<< END) is licensed under CC BY-SA 3.0
+    def run_image(
+        self,
+        incl: float,
+        phi: float,
+        posang: float,
+        image_idx: int | None = None,
+        preserve_output_files: bool = False,
+        show_progress: bool = True,
+        return_execution_time: bool = True,
+        verbose: bool = False,
+    ) -> dict | None:
+        pass
+        total_steps = self.nphot_scat
+        model_desc = f" | Model {self.model._id}"
+
+        x_pix, y_pix = self.model._run._sim._output_img_size
+
+        cmd = (
+            f"{self.get_command_prefix()} image "
+            f"lambda {self.ref_wavelength.value} "
+            f"incl {incl} phi {phi} posang {posang}"
+            f"npixx {x_pix} npixy {y_pix}"
+        )
+
+        if verbose:
+            print(f"CMD @ {self.get_file_directory()}  $ {cmd}")
+
+        starting_time = time.time_ns()
+        execution_times = {
+            "image_output_times": [],
+            "image_runtime": 0,
+        }
+
+        # >>> BEGIN
+        if total_steps > 0:
+            with (
+                tqdm(
+                    "Scattering Monte Carlo" + model_desc,
+                    total=total_steps,
+                    disable=not show_progress,
+                ) as progress,
+                subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=None if verbose else subprocess.DEVNULL,
+                    bufsize=1,
+                    universal_newlines=True,
+                    shell=True,
+                    cwd=self.get_file_directory(),
+                ) as p,
+            ):
+                for line in p.stdout:
+                    if "photon nr:" not in line.lower():
+                        continue
+
+                    execution_times["image_output_times"].append(
+                        time.time_ns() - starting_time
+                    )
+                    progress.n = int(line.lower().split("photon nr:")[-1].strip())
+                    progress.refresh()
+            # <<< END
+        else:
+            with tqdm(
+                desc="Ray-tracing" + model_desc, total=1, disable=not show_progress
+            ) as progress:
+                subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.DEVNULL if not verbose else None,
+                    stderr=subprocess.DEVNULL if not verbose else None,
+                    shell=True,
+                    cwd=self.get_file_directory(),
+                )
+                progress.update(1)
+
+        execution_times["image_runtime"] = time.time_ns() - starting_time
+
+        dust_temp_file = (
+            "dust_temperature.dat"
+            if image_idx is None
+            else f"dust_temperature_{image_idx}.dat"
+        )
+        image_file = "image.out" if image_idx is None else f"image_{image_idx}.dat"
+        if preserve_output_files:
+            shutil.copy(
+                self.get_file_directory() / "dust_temperature.dat",
+                self.get_image_directory() / dust_temp_file,
+            )
+
+            shutil.copy(
+                self.get_file_directory() / "image.out",
+                self.get_image_directory() / image_file,
+            )
+        else:
+            shutil.move(
+                self.get_file_directory() / "dust_temperature.dat",
+                self.get_image_directory() / dust_temp_file,
+            )
+            shutil.move(
+                self.get_file_directory() / "image.out",
+                self.get_image_directory() / image_file,
+            )
+
+        if return_execution_time:
+            return execution_times
+        else:
+            return None

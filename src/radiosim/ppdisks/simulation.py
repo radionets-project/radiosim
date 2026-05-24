@@ -32,7 +32,7 @@ from .disk_functions import (
     surface_density,
 )
 from .plotting.utils import configure_axes
-from .radmc3d import Grid
+from .radmc3d import Grid, RADMCSetup
 from .setup import Setup
 
 __all__ = ["Simulation", "SimulationRun", "DiskModel"]
@@ -75,6 +75,34 @@ def get_default_sampling_config():
         "output_parameters": {
             "num_largest_orbits": [100, 200],
         },
+        "grid_parameters": {
+            "r_scale": "log",
+            "theta_scale": "log",
+            "theta_steps": 500,
+            "theta_log_exp": -3.0,
+            "theta_tol": 0.1,
+        },
+        "thermal_mc_parameters": {
+            "scattering_mode": 1,  # Scattering mode:
+            # 0: no scattering
+            # 1: isotropic scattering
+            # 2: anisotropic scattering
+            # 3 - 5 --> see radmc3d manual
+            "fast_mode": 0,  # Whether to use 'fast mode'
+            "modified_random_walk": True,  # Whether to use MRW
+            "freq_res": 1000,  # num of frequencies tested for the MC run
+            "nphot_therm": 100_000_000,  # num of thermal photon packages for the MC run
+        },
+        "imaging_parameters": {
+            "nphot_scat": 0,  # num of scattering photon packages for the imaging run
+            "num_versions": [1, 2],  # max uses of the same dust distribution
+            "incl": [0.0, 30.0],  # inclination of the camera relative to image plane
+            "phi": [0.0, 45.0],  # polar angle of the camera relative to image plane
+            "posang": [
+                0.0,
+                45.0,
+            ],  # position angle of the camera relative to image plane
+        },
     }
 
 
@@ -87,6 +115,7 @@ class Simulation:
         float_type: type,
         polar_img_size: tuple[int],
         output_img_size: tuple[int],
+        ref_freq: float | un.Quantity,
         unit_system: UnitSystem,
         use_default_constants: bool,
     ):
@@ -107,6 +136,13 @@ class Simulation:
         )
 
         self._float_type: type = float_type
+
+        self._ref_freq: un.Quantity = (
+            ref_freq if isinstance(ref_freq, un.Quantity) else ref_freq * un.hertz
+        )
+        self._ref_wavelength: un.Quantity = ((const.c / self._ref_freq).decompose()).to(
+            un.micrometer
+        )
 
         self._polar_img_size: tuple[int] = polar_img_size
         self._output_img_size: tuple[int] = output_img_size
@@ -136,6 +172,7 @@ class Simulation:
                 "float_type": "FLOAT64"
                 if self._float_type == np.float64
                 else "FLOAT32",
+                "ref_freq": self._ref_freq.to(un.hertz).value,
                 "polar_img_size": list(self._polar_img_size),
                 "output_img_size": list(self._output_img_size),
                 "unit_system": self._unit_system.name,
@@ -165,7 +202,7 @@ class Simulation:
 
     def simulate(
         self,
-        num_models: int,
+        num_images: int,
         seed: int,
         num_outputs: int | None = None,
         steps_per_orbit: int | None = None,
@@ -202,7 +239,7 @@ class Simulation:
 
         if run_id is None:
             run = SimulationRun.new(
-                num_models=num_models,
+                num_images=num_images,
                 steps_per_orbit=steps_per_orbit,
                 num_outputs=num_outputs,
                 seed=seed,
@@ -210,29 +247,40 @@ class Simulation:
             )
         else:
             run = SimulationRun(id=run_id, sim=self, resume_rng=resume)
+            num_images = run.get_num_images()
 
         print(f"------ STARTING RUN {run._id} ------")
         if manual_run:
             print("----- ! MANUAL MODE ACTIVE ! -----")
 
-        start_idx = 0 if not resume else run.get_next_model_id()
-        for i in np.arange(start_idx, num_models):
+        num_current_images = run.get_num_current_images()
+        start_idx = 0 if not resume else num_current_images
+
+        for i in np.arange(start_idx, num_images):
+            if i < num_current_images:
+                continue
+
+            skip_fargo = False
             try:
                 model = run.get_model(id=i)
 
                 if overwrite:
                     print(
-                        f"WARNING! The model with id '{i}' already exists. "
+                        f"WARNING! The dust model with id '{i}' already exists. "
                         "It will be overwritten"
                     )
                     model.delete()
                 else:
                     print(
-                        f"WARNING! The model with id '{i}' already exists. "
+                        f"WARNING! The dust model with id '{i}' already exists. "
                         "It will not be overwritten. If you want to overwrite it, "
                         "set overwrite=True!"
                     )
-                    continue
+
+                    if model.get_image_directory().exists():
+                        continue
+                    else:
+                        skip_fargo = True
             except KeyError:
                 pass
 
@@ -244,8 +292,45 @@ class Simulation:
             else:
                 samples = override_samples
 
-            # Run FARGO3D Simulation
-            fargo_compile_time, fargo_runtime = self._simulate_fargo(
+            # Dump samples to TOML file
+
+            def toml_serialize_dict(read_dict):
+                write_dict = dict()
+                for key, value in read_dict.items():
+                    if isinstance(value, dict):
+                        write_dict[key] = toml_serialize_dict(read_dict=value)
+                    elif isinstance(value, np.ndarray):
+                        write_dict[key] = list(value)
+                    elif isinstance(value, np.int64):
+                        write_dict[key] = int(value)
+                    else:
+                        write_dict[key] = value
+                return write_dict
+
+            sample_config = model.get_sample_config()
+            sample_config.create()
+
+            sample_dump = samples.copy()
+            sample_config.dump_dict(content=toml_serialize_dict(read_dict=sample_dump))
+
+            if not skip_fargo:
+                # Run FARGO3D Simulation
+                fargo_compile_time, fargo_runtime = self._simulate_fargo(
+                    run=run,
+                    model=model,
+                    samples=samples,
+                    gpu=gpu,
+                    parallel=parallel,
+                    show_progress=show_progress,
+                    verbose=verbose,
+                    return_execution_time=record_execution_time,
+                    num_nodes=num_nodes,
+                    cuda_device_id=cuda_device_id,
+                )
+
+            # Run RADMC3D Simulation
+
+            radmc_runtimes = self._simulate_radmc(
                 run=run,
                 model=model,
                 samples=samples,
@@ -254,11 +339,11 @@ class Simulation:
                 show_progress=show_progress,
                 verbose=verbose,
                 return_execution_time=record_execution_time,
-                num_nodes=num_nodes,
+                num_mc_threads=num_mc_threads,
                 cuda_device_id=cuda_device_id,
             )
 
-            # Run RADMC3D Simulation
+            num_current_images += model.get_num_images()
 
             if record_execution_time:
                 record_toml = TOMLConfiguration(
@@ -267,10 +352,17 @@ class Simulation:
                 )
                 record_toml.dump_dict(
                     {
+                        "mode": {
+                            "gpu": gpu,
+                            "parallel": parallel,
+                            "num_nodes": num_nodes,
+                            "cuda_device_id": cuda_device_id,
+                        },
                         "fargo_compile_time": fargo_compile_time,
                         "fargo_run_time": fargo_runtime[0],
                         "fargo_output_times": fargo_runtime[1],
                     }
+                    | radmc_runtimes
                 )
 
     def _simulate_fargo(
@@ -447,27 +539,6 @@ class Simulation:
         option_config.save()
         option_config._autosave = True
 
-        # Dump samples to TOML file
-
-        sample_dump = samples.copy()
-
-        def toml_serialize_dict(read_dict):
-            write_dict = dict()
-            for key, value in read_dict.items():
-                if isinstance(value, dict):
-                    write_dict[key] = toml_serialize_dict(read_dict=value)
-                elif isinstance(value, np.ndarray):
-                    write_dict[key] = list(value)
-                elif isinstance(value, np.int64):
-                    write_dict[key] = int(value)
-                else:
-                    write_dict[key] = value
-            return write_dict
-
-        sample_config = model.get_sample_config()
-        sample_config.create()
-        sample_config.dump_dict(content=toml_serialize_dict(read_dict=sample_dump))
-
         # Recompile and Run Setup
 
         compile_time = self._setup.compile(
@@ -479,7 +550,7 @@ class Simulation:
             show_progress=kwargs["show_progress"],
             verbose=kwargs["verbose"],
             show_fargo_output=kwargs["verbose"],
-            return_execution_time=kwargs["record_execution_time"],
+            return_execution_time=kwargs["return_execution_time"],
         )
 
         run_time = self._setup.run(
@@ -489,7 +560,7 @@ class Simulation:
             show_progress=kwargs["show_progress"],
             cuda_device_id=kwargs["cuda_device_id"],
             verbose=kwargs["verbose"],
-            return_execution_time=kwargs["record_execution_time"],
+            return_execution_time=kwargs["return_execution_time"],
         )
 
         # Move the data files to the correct directory
@@ -506,9 +577,63 @@ class Simulation:
         return compile_time, run_time
 
     def _simulate_radmc(
-        self, run: "SimulationRun", model: "DiskModel", samples: dict, **kwargs
+        self,
+        run: "SimulationRun",
+        model: "DiskModel",
+        samples: dict,
+        num_mc_threads: int,
+        **kwargs,
     ) -> None:
-        pass
+        radmc_setup = RADMCSetup(
+            model=model,
+            ref_frequency=run._sim._ref_freq,
+            frequency_res=samples["thermal_mc_parameters"]["freq_res"],
+            nphot_therm=samples["thermal_mc_parameters"]["freq_res"],
+            nphot_scat=samples["imaging_parameters"]["nphot_scat"],
+            theta_steps=samples["grid_parameters"]["theta_steps"],
+            num_threads=num_mc_threads,
+            r_scale=samples["grid_parameters"]["r_scale"],
+            theta_scale=samples["grid_parameters"]["theta_scale"],
+            theta_log_exp=samples["grid_parameters"]["theta_log_exp"],
+            theta_tol=samples["grid_parameters"]["theta_tol"],
+            fast_mode=samples["thermal_mc_parameters"]["fast_mode"],
+            modified_random_walk=samples["thermal_mc_parameters"][
+                "modified_random_walk"
+            ],
+            scattering_mode=samples["thermal_mc_parameters"]["scattering_mode"],
+        )
+
+        # Create input files
+        radmc_setup.create_radmc3d_input()
+        radmc_setup.create_amr_grid_input()
+        radmc_setup.create_dust_density_input()
+        radmc_setup.create_wavelength_micron_input()
+        radmc_setup.create_stars_input()
+        radmc_setup.create_camera_wavelength_micron_input()
+        radmc_setup.create_dustopac_input()
+        radmc_setup.create_dustkappa_input()
+
+        runtimes = {}
+
+        mctherm_runtime = radmc_setup.run_mctherm(
+            show_progress=kwargs["show_progress"],
+            return_execution_time=kwargs["return_execution_time"],
+            verbose=kwargs["verbose"],
+        )
+
+        runtimes = runtimes | mctherm_runtime
+
+        for i in range(0, model.get_num_images()):
+            image_runtime = radmc_setup.run_image(
+                image_idx=i,
+                incl=samples["imaging_parameters.incl"][i],
+                phi=samples["imaging_parameters.phi"][i],
+                posang=samples["imaging_parameters.posang"][i],
+                return_execution_time=kwargs["return_execution_time"],
+            )
+            runtimes = runtimes | {i: image_runtime}
+
+        return runtimes
 
     @classmethod
     def new(
@@ -516,6 +641,7 @@ class Simulation:
         name: str,
         setup: str,
         sampling_config: PathLike | dict | None,
+        ref_freq: float | un.Quantity,
         parent_directory: PathLike | None = None,
         float_type: type = np.float64,
         polar_img_size: tuple[int] = (300, 800),
@@ -565,9 +691,11 @@ class Simulation:
             root_directory=root_directory,
             setup=setup,
             float_type=float_type,
+            output_img_size=output_img_size,
             polar_img_size=polar_img_size,
             unit_system=unit_system,
             use_default_constants=use_default_constants,
+            ref_freq=ref_freq,
         )
 
         instance.save_config()
@@ -589,6 +717,7 @@ class Simulation:
             float_type=np.float64
             if config["general.float_type"] == "FLOAT64"
             else np.float32,
+            ref_freq=config["general.ref_freq"],
             polar_img_size=tuple(config["general.polar_img_size"]),
             output_img_size=tuple(config["general.output_img_size"]),
             unit_system=UnitSystem.__members__[config["general.unit_system"]],
@@ -603,6 +732,7 @@ class SimulationRun:
         self,
         id: int,
         sim: Simulation,
+        num_images: int | None = None,
         seed: int | None = None,
         resume_rng: bool = True,
     ):
@@ -614,6 +744,11 @@ class SimulationRun:
             create_if_not_exists=True,
         )
         self._sim: Simulation = sim
+
+        if num_images is None:
+            self._num_images: int = self.get_num_images()
+        else:
+            self._num_images: int = num_images
 
         if seed is None:
             self._rng: np.random.Generator = np.random.default_rng(seed=self.get_seed())
@@ -692,23 +827,33 @@ class SimulationRun:
         return fig, ax
 
     def get_polar_img_size(self) -> tuple[int]:
-        return tuple(self._sampling_config["polar_img_size"])
+        return tuple(self._sampling_config["run.polar_img_size"])
 
     def get_num_outputs(self) -> int:
-        return self._sampling_config["num_outputs"]
+        return self._sampling_config["run.num_outputs"]
 
     def get_steps_per_orbit(self) -> int:
-        return self._sampling_config["steps_per_orbit"]
+        return self._sampling_config["run.steps_per_orbit"]
 
     def get_float_type(self) -> type:
         return (
             np.float64
-            if self._sampling_config["float_type"] == "FLOAT64"
+            if self._sampling_config["run.float_type"] == "FLOAT64"
             else np.float32
         )
 
+    def get_num_images(self) -> int:
+        return self._sampling_config["run.num_images"]
+
+    def get_num_current_images(self) -> int:
+        return (
+            np.sum([model.get_num_images() for model in self.get_models()])
+            if len(self.get_models()) > 0
+            else 0
+        )
+
     def get_seed(self) -> int:
-        return self._sampling_config["seed"]
+        return self._sampling_config["run.seed"]
 
     def get_models(self) -> list["DiskModel"]:
         return [
@@ -759,7 +904,7 @@ class SimulationRun:
                         write_dict[key] = rng.integers(low=value[0], high=value[1])
                     else:
                         write_dict[key] = rng.uniform(low=value[0], high=value[1])
-                elif np.isscalar(value):
+                elif np.isscalar(value) or isinstance(value, (str, bool)):
                     write_dict[key] = value
 
             return write_dict
@@ -803,6 +948,7 @@ class SimulationRun:
         num_planets = rng.integers(
             low=planet_sampling["num_planets"][0],
             high=planet_sampling["num_planets"][1],
+            endpoint=True,
         )
 
         planet_parameters["num_planets"] = num_planets
@@ -862,13 +1008,47 @@ class SimulationRun:
 
         mesh_parameters = sample_dict(sampling_config["mesh_parameters"])
         output_parameters = sample_dict(sampling_config["output_parameters"])
+        grid_parameters = sample_dict(sampling_config["grid_parameters"])
+        thermal_mc_parameters = sample_dict(sampling_config["thermal_mc_parameters"])
+
+        imaging_sampling = sampling_config["imaging_parameters"]
+        imaging_parameters = {
+            "nphot_scat": imaging_sampling["nphot_scat"],
+            "num_versions": rng.integers(
+                low=imaging_sampling["num_versions"][0],
+                high=imaging_sampling["num_versions"][1],
+                endpoint=True,
+            ),
+        }
+
+        imaging_parameters["incl"] = rng.uniform(
+            low=imaging_sampling["incl"][0],
+            high=imaging_sampling["incl"][1],
+            size=int(imaging_parameters["num_versions"]),
+        )
+
+        imaging_parameters["phi"] = rng.uniform(
+            low=imaging_sampling["phi"][0],
+            high=imaging_sampling["phi"][1],
+            size=int(imaging_parameters["num_versions"]),
+        )
+
+        imaging_parameters["posang"] = rng.uniform(
+            low=imaging_sampling["posang"][0],
+            high=imaging_sampling["posang"][1],
+            size=int(imaging_parameters["num_versions"]),
+        )
 
         samples = {
+            "run": sampling_config["run"],
             "disk_parameters": disk_parameters,
             "dust_parameters": dust_parameters,
             "planet_parameters": planet_parameters,
             "mesh_parameters": mesh_parameters,
             "output_parameters": output_parameters,
+            "grid_parameters": grid_parameters,
+            "thermal_mc_parameters": thermal_mc_parameters,
+            "imaging_parameters": imaging_parameters,
         }
 
         return samples
@@ -876,7 +1056,7 @@ class SimulationRun:
     @classmethod
     def new(
         cls,
-        num_models: int,
+        num_images: int,
         steps_per_orbit: int,
         num_outputs: int,
         seed: int,
@@ -886,16 +1066,18 @@ class SimulationRun:
             id=sim.get_next_run_id(),
             sim=sim,
             seed=seed,
+            num_images=num_images,
             resume_rng=False,
         )
         instance._directory.mkdir(exist_ok=True)
         instance._sampling_config.dump_dict(sim._sampling_config.as_dict())
 
-        instance._sampling_config["seed"] = seed
-        instance._sampling_config["polar_img_size"] = sim._polar_img_size
-        instance._sampling_config["steps_per_orbit"] = steps_per_orbit
-        instance._sampling_config["num_outputs"] = num_outputs
-        instance._sampling_config["float_type"] = (
+        instance._sampling_config["run.num_images"] = num_images
+        instance._sampling_config["run.seed"] = seed
+        instance._sampling_config["run.polar_img_size"] = sim._polar_img_size
+        instance._sampling_config["run.steps_per_orbit"] = steps_per_orbit
+        instance._sampling_config["run.num_outputs"] = num_outputs
+        instance._sampling_config["run.float_type"] = (
             "FLOAT64" if sim._float_type == np.float64 else "FLOAT32"
         )
 
@@ -955,10 +1137,10 @@ class DiskModel:
             dtype=self._run.get_float_type(),
         ).reshape(self._run.get_polar_img_size())
 
-        if r_scale == "log":
-            grid = (
-                Grid(model=self, theta_steps=1, r_scale="log") if grid is None else grid
-            )
+        if r_scale == "log" and grid is None:
+            grid = Grid(model=self, theta_steps=1, r_scale="log")
+
+        if grid is not None:
             # Logarithmic interpolation created with the help of GPT-5.2-Codex
             r_centers = 0.5 * (grid._r_edges.log[1:] + grid._r_edges.log[:-1])
 
@@ -967,6 +1149,8 @@ class DiskModel:
                 density_2d_log[:, j] = np.interp(
                     r_centers.value, grid._radii.linear.value, density_2d[:, j]
                 )
+
+            return density_2d_log
         else:
             return density_2d
 
@@ -1528,6 +1712,9 @@ class DiskModel:
                     save_to, progress_callback=_progress_func, writer=writer, dpi=dpi
                 )
 
+    def get_num_images(self) -> int:
+        return int(self.get_sample_config()["imaging_parameters.num_versions"])
+
     def get_radius_lims(self) -> tuple[float]:
         sample_config = self.get_sample_config()
 
@@ -1542,8 +1729,14 @@ class DiskModel:
     def get_sample_config(self) -> TOMLConfiguration:
         return TOMLConfiguration(self._directory / "samples.toml")
 
+    def get_image_directory(self) -> Path:
+        return self._directory.resolve() / "images"
+
     def get_data_directory(self) -> Path:
         return self._directory.resolve() / "data"
+
+    def get_radmc3d_directory(self) -> Path:
+        return self._directory.resolve() / "radmc3d"
 
     def get_fargo_output_path(self) -> str:
         return f"outputs/sim_{self._run._sim.name}/run_{self._run._id}/model_{self._id}"
