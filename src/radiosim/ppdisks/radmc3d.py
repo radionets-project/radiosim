@@ -118,26 +118,27 @@ class Grid:
 
         self.heights: un.Quantity = model.get_height(radius=self.radii).to(un.meter)
 
-        symlog = (
-            np.concatenate(
-                [
-                    -np.logspace(theta_log_exp, 1, self.N_theta // 2 - 1)[::-1],
-                    np.zeros(1),
-                    np.logspace(theta_log_exp, 1, self.N_theta // 2),
-                ]
+        if self.N_theta > 1:
+            symlog = (
+                np.concatenate(
+                    [
+                        -np.logspace(theta_log_exp, 1, self.N_theta // 2 - 1)[::-1],
+                        np.zeros(1),
+                        np.logspace(theta_log_exp, 1, self.N_theta // 2),
+                    ]
+                )
+                / 10
             )
-            / 10
-        )
-        symlog_edges = (
-            np.concatenate(
-                [
-                    -np.logspace(theta_log_exp, 1, self.N_theta // 2)[::-1],
-                    np.zeros(1),
-                    np.logspace(theta_log_exp, 1, self.N_theta // 2),
-                ]
+            symlog_edges = (
+                np.concatenate(
+                    [
+                        -np.logspace(theta_log_exp, 1, self.N_theta // 2)[::-1],
+                        np.zeros(1),
+                        np.logspace(theta_log_exp, 1, self.N_theta // 2),
+                    ]
+                )
+                / 10
             )
-            / 10
-        )
 
         theta_max = np.abs(
             np.arccos(self.heights[-1] / self.radii[-1]).value - np.pi / 2
@@ -150,7 +151,7 @@ class Grid:
                 self.N_theta,
             )
             * un.radian,
-            log=(symlog + np.pi / 2) * un.radian,
+            log=(symlog + np.pi / 2) * un.radian if self.N_theta > 1 else None,
         )
         self.thetas: un.Quantity = self._thetas.get_scale(mode=theta_scale)
         self._theta_edges: CoordinateScale = CoordinateScale(
@@ -160,7 +161,7 @@ class Grid:
                 self.N_theta + 1,
             )
             * un.radian,
-            log=(symlog_edges + np.pi / 2) * un.radian,
+            log=(symlog_edges + np.pi / 2) * un.radian if self.N_theta > 1 else None,
         )
         self.theta_edges: un.Quantity = self._theta_edges.get_scale(mode="linear")
 
@@ -230,7 +231,7 @@ class RADMCSetup:
         return self.model.get_image_directory()
 
     def get_command_prefix(self) -> str:
-        return Variables.get("RADMC3D_ROOT") / "radmc3d"
+        return Variables.get("RADMC3D_ROOT") / "src/radmc3d"
 
     def save_input_file(self, name: str, data: list, suffix="inp") -> None:
         with open(self.get_file_directory() / f"{name}.inp", "w") as file:
@@ -325,7 +326,7 @@ class RADMCSetup:
         )  # nstars
         output = [
             "2",  # iformat
-            f"{num_stars} {self.frequency_res}",  # nstars (# stars) nlam (# wavelenght)
+            f"{num_stars} {self.frequency_res}",  # nstars (# stars) nlam (# wavelength)
         ]
         # rstar[1] mstar[1] xstar[1] ystar[1] zstar[1]
 
@@ -371,7 +372,7 @@ class RADMCSetup:
             "-----------------------------",
         ]
 
-        for ispec in range(self.model.get_num_species()):
+        for ispec in range(1, self.model.get_num_species() + 1):
             output.extend([1, 0, f"dust{ispec}"])
 
         self.save_input_file(name="dustopac", data=output)
@@ -379,7 +380,7 @@ class RADMCSetup:
     def create_dustkappa_input(self) -> None:
         wavelengths = self._get_wavelenghts()
 
-        for ispec in range(self.model.get_num_species()):
+        for ispec in range(1, self.model.get_num_species() + 1):
             opac = self.model.get_opacities(
                 dust_idx=ispec, wavelengths=np.array(wavelengths)
             )
@@ -388,7 +389,7 @@ class RADMCSetup:
                 3,  # lambda kappa_abs kappa_scat g
                 self.frequency_res,  # nlambda
             ]
-            for i in range(len(wavelengths)):
+            for i in range(0, len(wavelengths)):
                 output.append(
                     f"{wavelengths[i]} {opac['k_abs'][0, i]} "
                     f"{opac['k_sca'][0, i]} {opac['g'][0, i]}"
@@ -405,7 +406,7 @@ class RADMCSetup:
         verbose: bool = False,
     ) -> dict | None:
         pass
-        total_steps = self.nphot_scat
+        total_steps = self.nphot_therm
         model_desc = f" | Model {self.model._id}"
 
         cmd = f"{self.get_command_prefix()} mctherm"
@@ -467,7 +468,6 @@ class RADMCSetup:
         return_execution_time: bool = True,
         verbose: bool = False,
     ) -> dict | None:
-        pass
         total_steps = self.nphot_scat
         model_desc = f" | Model {self.model._id}"
 
@@ -476,7 +476,7 @@ class RADMCSetup:
         cmd = (
             f"{self.get_command_prefix()} image "
             f"lambda {self.ref_wavelength.value} "
-            f"incl {incl} phi {phi} posang {posang}"
+            f"incl {incl} phi {phi} posang {posang} "
             f"npixx {x_pix} npixy {y_pix}"
         )
 
@@ -518,13 +518,18 @@ class RADMCSetup:
                     progress.refresh()
             # <<< END
         else:
+            print([file for file in self.get_file_directory().glob("*")])
             with tqdm(
-                desc="Ray-tracing" + model_desc, total=1, disable=not show_progress
+                desc=f"Ray-tracing image {image_idx}" + model_desc,
+                total=1,
+                disable=not show_progress,
             ) as progress:
                 subprocess.Popen(
                     cmd,
-                    stdout=subprocess.DEVNULL if not verbose else None,
-                    stderr=subprocess.DEVNULL if not verbose else None,
+                    # stdout=subprocess.DEVNULL if not verbose else None,
+                    # stderr=subprocess.DEVNULL if not verbose else None,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
                     shell=True,
                     cwd=self.get_file_directory(),
                 )
@@ -532,27 +537,17 @@ class RADMCSetup:
 
         execution_times["image_runtime"] = time.time_ns() - starting_time
 
-        dust_temp_file = (
-            "dust_temperature.dat"
-            if image_idx is None
-            else f"dust_temperature_{image_idx}.dat"
-        )
-        image_file = "image.out" if image_idx is None else f"image_{image_idx}.dat"
+        image_file = f"image_{image_idx}.out"
+        self.get_image_directory().mkdir(exist_ok=True, parents=True)
+        print(f"{self.get_image_directory().exists()=}")
+        print(f"{(self.get_file_directory() / 'image.out').exists()=}")
+        print(f"{(self.get_image_directory() / image_file)=}")
         if preserve_output_files:
-            shutil.copy(
-                self.get_file_directory() / "dust_temperature.dat",
-                self.get_image_directory() / dust_temp_file,
-            )
-
             shutil.copy(
                 self.get_file_directory() / "image.out",
                 self.get_image_directory() / image_file,
             )
         else:
-            shutil.move(
-                self.get_file_directory() / "dust_temperature.dat",
-                self.get_image_directory() / dust_temp_file,
-            )
             shutil.move(
                 self.get_file_directory() / "image.out",
                 self.get_image_directory() / image_file,

@@ -245,6 +245,7 @@ class Simulation:
                 seed=seed,
                 sim=self,
             )
+            resume = False
         else:
             run = SimulationRun(id=run_id, sim=self, resume_rng=resume)
             num_images = run.get_num_images()
@@ -261,33 +262,47 @@ class Simulation:
                 continue
 
             skip_fargo = False
-            try:
-                model = run.get_model(id=i)
+            skip_radmc = False
+            last_model = None
+            if len(run.get_models()) > 0 and resume:
+                last_model = run.get_models()[-1]
 
-                if overwrite:
-                    print(
-                        f"WARNING! The dust model with id '{i}' already exists. "
-                        "It will be overwritten"
+                skip_fargo = (
+                    last_model.get_data_directory()
+                    / f"dust1dens{last_model.get_num_outputs() - 1}.dat"
+                ).exists()
+
+                skip_radmc = bool(
+                    np.all(
+                        [
+                            (
+                                last_model.get_image_directory() / f"image_{j}.out"
+                            ).exists()
+                            for j in range(0, last_model.get_num_images())
+                        ]
                     )
-                    model.delete()
-                else:
-                    print(
-                        f"WARNING! The dust model with id '{i}' already exists. "
-                        "It will not be overwritten. If you want to overwrite it, "
-                        "set overwrite=True!"
-                    )
+                )
 
-                    if model.get_image_directory().exists():
-                        continue
-                    else:
-                        skip_fargo = True
-            except KeyError:
-                pass
+            model = (
+                DiskModel.new(
+                    id=run.get_next_model_id(),
+                    run=run,
+                )
+                if (not resume) or (resume and skip_fargo and skip_radmc)
+                else last_model
+            )
 
-            model = DiskModel.new(id=i, run=run)
+            if model == last_model and verbose:
+                print(f"Resuming at Model {model._id}")
+                print(f"{skip_fargo=}")
+                print(f"{skip_radmc=}")
+
+            if model != last_model:
+                skip_fargo = False
+                skip_radmc = False
 
             if not manual_run:
-                samples = run.draw_samples()
+                samples = run.draw_samples(model_id=model._id)
                 run.save_rng(model_id=model._id)
             else:
                 samples = override_samples
@@ -313,8 +328,8 @@ class Simulation:
             sample_dump = samples.copy()
             sample_config.dump_dict(content=toml_serialize_dict(read_dict=sample_dump))
 
+            # Run FARGO3D Simulation
             if not skip_fargo:
-                # Run FARGO3D Simulation
                 fargo_compile_time, fargo_runtime = self._simulate_fargo(
                     run=run,
                     model=model,
@@ -330,18 +345,16 @@ class Simulation:
 
             # Run RADMC3D Simulation
 
-            radmc_runtimes = self._simulate_radmc(
-                run=run,
-                model=model,
-                samples=samples,
-                gpu=gpu,
-                parallel=parallel,
-                show_progress=show_progress,
-                verbose=verbose,
-                return_execution_time=record_execution_time,
-                num_mc_threads=num_mc_threads,
-                cuda_device_id=cuda_device_id,
-            )
+            if not skip_radmc:
+                radmc_runtimes = self._simulate_radmc(
+                    run=run,
+                    model=model,
+                    samples=samples,
+                    show_progress=show_progress,
+                    verbose=verbose,
+                    return_execution_time=record_execution_time,
+                    num_mc_threads=num_mc_threads,
+                )
 
             num_current_images += model.get_num_images()
 
@@ -588,7 +601,7 @@ class Simulation:
             model=model,
             ref_frequency=run._sim._ref_freq,
             frequency_res=samples["thermal_mc_parameters"]["freq_res"],
-            nphot_therm=samples["thermal_mc_parameters"]["freq_res"],
+            nphot_therm=samples["thermal_mc_parameters"]["nphot_therm"],
             nphot_scat=samples["imaging_parameters"]["nphot_scat"],
             theta_steps=samples["grid_parameters"]["theta_steps"],
             num_threads=num_mc_threads,
@@ -623,15 +636,21 @@ class Simulation:
 
         runtimes = runtimes | mctherm_runtime
 
-        for i in range(0, model.get_num_images()):
+        for i in tqdm(
+            range(0, model.get_num_images()),
+            desc="Ray-tracing images",
+            disable=not kwargs["show_progress"],
+        ):
             image_runtime = radmc_setup.run_image(
                 image_idx=i,
-                incl=samples["imaging_parameters.incl"][i],
-                phi=samples["imaging_parameters.phi"][i],
-                posang=samples["imaging_parameters.posang"][i],
+                incl=samples["imaging_parameters"]["incl"][i],
+                phi=samples["imaging_parameters"]["phi"][i],
+                posang=samples["imaging_parameters"]["posang"][i],
                 return_execution_time=kwargs["return_execution_time"],
+                show_progress=kwargs["show_progress"],
+                verbose=kwargs["verbose"],
             )
-            runtimes = runtimes | {i: image_runtime}
+            runtimes = runtimes | {str(i): image_runtime}
 
         return runtimes
 
@@ -847,7 +866,14 @@ class SimulationRun:
 
     def get_num_current_images(self) -> int:
         return (
-            np.sum([model.get_num_images() for model in self.get_models()])
+            np.sum(
+                [
+                    model.get_num_images()
+                    if model.get_image_directory().exists()
+                    else 0
+                    for model in self.get_models()
+                ]
+            )
             if len(self.get_models()) > 0
             else 0
         )
@@ -892,7 +918,7 @@ class SimulationRun:
 
     def draw_samples(self, model_id: int | None = None) -> dict:
         sampling_config = self._sampling_config.as_dict()
-        rng = self.get_rng(model_id=model_id)
+        rng = self.get_rng(model_id=model_id - 1 if model_id > 0 else None)
 
         def sample_dict(read_dict):
             write_dict = dict()
@@ -1184,6 +1210,7 @@ class DiskModel:
         )
 
         exponent = np.exp(eps * (np.exp(height_ratios) - 1) - height_ratios)
+
         density_3d = density_2d[:, :, None] * exponent[:, None, :] / un.meter
         density_3d[density_3d.value < 1e-20] = 0
         density_3d = density_3d.swapaxes(1, 2)
@@ -1194,11 +1221,10 @@ class DiskModel:
             h = grid.heights[i].si.value
             h2 = 2 * h**2
 
-            def integrand(z):
-                return np.exp(eps * (np.exp(z**2 / h2) - 1) - z**2 / h2)  # noqa U038
+            integrand = lambda z: np.exp(eps * (np.exp(z**2 / h2) - 1) - z**2 / h2)  # noqa U038
 
             norm[i], _ = integrate.quad(
-                integrand, grid.heights.si.max().value, grid.heights.si.max().value
+                integrand, -grid.heights.si.max().value, grid.heights.si.max().value
             )
 
         density_3d /= norm[:, None, None]
@@ -1316,6 +1342,9 @@ class DiskModel:
         wavelengths: np.ndarray | un.Quantity,
         output_idx: int = -1,
     ) -> dict:
+        if output_idx < 0:
+            output_idx = np.arange(0, self.get_num_outputs())[output_idx]
+
         unit_system = self._run._sim._unit_system
         diel_const, rho_s = opacities.get_dsharp_mix()
 
@@ -1328,7 +1357,7 @@ class DiskModel:
             gas_surface_density=np.fromfile(
                 self.get_data_directory() / f"gasdens{output_idx}.dat",
                 dtype=self._run.get_float_type(),
-            )
+            ).mean()
             * (1 * unit_system.mass / unit_system.length**2).si,
         )
 
@@ -1604,7 +1633,7 @@ class DiskModel:
         return plot_image(
             data=polar_intensities,
             xy_lims=xy_lims,
-            intensity_label=(f"Dust density / {dens_unit.to_string(format='latex')}",),
+            intensity_label=f"Dust density / {dens_unit.to_string(format='latex')}",
             intensity_limits=intensity_limits,
             dtype=self._run.get_float_type(),
             save_to=save_to,
