@@ -518,30 +518,20 @@ class RADMCSetup:
                     progress.refresh()
             # <<< END
         else:
-            print([file for file in self.get_file_directory().glob("*")])
-            with tqdm(
-                desc=f"Ray-tracing image {image_idx}" + model_desc,
-                total=1,
-                disable=not show_progress,
-            ) as progress:
-                subprocess.Popen(
-                    cmd,
-                    # stdout=subprocess.DEVNULL if not verbose else None,
-                    # stderr=subprocess.DEVNULL if not verbose else None,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    shell=True,
-                    cwd=self.get_file_directory(),
-                )
-                progress.update(1)
+            subprocess.run(
+                cmd,
+                stdout=subprocess.DEVNULL if not verbose else None,
+                stderr=subprocess.DEVNULL if not verbose else None,
+                shell=True,
+                cwd=self.get_file_directory(),
+            )
 
         execution_times["image_runtime"] = time.time_ns() - starting_time
 
         image_file = f"image_{image_idx}.out"
+        print([file for file in self.get_file_directory().glob("*")])
         self.get_image_directory().mkdir(exist_ok=True, parents=True)
-        print(f"{self.get_image_directory().exists()=}")
-        print(f"{(self.get_file_directory() / 'image.out').exists()=}")
-        print(f"{(self.get_image_directory() / image_file)=}")
+
         if preserve_output_files:
             shutil.copy(
                 self.get_file_directory() / "image.out",
@@ -552,6 +542,8 @@ class RADMCSetup:
                 self.get_file_directory() / "image.out",
                 self.get_image_directory() / image_file,
             )
+
+        print(f"{(self.get_image_directory() / image_file).exists()=}")
 
         if return_execution_time:
             return execution_times

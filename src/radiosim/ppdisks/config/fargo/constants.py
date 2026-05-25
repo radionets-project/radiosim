@@ -160,12 +160,17 @@ class Constants:
         return self.__repr__()
 
     def __setitem__(self, key: str, value: float | un.Quantity):
+        print(f"{key} = {value}")
+        print(f"{type(value)=}")
         constant = self[key]
         if isinstance(value, float):
+            print("A")
             setattr(self._constants, key, value * constant.unit)
         elif isinstance(value, un.Quantity):
+            print("B")
             setattr(self._constants, key, value.to(constant.unit))
         else:
+            print("C")
             raise TypeError(
                 "The constant must either be a float value "
                 "or an astropy.units.Quantity!"

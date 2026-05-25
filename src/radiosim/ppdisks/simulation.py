@@ -247,7 +247,7 @@ class Simulation:
             )
             resume = False
         else:
-            run = SimulationRun(id=run_id, sim=self, resume_rng=resume)
+            run = SimulationRun(id=run_id, sim=self, resume_rng=False)
             num_images = run.get_num_images()
 
         print(f"------ STARTING RUN {run._id} ------")
@@ -636,11 +636,7 @@ class Simulation:
 
         runtimes = runtimes | mctherm_runtime
 
-        for i in tqdm(
-            range(0, model.get_num_images()),
-            desc="Ray-tracing images",
-            disable=not kwargs["show_progress"],
-        ):
+        for i in range(0, model.get_num_images()):
             image_runtime = radmc_setup.run_image(
                 image_idx=i,
                 incl=samples["imaging_parameters"]["incl"][i],
@@ -904,6 +900,7 @@ class SimulationRun:
         return np.max(dir_ids) + 1
 
     def get_rng(self, model_id: int | None = None) -> np.random.Generator:
+        print(f"{model_id=}")
         if model_id is None:
             return self._rng
 
