@@ -6,6 +6,7 @@ from pathlib import Path
 import sympy
 from astropy import constants
 from astropy import units as un
+from astropy.units import Quantity
 
 from ..variables import Variables
 
@@ -160,17 +161,20 @@ class Constants:
         return self.__repr__()
 
     def __setitem__(self, key: str, value: float | un.Quantity):
-        print(f"{key} = {value}")
-        print(f"{type(value)=}")
+        # print(f"{key} = {value}")
+        # print(f"{type(value)=}")
+        # print(f"{un=}")
+        # print(f"{un.Quantity=}")
+        # print(f"{type(un.Quantity)=}")
         constant = self[key]
         if isinstance(value, float):
-            print("A")
+            # print("A")
             setattr(self._constants, key, value * constant.unit)
-        elif isinstance(value, un.Quantity):
-            print("B")
+        elif isinstance(value, Quantity):
+            # print("B")
             setattr(self._constants, key, value.to(constant.unit))
         else:
-            print("C")
+            # print("C")
             raise TypeError(
                 "The constant must either be a float value "
                 "or an astropy.units.Quantity!"

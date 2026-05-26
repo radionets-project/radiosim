@@ -529,7 +529,6 @@ class RADMCSetup:
         execution_times["image_runtime"] = time.time_ns() - starting_time
 
         image_file = f"image_{image_idx}.out"
-        print([file for file in self.get_file_directory().glob("*")])
         self.get_image_directory().mkdir(exist_ok=True, parents=True)
 
         if preserve_output_files:
@@ -542,8 +541,6 @@ class RADMCSetup:
                 self.get_file_directory() / "image.out",
                 self.get_image_directory() / image_file,
             )
-
-        print(f"{(self.get_image_directory() / image_file).exists()=}")
 
         if return_execution_time:
             return execution_times

@@ -302,8 +302,8 @@ class Simulation:
                 skip_radmc = False
 
             if not manual_run:
-                samples = run.draw_samples(model_id=model._id)
-                run.save_rng(model_id=model._id)
+                samples = run.draw_samples(model_id=model._id)  # current new model id
+                run.save_rng(model_id=model._id)  # current new model id
             else:
                 samples = override_samples
 
@@ -562,7 +562,8 @@ class Simulation:
             model_id=model._id,
             show_progress=kwargs["show_progress"],
             verbose=kwargs["verbose"],
-            show_fargo_output=kwargs["verbose"],
+            # show_fargo_output=kwargs["verbose"],
+            show_fargo_output=False,
             return_execution_time=kwargs["return_execution_time"],
         )
 
@@ -907,7 +908,9 @@ class SimulationRun:
         return self.get_model(id=model_id).get_rng()
 
     def save_rng(self, model_id: int | None = None) -> None:
-        model = self.get_model(id=self.get_next_model_id() - 1 if None else model_id)
+        model = self.get_model(
+            id=self.get_next_model_id() - 1 if model_id is None else model_id
+        )
         rng_path = model._directory / "rng_state.pkl"
 
         with open(rng_path, "wb") as pkl:
@@ -915,7 +918,9 @@ class SimulationRun:
 
     def draw_samples(self, model_id: int | None = None) -> dict:
         sampling_config = self._sampling_config.as_dict()
-        rng = self.get_rng(model_id=model_id - 1 if model_id > 0 else None)
+        rng = self.get_rng(
+            model_id=model_id - 1 if model_id > 0 else None
+        )  # get RNG from previous model
 
         def sample_dict(read_dict):
             write_dict = dict()
@@ -1074,6 +1079,7 @@ class SimulationRun:
             "imaging_parameters": imaging_parameters,
         }
 
+        self._rng = rng
         return samples
 
     @classmethod
@@ -1333,21 +1339,17 @@ class DiskModel:
             * unit_system.length
         )
 
-    def get_opacities(
-        self,
-        dust_idx: int,
-        wavelengths: np.ndarray | un.Quantity,
-        output_idx: int = -1,
-    ) -> dict:
+    def get_approximate_grain_size(
+        self, dust_idx: int, output_idx: int = -1
+    ) -> un.Quantity:
+        unit_system = self._run._sim._unit_system
+
         if output_idx < 0:
             output_idx = np.arange(0, self.get_num_outputs())[output_idx]
 
-        unit_system = self._run._sim._unit_system
-        diel_const, rho_s = opacities.get_dsharp_mix()
-
         # Average density of grains (solid_dust_density) for DSHARP taken from
         # https://github.com/birnstiel/dsharp_opac/blob/2715ec5a1ebb892cca20737f54f8ccad317c8466/notebooks/opacity_examples.ipynb
-        grain_size = approximate_grain_size(
+        return approximate_grain_size(
             stokes_number=1
             / self.get_sample_config()[f"dust_parameters.invstokes.{dust_idx}"],
             solid_dust_density=1.6686 * un.gram / un.centimeter**3,
@@ -1356,6 +1358,18 @@ class DiskModel:
                 dtype=self._run.get_float_type(),
             ).mean()
             * (1 * unit_system.mass / unit_system.length**2).si,
+        ).decompose()
+
+    def get_opacities(
+        self,
+        dust_idx: int,
+        wavelengths: np.ndarray | un.Quantity,
+        output_idx: int = -1,
+    ) -> dict:
+        diel_const, rho_s = opacities.get_dsharp_mix()
+
+        grain_size = self.get_approximate_grain_size(
+            dust_idx=dust_idx, output_idx=output_idx
         )
 
         wavelengths = (
