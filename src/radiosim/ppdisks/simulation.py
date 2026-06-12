@@ -361,8 +361,15 @@ class Simulation:
             if record_execution_time:
                 record_toml = TOMLConfiguration(
                     path=model.get_data_directory() / "execution_time.toml",
-                    create_if_not_exists=True,
+                    create_if_not_exists=False,
                 )
+
+                if record_toml.is_valid():
+                    prev_values = record_toml.as_dict()
+                else:
+                    record_toml.create()
+                    prev_values = None
+
                 record_toml.dump_dict(
                     {
                         "mode": {
@@ -370,10 +377,18 @@ class Simulation:
                             "parallel": parallel,
                             "num_nodes": num_nodes,
                             "cuda_device_id": cuda_device_id,
-                        },
-                        "fargo_compile_time": fargo_compile_time,
-                        "fargo_run_time": fargo_runtime[0],
-                        "fargo_output_times": fargo_runtime[1],
+                        }
+                        if prev_values is None
+                        else prev_values["mode"],
+                        "fargo_compile_time": fargo_compile_time
+                        if prev_values is None
+                        else prev_values["fargo_compile_time"],
+                        "fargo_run_time": fargo_runtime[0]
+                        if prev_values is None
+                        else prev_values["fargo_run_time"],
+                        "fargo_output_times": fargo_runtime[1]
+                        if prev_values is None
+                        else prev_values["fargo_output_times"],
                     }
                     | radmc_runtimes
                 )
@@ -901,7 +916,6 @@ class SimulationRun:
         return np.max(dir_ids) + 1
 
     def get_rng(self, model_id: int | None = None) -> np.random.Generator:
-        print(f"{model_id=}")
         if model_id is None:
             return self._rng
 

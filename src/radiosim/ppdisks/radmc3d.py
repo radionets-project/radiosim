@@ -84,7 +84,7 @@ class Grid:
             )
             * un.meter,
         )
-        self.radii = un.Quantity = self._radii.get_scale(mode=r_scale)
+        self.radii: un.Quantity = self._radii.get_scale(mode=r_scale)
 
         self._r_edges: CoordinateScale = CoordinateScale(
             linear=np.linspace(
@@ -163,7 +163,7 @@ class Grid:
             * un.radian,
             log=(symlog_edges + np.pi / 2) * un.radian if self.N_theta > 1 else None,
         )
-        self.theta_edges: un.Quantity = self._theta_edges.get_scale(mode="linear")
+        self.theta_edges: un.Quantity = self._theta_edges.get_scale(mode=theta_scale)
 
     def get_polar_grid(
         self, r_mode: str | None = None, phi_mode: str | None = None
