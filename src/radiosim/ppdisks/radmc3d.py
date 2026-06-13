@@ -286,16 +286,11 @@ class RADMCSetup:
             str(self.model.get_num_species()),  # nspec (# of dust species)
         ]
 
-        unit_system = self.model._run._sim._unit_system
-
-        density_unit = 1 * unit_system.mass / unit_system.length**3
-
         for ispec in np.arange(1, self.model.get_num_species() + 1):
             data = (
                 self.model.get_dust_density_3d(
                     output_idx=-1, dust_idx=ispec, r_scale=None, grid=self.grid
                 )
-                * density_unit
             ).cgs.value.ravel(order="F")
             dust_density_output.extend(data.tolist())
 

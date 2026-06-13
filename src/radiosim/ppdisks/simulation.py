@@ -45,7 +45,7 @@ def get_default_sampling_config():
             "disk_mass_ref_radius": 150,  # Reference radius R_ref in AU
             "disk_mass": [0.01, 0.03],  # Cumulative disk mask in M_sun @ r=R_ref
             "sigma_slope": [0.1, 0.3],  # Exponent of the density profile
-            "flaring_index": [0.0, 0.0],
+            "flaring_index": [0.5, 2.0],
             "alpha": [0.001, 0.01],  # Shakura-Sunyaev viscosity parameter
         },
         "dust_parameters": {
@@ -59,8 +59,8 @@ def get_default_sampling_config():
             "binary_period": [6.04800e5, 3e7],  # Seconds (logarithmic sampling)
             "binary_eccentricity": [0.0, 0.2],  # 0 = Circle, 0 < e < 1 = Ellipse
             "stellar_mass": [0.5, 2],  # Solar Masses
-            "stellar_temperature": [2000.0, 3000.0],  # Kelvin
-            "num_planets": [2, 5],
+            "stellar_temperature": [3000.0, 6000.0],  # Kelvin
+            "num_planets": [2, 3],
             "planet_mass": [1.0e-6, 5.0e-3],  # Solar Masses
             "planet_orbit_radius": [6.0, 15.0],  # Astronomical Units
             # short: PEF -> no other planets allowed closer than R_orbit * PEF
@@ -79,7 +79,7 @@ def get_default_sampling_config():
             "r_scale": "log",
             "theta_scale": "log",
             "theta_steps": 500,
-            "theta_log_exp": -3.0,
+            "theta_log_exp": -1.5,
             "theta_tol": 0.1,
         },
         "thermal_mc_parameters": {
@@ -91,7 +91,7 @@ def get_default_sampling_config():
             "fast_mode": 0,  # Whether to use 'fast mode'
             "modified_random_walk": True,  # Whether to use MRW
             "freq_res": 1000,  # num of frequencies tested for the MC run
-            "nphot_therm": 100_000_000,  # num of thermal photon packages for the MC run
+            "nphot_therm": 1_000_000_000,  # num of thermal photon packages for MC run
         },
         "imaging_parameters": {
             "nphot_scat": 0,  # num of scattering photon packages for the imaging run
@@ -208,6 +208,7 @@ class Simulation:
         steps_per_orbit: int | None = None,
         run_id: int | None = None,
         resume: bool = True,
+        resume_model_id: int | None = None,
         gpu: bool = True,
         cuda_device_id: int = 0,
         parallel: bool = False,
@@ -255,51 +256,46 @@ class Simulation:
             print("----- ! MANUAL MODE ACTIVE ! -----")
 
         num_current_images = run.get_num_current_images()
-        start_idx = 0 if not resume else num_current_images
+        if not resume or num_current_images == 0:
+            start_idx = 0
+        elif resume and resume_model_id is not None:
+            start_idx = (
+                resume_model_id
+                if resume_model_id > 0
+                else run.get_models()[resume_model_id]._id
+            )
+        else:
+            start_idx = num_current_images
 
         for i in np.arange(start_idx, num_images):
-            if i < num_current_images:
-                continue
-
             skip_fargo = False
             skip_radmc = False
-            last_model = None
-            if len(run.get_models()) > 0 and resume:
-                last_model = run.get_models()[-1]
 
-                skip_fargo = (
-                    last_model.get_data_directory()
-                    / f"dust1dens{last_model.get_num_outputs() - 1}.dat"
-                ).exists()
+            model = DiskModel(id=i, run=run)
+            existed_prev = True
 
-                skip_radmc = bool(
-                    np.all(
-                        [
-                            (
-                                last_model.get_image_directory() / f"image_{j}.out"
-                            ).exists()
-                            for j in range(0, last_model.get_num_images())
-                        ]
-                    )
+            if not model.exists():
+                model = DiskModel.new(id=i, run=run)
+                existed_prev = False
+
+            skip_fargo = (
+                model.get_data_directory()
+                / f"dust1dens{model.get_num_outputs() - 1}.dat"
+            ).exists()
+
+            skip_radmc = model.get_image_directory().exists() and bool(
+                np.all(
+                    [
+                        (model.get_image_directory() / f"image_{j}.out").exists()
+                        for j in range(0, model.get_num_images())
+                    ]
                 )
-
-            model = (
-                DiskModel.new(
-                    id=run.get_next_model_id(),
-                    run=run,
-                )
-                if (not resume) or (resume and skip_fargo and skip_radmc)
-                else last_model
             )
 
-            if model == last_model and verbose:
+            if existed_prev and verbose:
                 print(f"Resuming at Model {model._id}")
                 print(f"{skip_fargo=}")
                 print(f"{skip_radmc=}")
-
-            if model != last_model:
-                skip_fargo = False
-                skip_radmc = False
 
             if not manual_run:
                 samples = run.draw_samples(model_id=model._id)  # current new model id
@@ -1133,8 +1129,23 @@ class DiskModel:
         self._directory: Path = run._directory / f"model_{id}"
         self._run: SimulationRun = run
 
+    def exists(self) -> bool:
+        return self._directory.exists()
+
     def get_num_species(self) -> int:
         return len(self.get_sample_config()["dust_parameters.invstokes"])
+
+    def get_grid(self) -> Grid:
+        samples = self.get_sample_config()
+
+        return Grid(
+            model=self,
+            r_scale=samples["grid_parameters"]["r_scale"],
+            theta_steps=samples["grid_parameters"]["theta_steps"],
+            theta_scale=samples["grid_parameters"]["theta_scale"],
+            theta_log_exp=samples["grid_parameters"]["theta_log_exp"],
+            theta_tol=samples["grid_parameters"]["theta_tol"],
+        )
 
     def get_time_deltas(self) -> float:
         sample_config = self.get_sample_config()
@@ -1294,6 +1305,46 @@ class DiskModel:
             r_min,
             r_max,
         )
+
+    def get_image(
+        self, idx: int, fov: float | un.Quantity | None = None
+    ) -> un.Quantity | np.ndarray:
+        with open(self.get_image_directory() / f"image_{idx}.out") as file:
+            img_data = file.readlines()
+
+        for i in range(len(img_data)):
+            mod_data = img_data[i].strip()
+            if mod_data != "":
+                img_data[i] = mod_data
+
+        img_shape = np.array(img_data[1].split(), dtype=int).tolist()
+        img = np.array(img_data[6:-1], dtype=np.float64).reshape(img_shape)
+
+        if fov is not None:
+            flux_unit = (
+                un.erg
+                * un.centimeter ** (-2)
+                * un.hertz ** (-1)
+                * un.second ** (-1)
+                * un.steradian ** (-1)
+            )
+
+            fov = fov if isinstance(fov, un.Quantity) else fov * un.arcsecond
+
+            solid_angle = 4 * np.arcsin(np.sin(fov / 2) ** 2)
+            solid_angle = solid_angle.value * un.steradian
+
+            return (img * flux_unit).to(un.jansky)
+        else:
+            return img
+
+    def get_dust_temperature(self) -> np.ndarray:
+        temperature = np.fromfile(
+            self.get_data_directory().parent / "radmc3d/dust_temperature.dat", sep="\n"
+        )[3:]
+        grid = self.get_grid()
+        temperature = temperature.reshape((grid.N_phi, grid.N_theta, grid.N_r)).T
+        return temperature * un.Kelvin
 
     def get_cumulative_mass(
         self, radius: float | ArrayLike | un.Quantity
