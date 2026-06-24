@@ -59,17 +59,18 @@ class Grid:
         self,
         model: DiskModel,
         theta_steps: int,
+        extrapolation: bool,
         r_scale: str | None = "log",
         theta_scale: str | None = "log",
         theta_log_exp: float = -3,
         theta_tol: float = 0.1,
     ):
-        N_r, N_phi = model._run.get_polar_img_size()
+        N_r, N_phi = model.get_polar_size(extrapolation=extrapolation)
         self.N_r: int = N_r
         self.N_phi: int = N_phi
         self.N_theta: int = theta_steps
 
-        r_min, r_max = model.get_radius_lims()
+        r_min, r_max = model.get_radius_lims(extrapolation=extrapolation)
         self.r_min: un.Quantity = (r_min * un.AU).to(un.meter)
         self.r_max: un.Quantity = (r_max * un.AU).to(un.meter)
 

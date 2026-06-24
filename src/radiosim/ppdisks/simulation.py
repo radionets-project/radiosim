@@ -14,6 +14,7 @@ from astropy import units as un
 from astropy.time import Time
 from numpy.typing import ArrayLike
 from scipy import integrate
+from scipy.interpolate import PchipInterpolator
 from tqdm.auto import tqdm
 
 from radiosim.ppdisks.config import TOMLConfiguration
@@ -71,6 +72,19 @@ def get_default_sampling_config():
         "mesh_parameters": {
             "y_min": [3.0, 5.0],  # Astronomical Units
             "y_max_ratio": [1.5, 3],  # Multiple of max(orbital_radius)
+        },
+        "extrapolation_parameters": {
+            "extrapolation_active": True,  # whether to extrapolate the dustdens
+            "extrapolation_cutoff_idx": 30,  # dustdens values included in extrapolation
+            "density_rim_extend_factor": [
+                0.7,
+                3.0,
+            ],  # multiple of value @ smallest radius
+            "r_rim_maxium_factor": [
+                0.3,
+                0.7,
+            ],  # factor of position of inner rim maximum
+            "r_min": [0.5, 1.0],  # minimal radius in AU
         },
         "output_parameters": {
             "num_largest_orbits": [100, 200],
@@ -1045,6 +1059,30 @@ class SimulationRun:
         )
 
         mesh_parameters = sample_dict(sampling_config["mesh_parameters"])
+
+        if sampling_config["extrapolation_parameters"][
+            "extrapolation_active"
+        ] and np.max(sampling_config["extrapolation_parameters"]["r_min"]) >= np.min(
+            sampling_config["mesh_parameters"]["y_min"]
+        ):
+            raise ValueError(
+                "The minimum radius for the extrapolated inner part of the disk is "
+                "greater or equal to the minimum possible radius of the FARGO mesh!"
+            )
+
+        if (
+            np.max(sampling_config["extrapolation_parameters"]["r_rim_maxium_factor"])
+            > 1
+        ):
+            raise ValueError(
+                "The position of the maximum of the extrapolated inner ring may not be "
+                "outside the rim area! Thus the extension factor must be smaller 1!"
+            )
+
+        extrapolation_parameters = sample_dict(
+            sampling_config["extrapolation_parameters"]
+        )
+
         output_parameters = sample_dict(sampling_config["output_parameters"])
         grid_parameters = sample_dict(sampling_config["grid_parameters"])
         thermal_mc_parameters = sample_dict(sampling_config["thermal_mc_parameters"])
@@ -1083,6 +1121,7 @@ class SimulationRun:
             "dust_parameters": dust_parameters,
             "planet_parameters": planet_parameters,
             "mesh_parameters": mesh_parameters,
+            "extrapolation_parameters": extrapolation_parameters,
             "output_parameters": output_parameters,
             "grid_parameters": grid_parameters,
             "thermal_mc_parameters": thermal_mc_parameters,
@@ -1129,57 +1168,11 @@ class DiskModel:
         self._directory: Path = run._directory / f"model_{id}"
         self._run: SimulationRun = run
 
-    def exists(self) -> bool:
-        return self._directory.exists()
-
-    def get_num_species(self) -> int:
-        return len(self.get_sample_config()["dust_parameters.invstokes"])
-
-    def get_grid(self) -> Grid:
-        samples = self.get_sample_config()
-
-        return Grid(
-            model=self,
-            r_scale=samples["grid_parameters"]["r_scale"],
-            theta_steps=samples["grid_parameters"]["theta_steps"],
-            theta_scale=samples["grid_parameters"]["theta_scale"],
-            theta_log_exp=samples["grid_parameters"]["theta_log_exp"],
-            theta_tol=samples["grid_parameters"]["theta_tol"],
-        )
-
-    def get_time_deltas(self) -> float:
-        sample_config = self.get_sample_config()
-        planet_parameters = sample_config["planet_parameters"]
-
-        distances = np.array(planet_parameters["planet_orbit_radius"]) * un.AU
-
-        num_orbits = sample_config["output_parameters.num_largest_orbits"]
-
-        period = orbital_period(
-            mass=np.sum(planet_parameters["stellar_mass"]) * const.M_sun,
-            radius=distances.max().to(self._run._sim._unit_system.length),
-            G=self._run._sim._constants["G"],
-        )
-
-        total_time = num_orbits * period
-
-        return (
-            period / self._run.get_steps_per_orbit(),
-            total_time / self.get_num_outputs(),
-        )
-
-    def get_num_outputs(self) -> int:
-        files = {
-            f
-            for f in Path(self.get_data_directory()).glob("gasdens*.dat")
-            if f.is_file() and "2d" not in f.name
-        }
-        return len(files)
-
     def get_dust_density(
         self,
         output_idx: int = -1,
         dust_idx: int = 1,
+        extrapolation: bool = False,
         r_scale: str | None = None,
         grid: Grid | None = None,
     ) -> np.ndarray:
@@ -1189,10 +1182,80 @@ class DiskModel:
         density_2d = np.fromfile(
             self.get_data_directory() / f"dust{dust_idx}dens{output_idx}.dat",
             dtype=self._run.get_float_type(),
-        ).reshape(self._run.get_polar_img_size())
+        ).reshape(self.get_polar_size(extrapolation=False))
+
+        if extrapolation and grid:
+            warnings.warn(
+                "There was a custom grid given and the extrapolation mode is active! "
+                "Be aware, that the grid needs to take the interpolated pixels into "
+                "account to get the correct output!",
+                stacklevel=1,
+            )
 
         if r_scale == "log" and grid is None:
-            grid = Grid(model=self, theta_steps=1, r_scale="log")
+            grid = Grid(
+                model=self, theta_steps=1, r_scale="log", extrapolation=extrapolation
+            )
+
+        if extrapolation:
+            samples = self.get_sample_config().as_dict()
+            max_value_radius = (
+                grid.r_min
+                + np.abs(
+                    grid.r_min
+                    - (samples["mesh_parameters"]["y_min"] * un.AU).to(un.meter)
+                )
+                * samples["extrapolation_parameters"]["r_rim_maxium_factor"]
+            ).to(un.meter)
+            N_r_extrapolated, N_phi = self.get_polar_size(extrapolation=True)
+            N_r_non_extrapolated, _ = self.get_polar_size(extrapolation=False)
+
+            N_add_cells = N_r_extrapolated - N_r_non_extrapolated
+
+            density_extrapolated = np.zeros((N_r_extrapolated, N_phi))
+            density_extrapolated[N_add_cells:, :] = density_2d
+
+            cutoff_idx = samples["extrapolation_parameters"]["extrapolation_cutoff_idx"]
+
+            x = grid._radii.linear[: N_add_cells + cutoff_idx]
+
+            x_ref = np.concatenate(
+                [
+                    np.array(
+                        [
+                            grid.r_min.value,
+                            max_value_radius.value,
+                            grid._radii.linear[N_add_cells : N_add_cells + cutoff_idx],
+                        ]
+                    )
+                ]
+            )
+
+            for col in range(N_phi):
+                density_slice = density_2d[:, col]
+
+                max_value_density = (
+                    density_slice[0]
+                    * samples["extrapolation_parameters"]["density_rim_extend_factor"]
+                )
+                min_value_density = density_slice.min()
+
+                y_ref = np.concatenate(
+                    [
+                        np.array(
+                            [
+                                min_value_density,
+                                max_value_density,
+                                density_slice[N_add_cells : N_add_cells + cutoff_idx],
+                            ]
+                        )
+                    ]
+                )
+                density_extrapolated[:N_add_cells, col] = PchipInterpolator(
+                    x_ref, y_ref
+                )(x)[:N_add_cells]
+
+            density_2d = density_extrapolated
 
         if grid is not None:
             # Logarithmic interpolation created with the help of GPT-5.2-Codex
@@ -1817,13 +1880,81 @@ class DiskModel:
                     save_to, progress_callback=_progress_func, writer=writer, dpi=dpi
                 )
 
+    def exists(self) -> bool:
+        return self._directory.exists()
+
+    def get_num_species(self) -> int:
+        return len(self.get_sample_config()["dust_parameters.invstokes"])
+
+    def get_polar_size(self, extrapolation: bool) -> tuple[int]:
+        polar_size = self._run.get_polar_img_size()
+        if not extrapolation:
+            return polar_size
+        else:
+            samples = self.get_sample_config()
+
+            polar_size = list(polar_size)
+            r_min, r_max = self.get_radius_lims()
+            r_cell_size = np.abs(r_max - r_min) / polar_size[0]
+
+            r_min_extrapolated = samples["extrapolation_parameters"]["r_min"]
+
+            polar_size[0] += np.abs(r_min - r_min_extrapolated) // r_cell_size
+            return tuple(polar_size)
+
+    def get_grid(self, extrapolation: bool) -> Grid:
+        samples = self.get_sample_config()
+
+        return Grid(
+            model=self,
+            r_scale=samples["grid_parameters"]["r_scale"],
+            extrapolation=True,
+            theta_steps=samples["grid_parameters"]["theta_steps"],
+            theta_scale=samples["grid_parameters"]["theta_scale"],
+            theta_log_exp=samples["grid_parameters"]["theta_log_exp"],
+            theta_tol=samples["grid_parameters"]["theta_tol"],
+        )
+
+    def get_time_deltas(self) -> float:
+        sample_config = self.get_sample_config()
+        planet_parameters = sample_config["planet_parameters"]
+
+        distances = np.array(planet_parameters["planet_orbit_radius"]) * un.AU
+
+        num_orbits = sample_config["output_parameters.num_largest_orbits"]
+
+        period = orbital_period(
+            mass=np.sum(planet_parameters["stellar_mass"]) * const.M_sun,
+            radius=distances.max().to(self._run._sim._unit_system.length),
+            G=self._run._sim._constants["G"],
+        )
+
+        total_time = num_orbits * period
+
+        return (
+            period / self._run.get_steps_per_orbit(),
+            total_time / self.get_num_outputs(),
+        )
+
+    def get_num_outputs(self) -> int:
+        files = {
+            f
+            for f in Path(self.get_data_directory()).glob("gasdens*.dat")
+            if f.is_file() and "2d" not in f.name
+        }
+        return len(files)
+
     def get_num_images(self) -> int:
         return int(self.get_sample_config()["imaging_parameters.num_versions"])
 
-    def get_radius_lims(self) -> tuple[float]:
+    def get_radius_lims(self, extrapolation: bool = False) -> tuple[float]:
         sample_config = self.get_sample_config()
 
-        r_min = sample_config["mesh_parameters.y_min"]
+        r_min = (
+            sample_config["mesh_parameters.y_min"]
+            if not extrapolation
+            else sample_config["extrapolation_parameters.r_min"]
+        )
         r_max = (
             np.max(sample_config["planet_parameters.planet_orbit_radius"])
             * sample_config["mesh_parameters.y_max_ratio"]
