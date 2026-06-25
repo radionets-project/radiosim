@@ -182,12 +182,7 @@ class RADMCSetup:
         frequency_res: int,
         nphot_therm: int,
         nphot_scat: int,
-        theta_steps: int,
         num_threads: int,
-        r_scale: str | None = "log",
-        theta_scale: str | None = "log",
-        theta_log_exp: float = -3.0,
-        theta_tol: float = 0.1,
         fast_mode: int = 0,
         modified_random_walk: bool = True,
         scattering_mode: int = 1,
@@ -214,15 +209,7 @@ class RADMCSetup:
             low=-(max_seed - 1), high=max_seed - 1, dtype=np.int32
         )
 
-        self.grid: Grid = Grid(
-            model=model,
-            theta_steps=theta_steps,
-            r_scale=r_scale,
-            theta_scale=theta_scale,
-            theta_log_exp=theta_log_exp,
-            theta_tol=theta_tol,
-        )
-
+        self.grid: Grid = model.get_grid(extrapolation=model.is_extrapolation_active())
         self.get_file_directory().mkdir(exist_ok=True, parents=True)
 
     def get_file_directory(self) -> Path:
@@ -290,7 +277,11 @@ class RADMCSetup:
         for ispec in np.arange(1, self.model.get_num_species() + 1):
             data = (
                 self.model.get_dust_density_3d(
-                    output_idx=-1, dust_idx=ispec, r_scale=None, grid=self.grid
+                    output_idx=-1,
+                    dust_idx=ispec,
+                    r_scale=None,
+                    grid=self.grid,
+                    extrapolation=self.model.is_extrapolation_active(),
                 )
             ).cgs.value.ravel(order="F")
             dust_density_output.extend(data.tolist())

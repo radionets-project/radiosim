@@ -629,12 +629,7 @@ class Simulation:
             frequency_res=samples["thermal_mc_parameters"]["freq_res"],
             nphot_therm=samples["thermal_mc_parameters"]["nphot_therm"],
             nphot_scat=samples["imaging_parameters"]["nphot_scat"],
-            theta_steps=samples["grid_parameters"]["theta_steps"],
             num_threads=num_mc_threads,
-            r_scale=samples["grid_parameters"]["r_scale"],
-            theta_scale=samples["grid_parameters"]["theta_scale"],
-            theta_log_exp=samples["grid_parameters"]["theta_log_exp"],
-            theta_tol=samples["grid_parameters"]["theta_tol"],
             fast_mode=samples["thermal_mc_parameters"]["fast_mode"],
             modified_random_walk=samples["thermal_mc_parameters"][
                 "modified_random_walk"
@@ -1184,14 +1179,6 @@ class DiskModel:
             dtype=self._run.get_float_type(),
         ).reshape(self.get_polar_size(extrapolation=False))
 
-        if extrapolation and grid:
-            warnings.warn(
-                "There was a custom grid given and the extrapolation mode is active! "
-                "Be aware, that the grid needs to take the interpolated pixels into "
-                "account to get the correct output!",
-                stacklevel=1,
-            )
-
         if r_scale == "log" and grid is None:
             grid = Grid(
                 model=self, theta_steps=1, r_scale="log", extrapolation=extrapolation
@@ -1272,13 +1259,22 @@ class DiskModel:
             return density_2d
 
     def get_dust_density_3d(
-        self, output_idx: int, r_scale: str | None, grid: Grid, dust_idx: int = 1
+        self,
+        output_idx: int,
+        r_scale: str | None,
+        grid: Grid,
+        extrapolation: bool,
+        dust_idx: int = 1,
     ) -> np.ndarray:
         unit_system = self._run._sim._unit_system
 
         density_2d = (
             self.get_dust_density(
-                output_idx=output_idx, dust_idx=dust_idx, r_scale=r_scale, grid=grid
+                output_idx=output_idx,
+                dust_idx=dust_idx,
+                r_scale=r_scale,
+                grid=grid,
+                extrapolation=extrapolation,
             )
             * unit_system.mass
             / unit_system.length**2
@@ -1325,37 +1321,31 @@ class DiskModel:
     def get_polar_dust_density(
         self,
         grid_shape: tuple[int],
+        extrapolation: bool,
         output_idx: int = -1,
         dust_idx: int = 1,
         a_maj: float = 1.0,
         b_min: float = 1.0,
         rot_angle: float = 0.0,
+        r_scale: str | None = None,
         xy_lims: ArrayLike | None = None,
         xy_unit: un.Unit = un.AU,
     ) -> tuple[np.ndarray, float, float]:
         polar_intensities = self.get_dust_density(
-            output_idx=output_idx, dust_idx=dust_idx
+            output_idx=output_idx,
+            dust_idx=dust_idx,
+            extrapolation=extrapolation,
         )
 
-        r_min, r_max = self.get_radius_lims()
-        r_min = (r_min * un.AU).to(xy_unit).value
-        r_max = (r_max * un.AU).to(xy_unit).value
+        grid = self.get_grid(extrapolation=extrapolation)
+        r_min, r_max = grid.r_min, grid.r_max
 
-        r = np.linspace(
-            r_min,
-            r_max,
-            polar_intensities.shape[0],
-        )
-        phi = np.linspace(0, 2 * np.pi, polar_intensities.shape[1])
-
-        rs, phis = np.meshgrid(r, phi)
-        rs = rs.T
-        phis = phis.T
+        rs, phis = grid.get_polar_grid(r_mode=r_scale)
 
         return (
             ellipse_img2cartesian_img(
-                r=rs,
-                phi=phis,
+                r=rs.T,
+                phi=phis.T,
                 intensities=polar_intensities,
                 grid_shape=grid_shape,
                 a=a_maj,
@@ -1739,6 +1729,7 @@ class DiskModel:
     def plot_dust_density(
         self,
         grid_shape: tuple,
+        extrapolation: bool = False,
         output_idx: int = -1,
         dust_idx: int = 1,
         a_maj: float = 1.0,
@@ -1757,6 +1748,7 @@ class DiskModel:
 
         polar_intensities, _, r_max = self.get_polar_dust_density(
             grid_shape=grid_shape,
+            extrapolation=extrapolation,
             output_idx=output_idx,
             dust_idx=dust_idx,
             a_maj=a_maj,
@@ -1784,6 +1776,7 @@ class DiskModel:
         self,
         grid_shape: tuple,
         step_size: int,
+        extrapolation: bool = False,
         output_fmt: str = "mp4",
         output_dir: str | PathLike | None = None,
         save_to: str | PathLike | None = None,
@@ -1826,6 +1819,7 @@ class DiskModel:
         for i in np.arange(0, num_outputs):
             img, _, _ = self.get_polar_dust_density(
                 grid_shape=grid_shape,
+                extrapolation=extrapolation,
                 output_idx=output_idcs[i],
                 dust_idx=dust_idx,
                 a_maj=a_maj,
@@ -1837,6 +1831,7 @@ class DiskModel:
 
         im, fig, ax = self.plot_dust_density(
             grid_shape=grid_shape,
+            extrapolation=extrapolation,
             output_idx=start_idx,
             dust_idx=dust_idx,
             xy_unit=xy_unit,
@@ -1964,6 +1959,9 @@ class DiskModel:
 
     def get_sample_config(self) -> TOMLConfiguration:
         return TOMLConfiguration(self._directory / "samples.toml")
+
+    def is_extrapolation_active(self) -> bool:
+        return self.get_sample_config()["extrapolation_parameters.extrapolation_active"]
 
     def get_image_directory(self) -> Path:
         return self._directory.resolve() / "images"
