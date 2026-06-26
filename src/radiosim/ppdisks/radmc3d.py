@@ -48,7 +48,7 @@ class CoordinateScale:
 
     def get_scale(self, mode: str | None):
         match mode:
-            case "linear" | None:
+            case "linear":
                 return self.linear
             case "log":
                 return self.log
@@ -60,8 +60,8 @@ class Grid:
         model: DiskModel,
         theta_steps: int,
         extrapolation: bool,
-        r_scale: str | None = "log",
-        theta_scale: str | None = "log",
+        r_scale: str = "log",
+        theta_scale: str = "log",
         theta_log_exp: float = -3,
         theta_tol: float = 0.1,
     ):
@@ -69,6 +69,10 @@ class Grid:
         self.N_r: int = N_r
         self.N_phi: int = N_phi
         self.N_theta: int = theta_steps
+
+        self.r_scale: str = r_scale
+        self.phi_scale: str = "linear"
+        self.theta_scale: str = theta_scale
 
         r_min, r_max = model.get_radius_lims(extrapolation=extrapolation)
         self.r_min: un.Quantity = (r_min * un.AU).to(un.meter)

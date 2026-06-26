@@ -84,7 +84,7 @@ def get_default_sampling_config():
                 0.3,
                 0.7,
             ],  # factor of position of inner rim maximum
-            "r_min": [0.5, 1.0],  # minimal radius in AU
+            "r_min": [0.1, 1.0],  # minimal radius in AU
         },
         "output_parameters": {
             "num_largest_orbits": [100, 200],
@@ -1179,21 +1179,28 @@ class DiskModel:
             dtype=self._run.get_float_type(),
         ).reshape(self.get_polar_size(extrapolation=False))
 
-        if r_scale == "log" and grid is None:
-            grid = Grid(
-                model=self, theta_steps=1, r_scale="log", extrapolation=extrapolation
+        interpolate = (
+            (grid is not None and grid.r_scale == "log")
+            or r_scale == "log"
+            or (
+                self.get_sample_config()["grid_parameters.r_scale"] == "log"
+                and r_scale is None
             )
+        )
 
-        if extrapolation:
+        if grid is None:
+            grid = self.get_grid(extrapolation=extrapolation, r_scale=r_scale)
+
+        if extrapolation and grid is not None:
             samples = self.get_sample_config().as_dict()
             max_value_radius = (
-                grid.r_min
-                + np.abs(
+                np.abs(
                     grid.r_min
                     - (samples["mesh_parameters"]["y_min"] * un.AU).to(un.meter)
                 )
                 * samples["extrapolation_parameters"]["r_rim_maxium_factor"]
             ).to(un.meter)
+            print(max_value_radius.to(un.AU))
             N_r_extrapolated, N_phi = self.get_polar_size(extrapolation=True)
             N_r_non_extrapolated, _ = self.get_polar_size(extrapolation=False)
 
@@ -1212,9 +1219,9 @@ class DiskModel:
                         [
                             grid.r_min.value,
                             max_value_radius.value,
-                            grid._radii.linear[N_add_cells : N_add_cells + cutoff_idx],
                         ]
-                    )
+                    ),
+                    grid._radii.linear[N_add_cells : N_add_cells + cutoff_idx].value,
                 ]
             )
 
@@ -1233,9 +1240,9 @@ class DiskModel:
                             [
                                 min_value_density,
                                 max_value_density,
-                                density_slice[N_add_cells : N_add_cells + cutoff_idx],
                             ]
-                        )
+                        ),
+                        density_slice[:cutoff_idx],
                     ]
                 )
                 density_extrapolated[:N_add_cells, col] = PchipInterpolator(
@@ -1244,7 +1251,7 @@ class DiskModel:
 
             density_2d = density_extrapolated
 
-        if grid is not None:
+        if interpolate:
             # Logarithmic interpolation created with the help of GPT-5.2-Codex
             r_centers = 0.5 * (grid._r_edges.log[1:] + grid._r_edges.log[:-1])
 
@@ -1335,10 +1342,11 @@ class DiskModel:
             output_idx=output_idx,
             dust_idx=dust_idx,
             extrapolation=extrapolation,
+            r_scale=r_scale,
         )
 
-        grid = self.get_grid(extrapolation=extrapolation)
-        r_min, r_max = grid.r_min, grid.r_max
+        grid = self.get_grid(extrapolation=extrapolation, r_scale=r_scale)
+        r_min, r_max = grid.r_min.value, grid.r_max.value
 
         rs, phis = grid.get_polar_grid(r_mode=r_scale)
 
@@ -1730,6 +1738,7 @@ class DiskModel:
         self,
         grid_shape: tuple,
         extrapolation: bool = False,
+        r_scale: str | None = None,
         output_idx: int = -1,
         dust_idx: int = 1,
         a_maj: float = 1.0,
@@ -1756,6 +1765,7 @@ class DiskModel:
             rot_angle=rot_angle,
             xy_lims=xy_lims,
             xy_unit=xy_unit,
+            r_scale=r_scale,
         )
 
         xy_lims = xy_lims if xy_lims is not None else [[-r_max, r_max], [-r_max, r_max]]
@@ -1777,6 +1787,7 @@ class DiskModel:
         grid_shape: tuple,
         step_size: int,
         extrapolation: bool = False,
+        r_scale: str | None = None,
         output_fmt: str = "mp4",
         output_dir: str | PathLike | None = None,
         save_to: str | PathLike | None = None,
@@ -1820,6 +1831,7 @@ class DiskModel:
             img, _, _ = self.get_polar_dust_density(
                 grid_shape=grid_shape,
                 extrapolation=extrapolation,
+                r_scale=r_scale,
                 output_idx=output_idcs[i],
                 dust_idx=dust_idx,
                 a_maj=a_maj,
@@ -1832,6 +1844,7 @@ class DiskModel:
         im, fig, ax = self.plot_dust_density(
             grid_shape=grid_shape,
             extrapolation=extrapolation,
+            r_scale=r_scale,
             output_idx=start_idx,
             dust_idx=dust_idx,
             xy_unit=xy_unit,
@@ -1894,18 +1907,27 @@ class DiskModel:
 
             r_min_extrapolated = samples["extrapolation_parameters"]["r_min"]
 
-            polar_size[0] += np.abs(r_min - r_min_extrapolated) // r_cell_size
+            polar_size[0] += int(np.abs(r_min - r_min_extrapolated) // r_cell_size)
             return tuple(polar_size)
 
-    def get_grid(self, extrapolation: bool) -> Grid:
+    def get_grid(
+        self,
+        extrapolation: bool,
+        r_scale: str | None = None,
+        theta_scale: str | None = None,
+    ) -> Grid:
         samples = self.get_sample_config()
 
         return Grid(
             model=self,
-            r_scale=samples["grid_parameters"]["r_scale"],
-            extrapolation=True,
+            r_scale=samples["grid_parameters"]["r_scale"]
+            if r_scale is None
+            else r_scale,
+            extrapolation=extrapolation,
             theta_steps=samples["grid_parameters"]["theta_steps"],
-            theta_scale=samples["grid_parameters"]["theta_scale"],
+            theta_scale=samples["grid_parameters"]["theta_scale"]
+            if theta_scale is None
+            else theta_scale,
             theta_log_exp=samples["grid_parameters"]["theta_log_exp"],
             theta_tol=samples["grid_parameters"]["theta_tol"],
         )
