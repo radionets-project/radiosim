@@ -121,7 +121,12 @@ class Grid:
         )
         self.phi_edges: un.Quantity = self._phi_edges.get_scale(mode="linear")
 
-        self.heights: un.Quantity = model.get_height(radius=self.radii).to(un.meter)
+        self._heights: CoordinateScale = CoordinateScale(
+            linear=model.get_height(radius=self._radii.linear).to(un.meter),
+            log=model.get_height(radius=self._radii.log).to(un.meter),
+        )
+
+        self.heights: un.Quantity = self._heights.get_scale(mode=r_scale)
 
         if self.N_theta > 1:
             symlog = (

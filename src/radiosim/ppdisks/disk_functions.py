@@ -1,6 +1,7 @@
 import astropy.units as un
 import numpy as np
 from numpy.typing import ArrayLike
+from scipy.interpolate import PchipInterpolator
 from scipy.optimize import curve_fit
 
 
@@ -56,8 +57,11 @@ def disk_height(
     ref_aspect_ratio: float,
     flaring_index: float,
     R0: float,
+    interpolate_height: bool = True,
+    interpolation_idx_extend: int = 10,
+    min_height: un.Quantity | float = (1 * un.AU),
 ) -> float | ArrayLike:
-    return (
+    val = (
         aspect_ratio(
             radius=radius,
             ref_aspect_ratio=ref_aspect_ratio,
@@ -66,6 +70,32 @@ def disk_height(
         )
         * radius
     )
+
+    min_height = (
+        min_height.to(un.meter).value
+        if isinstance(min_height, un.Quantity)
+        else min_height
+    )
+
+    if min_height > 0 and np.max(val) > min_height and np.any(val < min_height):
+        invalid_idx = np.argwhere(val > min_height)[0][0]
+
+        # TODO: This is not really elegant, should be replaced by a better approach
+
+        if interpolate_height:
+            val[: invalid_idx + interpolation_idx_extend] = PchipInterpolator(
+                np.append(
+                    np.array([radius[0]]),
+                    radius[invalid_idx + interpolation_idx_extend :],
+                ),
+                np.append(
+                    np.array([min_height]),
+                    val[invalid_idx + interpolation_idx_extend :],
+                ),
+            )(radius)[: invalid_idx + interpolation_idx_extend]
+        else:
+            val[:invalid_idx] = min_height
+    return val
 
 
 # Equation 14 in https://www.aanda.org/articles/aa/pdf/2010/05/aa13731-09.pdf

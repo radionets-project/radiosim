@@ -380,28 +380,22 @@ class Simulation:
                     record_toml.create()
                     prev_values = None
 
-                record_toml.dump_dict(
-                    {
-                        "mode": {
-                            "gpu": gpu,
-                            "parallel": parallel,
-                            "num_nodes": num_nodes,
-                            "cuda_device_id": cuda_device_id,
-                        }
-                        if prev_values is None
-                        else prev_values["mode"],
-                        "fargo_compile_time": fargo_compile_time
-                        if prev_values is None
-                        else prev_values["fargo_compile_time"],
-                        "fargo_run_time": fargo_runtime[0]
-                        if prev_values is None
-                        else prev_values["fargo_run_time"],
-                        "fargo_output_times": fargo_runtime[1]
-                        if prev_values is None
-                        else prev_values["fargo_output_times"],
-                    }
-                    | radmc_runtimes
-                )
+                record_toml["mode"] = {
+                    "gpu": gpu,
+                    "parallel": parallel,
+                    "num_nodes": num_nodes,
+                    "cuda_device_id": cuda_device_id,
+                }
+
+                if "fargo_compile_time" in locals():
+                    record_toml["fargo_compile_time"] = fargo_compile_time
+
+                if "fargo_runtime" in locals():
+                    record_toml["fargo_run_time"] = fargo_runtime[0]
+                    record_toml["fargo_output_times"] = fargo_runtime[1]
+
+                if "radmc_runtimes" in locals():
+                    record_toml.dump_dict(record_toml.as_dict() | radmc_runtimes)
 
     def _simulate_fargo(
         self,
@@ -431,7 +425,7 @@ class Simulation:
                     distance=planet_parameters["binary_period"],
                     mass=planet_parameters["stellar_mass"][0] * const.M_sun,
                     feels_disk=False,
-                    feels_others=True,
+                    feels_others=False,
                     unit_system=self._unit_system,
                 )
             )
@@ -442,7 +436,7 @@ class Simulation:
                     distance=planet_parameters["binary_eccentricity"],
                     mass=planet_parameters["stellar_mass"][1] * const.M_sun,
                     feels_disk=False,
-                    feels_others=True,
+                    feels_others=False,
                     unit_system=self._unit_system,
                 )
             )
@@ -462,7 +456,7 @@ class Simulation:
                     distance=planet_parameters["planet_orbit_radius"][planet_idx]
                     * un.AU,
                     mass=planet_parameters["planet_mass"][planet_idx] * const.M_sun,
-                    feels_disk=True,
+                    feels_disk=False,
                     feels_others=True,
                     unit_system=self._unit_system,
                 )
@@ -705,12 +699,14 @@ class Simulation:
         if isinstance(sampling_config, dict):
             sampling_dict = sampling_config
             sampling_config = TOMLConfiguration(
-                path=root_directory / "sampling_config.toml", create_if_not_exists=True
+                path=root_directory / "sampling_config.toml",
+                create_if_not_exists=True,
             )
             sampling_config.dump_dict(content=sampling_dict)
         elif sampling_config is None:
             sampling_config = TOMLConfiguration(
-                path=root_directory / "sampling_config.toml", create_if_not_exists=True
+                path=root_directory / "sampling_config.toml",
+                create_if_not_exists=True,
             )
             sampling_config.dump_dict(content=get_default_sampling_config())
         else:
@@ -1170,7 +1166,8 @@ class DiskModel:
         extrapolation: bool = False,
         r_scale: str | None = None,
         grid: Grid | None = None,
-    ) -> np.ndarray:
+        return_grid: bool = False,
+    ) -> np.ndarray | tuple[np.ndarray, Grid]:
         if output_idx < 0:
             output_idx = np.arange(0, self.get_num_outputs())[output_idx]
 
@@ -1200,7 +1197,6 @@ class DiskModel:
                 )
                 * samples["extrapolation_parameters"]["r_rim_maxium_factor"]
             ).to(un.meter)
-            print(max_value_radius.to(un.AU))
             N_r_extrapolated, N_phi = self.get_polar_size(extrapolation=True)
             N_r_non_extrapolated, _ = self.get_polar_size(extrapolation=False)
 
@@ -1261,38 +1257,44 @@ class DiskModel:
                     r_centers.value, grid._radii.linear.value, density_2d[:, j]
                 )
 
-            return density_2d_log
+            if not return_grid:
+                return density_2d_log
+            else:
+                return density_2d_log, grid
         else:
-            return density_2d
+            if not return_grid:
+                return density_2d
+            else:
+                return density_2d, grid
 
     def get_dust_density_3d(
         self,
         output_idx: int,
         r_scale: str | None,
-        grid: Grid,
         extrapolation: bool,
+        grid: Grid | None = None,
         dust_idx: int = 1,
     ) -> np.ndarray:
         unit_system = self._run._sim._unit_system
 
+        density_2d, grid = self.get_dust_density(
+            output_idx=output_idx,
+            dust_idx=dust_idx,
+            r_scale=r_scale,
+            grid=grid,
+            extrapolation=extrapolation,
+            return_grid=True,
+        )
         density_2d = (
-            self.get_dust_density(
-                output_idx=output_idx,
-                dust_idx=dust_idx,
-                r_scale=r_scale,
-                grid=grid,
-                extrapolation=extrapolation,
-            )
-            * unit_system.mass
-            / unit_system.length**2
+            density_2d * unit_system.mass / unit_system.length**2
         ).si  # kg / m^2
 
         # 2d -> 3d relations from https://www.aanda.org/articles/aa/pdf/2009/12/aa11220-08.pdf
 
         zs = grid.radii[None].T @ np.cos(grid.thetas.value)[None]
-        height_ratios = zs**2 / (
-            2 * np.tile(grid.heights[:, None], (1, grid.N_theta)) ** 2
-        )
+        height_ratios = (
+            zs / (np.sqrt(2) * np.tile(grid.heights[:, None], (1, grid.N_theta)))
+        ) ** 2
 
         samples = self.get_sample_config()
 
@@ -1318,7 +1320,9 @@ class DiskModel:
             integrand = lambda z: np.exp(eps * (np.exp(z**2 / h2) - 1) - z**2 / h2)  # noqa U038
 
             norm[i], _ = integrate.quad(
-                integrand, -grid.heights.si.max().value, grid.heights.si.max().value
+                integrand,
+                -grid.heights.si.max().value,
+                grid.heights.si.max().value,
             )
 
         density_3d /= norm[:, None, None]
@@ -1403,7 +1407,7 @@ class DiskModel:
         temperature = np.fromfile(
             self.get_data_directory().parent / "radmc3d/dust_temperature.dat", sep="\n"
         )[3:]
-        grid = self.get_grid()
+        grid = self.get_grid(extrapolation=self.is_extrapolation_active())
         temperature = temperature.reshape((grid.N_phi, grid.N_theta, grid.N_r)).T
         return temperature * un.Kelvin
 
