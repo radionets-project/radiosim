@@ -87,8 +87,8 @@ def create_sky_distribution(
     simulation_task_id: int,
     rng=None,
 ) -> None:
-    for _ in range(num_bundles):
-        path = conf.paths.outpath / f"data_{mode}_{opt}.h5"
+    for i in range(num_bundles):
+        path = conf.paths.outpath / f"data_{mode}_{opt}_{i}.h5"
         grid = create_grid(conf.dataset.img_size, conf.dataset.bundle_size)
 
         if mode == "jet":

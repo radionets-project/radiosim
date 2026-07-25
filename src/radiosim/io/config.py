@@ -113,11 +113,11 @@ class PPDiskConfig(BaseModel):
 
 
 class DataSetConfig(BaseModel, validate_assignment=True):
-    bundles_train: int = Field(default_value=1, ge=0)
-    bundles_valid: int = Field(default_value=1, ge=0)
-    bundles_test: int = Field(default_value=1, ge=0)
-    bundle_size: int = Field(default_value=100, ge=1)
-    img_size: int = Field(default_value=512, ge=64)
+    bundles_train: int = Field(default=1, ge=0)
+    bundles_valid: int = Field(default=1, ge=0)
+    bundles_test: int = Field(default=1, ge=0)
+    bundle_size: int = Field(default=100, ge=1)
+    img_size: int = Field(default=512, ge=64)
     noise: bool = True
     noise_level: list[float] = [0.0, 15.0]
 
