@@ -15,7 +15,7 @@ radiosim |ci| |pre-commit| |codecov| |pypi| |zenodo| |license|
    :alt: Code coverage
 
 .. |pypi| image:: https://badge.fury.io/py/radiosim.svg
-   :target: https://badge.fury.io/py/radiosim
+   :target: https://pypi.org/project/radiosim/
    :alt: PyPI version
 
 .. |zenodo| image:: https://zenodo.org/badge/337708657.svg
