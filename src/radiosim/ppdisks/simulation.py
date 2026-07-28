@@ -59,19 +59,19 @@ def get_default_sampling_config():
             "binary_ratio": 0.0,  # Ratio of binary systems to single systems
             "binary_period": [6.04800e5, 3e7],  # Seconds (logarithmic sampling)
             "binary_eccentricity": [0.0, 0.2],  # 0 = Circle, 0 < e < 1 = Ellipse
-            "stellar_mass": [0.5, 2],  # Solar Masses
+            "stellar_mass": [0.5, 2.0],  # Solar Masses
             "stellar_temperature": [3000.0, 6000.0],  # Kelvin
-            "num_planets": [2, 3],
+            "num_planets": [1, 3],
             "planet_mass": [1.0e-6, 5.0e-3],  # Solar Masses
             "planet_orbit_radius": [6.0, 15.0],  # Astronomical Units
-            # short: PEF -> no other planets allowed closer than R_orbit * PEF
             "planet_exclusion_factor": 0.2,
+            # short: PEF -> no other planets allowed closer than R_orbit * PEF
             "planet_exclusion_max_iter": 100,  # max iterations to determine valid orbit
             "eccentricity": [0.0, 0.1],  # 0 = Circle, 0 < e < 1 = Ellipse
         },
         "mesh_parameters": {
-            "y_min": [3.0, 5.0],  # Astronomical Units
-            "y_max_ratio": [1.5, 3],  # Multiple of max(orbital_radius)
+            "y_min": [4.0, 5.0],  # Astronomical Units
+            "y_max_ratio": [1.5, 3.0],  # Multiple of max(orbital_radius)
         },
         "extrapolation_parameters": {
             "extrapolation_active": True,  # whether to extrapolate the dustdens
@@ -392,7 +392,7 @@ class Simulation:
 
                 if "fargo_runtime" in locals():
                     record_toml["fargo_run_time"] = fargo_runtime[0]
-                    record_toml["fargo_output_times"] = fargo_runtime[1]
+                    record_toml["fargo_output_time"] = fargo_runtime[1]
 
                 if "radmc_runtimes" in locals():
                     record_toml.dump_dict(record_toml.as_dict() | radmc_runtimes)
@@ -457,7 +457,7 @@ class Simulation:
                     * un.AU,
                     mass=planet_parameters["planet_mass"][planet_idx] * const.M_sun,
                     feels_disk=False,
-                    feels_others=True,
+                    feels_others=False,
                     unit_system=self._unit_system,
                 )
             )
@@ -797,11 +797,13 @@ class SimulationRun:
 
     def plot_times(
         self,
-        mode: str = "total",
+        mode: str,
+        stage: str,
+        time_unit: un.Unit = un.second,
         show_total_time: bool = True,
+        show_metrics: bool = True,
         save_to: str | PathLike | None = None,
         save_args: dict | None = None,
-        time_unit: un.Unit = un.second,
         color: str = "maroon",
         plot_args: dict | None = None,
         fig: matplotlib.figure.Figure | None = None,
@@ -815,43 +817,92 @@ class SimulationRun:
         fig, ax = configure_axes(fig=fig, ax=ax, fig_args=fig_args)
 
         models = self.get_models()
-        ylabel = ""
-        match mode:
-            case "run":
-                times = np.array(
-                    [model.get_execution_times()["run_time"] for model in models]
-                )
-                ylabel = "Runtime"
-            case "compile":
-                times = np.array(
-                    [model.get_execution_times()["compile_time"] for model in models]
-                )
-                ylabel = "Compile Time"
-            case "total":
-                times = np.zeros(len(models))
-                for i in range(len(models)):
-                    execution_times = models[i].get_execution_times()
-                    times[i] = (
-                        execution_times["run_time"] + execution_times["compile_time"]
+
+        valid_modes = {
+            "fargo": ["compile", "run"],
+            "mctherm": ["run"],
+            "image": ["run"],
+            "total": None,
+        }
+
+        valid_stages = valid_modes[mode]
+
+        if mode != "total" and stage.lower() not in valid_stages:
+            raise ValueError(f"Unknown stage '{stage}'")
+
+        times = np.empty(len(models))
+        for i, model in enumerate(models):
+            execution_times = model.get_execution_times()
+
+            if mode != "total":
+                key = f"{mode}_{stage}_time"
+
+                if mode == "image":
+                    times[i] = np.sum(
+                        [
+                            execution_times[str(img_idx)][key]
+                            for img_idx in range(model.get_num_images())
+                        ]
                     )
-                ylabel = "Total Time"
-            case _:
-                raise ValueError("Valid modes are 'run', 'compile', 'total'.")
+                else:
+                    times[i] = execution_times[key]
+            else:
+                time = 0
+
+                time += execution_times["fargo_compile_time"]
+                time += execution_times["fargo_run_time"]
+                time += execution_times["mctherm_run_time"]
+
+                for img_idx in range(model.get_num_images()):
+                    time += execution_times[str(img_idx)]["image_run_time"]
+
+                times[i] = time
 
         times *= un.nanosecond
         times = times.to(time_unit)
 
+        if mode != "total":
+            match stage:
+                case "run":
+                    stage_label = "Run Time"
+                case "compile":
+                    stage_label = "Compile Time"
+                case _:
+                    stage_label = "Time"
+        else:
+            stage_label = "Run Time"
+
+        ylabel = f"{mode if mode != 'total' else 'Total'} {stage_label}"
+
+        box_lines = []
         if show_total_time:
-            plot_args["label"] = f"Total Time: {np.round(np.sum(times), 3)}"
+            box_lines.append(f"Total: {np.round(times.sum(), 2)}")
+
+        if show_metrics:
+            box_lines.extend(
+                [
+                    f"Average: ({np.round(times.mean().value, 2)} ± "
+                    f"{np.round(times.std().value, 2)}) "
+                    f"{times.unit.to_string(format='latex')}",
+                    f"Minimum: {np.round(times.min(), 2)}",
+                    f"Maximum: {np.round(times.max(), 2)}",
+                ]
+            )
+
+        if len(box_lines) > 0:
+            ax.annotate(
+                "\n".join(box_lines),
+                (0.65, 0.95),
+                xycoords=ax.get_window_extent(),
+                va="top",
+                bbox={"facecolor": "lightgray", "alpha": 0.8, "edgecolor": "black"},
+            )
 
         model_ids = [model._id for model in models]
         ax.scatter(model_ids, times.value, color=color, **plot_args)
 
         ax.set_xlabel("Model ID")
         ax.set_ylabel(f"{ylabel} / {time_unit.to_string(format='latex')}")
-
-        if show_total_time:
-            ax.legend()
 
         if save_to is not None:
             fig.savefig(save_to, **save_args)
@@ -1196,6 +1247,7 @@ class DiskModel:
                     - (samples["mesh_parameters"]["y_min"] * un.AU).to(un.meter)
                 )
                 * samples["extrapolation_parameters"]["r_rim_maxium_factor"]
+                + grid.r_min
             ).to(un.meter)
             N_r_extrapolated, N_phi = self.get_polar_size(extrapolation=True)
             N_r_non_extrapolated, _ = self.get_polar_size(extrapolation=False)
@@ -1372,7 +1424,10 @@ class DiskModel:
         )
 
     def get_image(
-        self, idx: int, fov: float | un.Quantity | None = None
+        self,
+        idx: int,
+        fov: float | un.Quantity | None = None,
+        intensity_cutoff: float = 1e-20,
     ) -> un.Quantity | np.ndarray:
         with open(self.get_image_directory() / f"image_{idx}.out") as file:
             img_data = file.readlines()
@@ -1384,6 +1439,8 @@ class DiskModel:
 
         img_shape = np.array(img_data[1].split(), dtype=int).tolist()
         img = np.array(img_data[6:-1], dtype=np.float64).reshape(img_shape)
+
+        img[img < intensity_cutoff] = intensity_cutoff
 
         if fov is not None:
             flux_unit = (
@@ -1399,7 +1456,7 @@ class DiskModel:
             solid_angle = 4 * np.arcsin(np.sin(fov / 2) ** 2)
             solid_angle = solid_angle.value * un.steradian
 
-            return (img * flux_unit).to(un.jansky)
+            return (img * flux_unit * solid_angle).to(un.jansky)
         else:
             return img
 
@@ -1891,6 +1948,53 @@ class DiskModel:
                 anim.save(
                     save_to, progress_callback=_progress_func, writer=writer, dpi=dpi
                 )
+
+    def plot_image(
+        self,
+        idx: int,
+        fov: float | un.Quantity | None = None,
+        intensity_cutoff: float = 1e-20,
+        xy_lims: ArrayLike | None = None,
+        xy_unit: un.Unit = un.AU,
+        intensity_limits: ArrayLike | None = None,
+        save_to: str | None = None,
+        save_args: dict = None,
+        **kwargs,
+    ) -> tuple[
+        matplotlib.image.AxesImage, matplotlib.figure.Figure, matplotlib.axes.Axes
+    ]:
+        img = self.get_image(idx=idx, fov=fov, intensity_cutoff=intensity_cutoff)
+
+        flux_unit = (
+            un.erg
+            * un.centimeter ** (-2)
+            * un.hertz ** (-1)
+            * un.second ** (-1)
+            * un.steradian ** (-1)
+        )
+
+        r_max = (
+            self.get_grid(extrapolation=self.is_extrapolation_active())
+            .r_max.to(xy_unit)
+            .value
+        )
+
+        xy_lims = xy_lims if xy_lims is not None else [[-r_max, r_max], [-r_max, r_max]]
+
+        if isinstance(img, un.Quantity):
+            flux_unit = img.unit
+            img = img.value
+
+        return plot_image(
+            data=img,
+            xy_lims=xy_lims,
+            intensity_label=f"Flux density / {flux_unit.to_string(format='latex')}",
+            intensity_limits=intensity_limits,
+            dtype=self._run.get_float_type(),
+            save_to=save_to,
+            save_args=save_args,
+            **kwargs,
+        )
 
     def exists(self) -> bool:
         return self._directory.exists()

@@ -412,8 +412,8 @@ class RADMCSetup:
 
         starting_time = time.time_ns()
         execution_times = {
-            "mctherm_output_times": [],
-            "mctherm_runtime": 0,
+            "mctherm_output_time": [],
+            "mctherm_run_time": 0,
         }
 
         # >>> BEGIN
@@ -437,14 +437,14 @@ class RADMCSetup:
                 if "photon nr:" not in line.lower():
                     continue
 
-                execution_times["mctherm_output_times"].append(
+                execution_times["mctherm_output_time"].append(
                     time.time_ns() - starting_time
                 )
                 progress.n = int(line.lower().split("photon nr:")[-1].strip())
                 progress.refresh()
         # <<< END
 
-        execution_times["mctherm_runtime"] = time.time_ns() - starting_time
+        execution_times["mctherm_run_time"] = time.time_ns() - starting_time
 
         if return_execution_time:
             return execution_times
@@ -481,8 +481,8 @@ class RADMCSetup:
 
         starting_time = time.time_ns()
         execution_times = {
-            "image_output_times": [],
-            "image_runtime": 0,
+            "image_output_time": [],
+            "image_run_time": 0,
         }
 
         # >>> BEGIN
@@ -507,7 +507,7 @@ class RADMCSetup:
                     if "photon nr:" not in line.lower():
                         continue
 
-                    execution_times["image_output_times"].append(
+                    execution_times["image_output_time"].append(
                         time.time_ns() - starting_time
                     )
                     progress.n = int(line.lower().split("photon nr:")[-1].strip())
@@ -522,7 +522,7 @@ class RADMCSetup:
                 cwd=self.get_file_directory(),
             )
 
-        execution_times["image_runtime"] = time.time_ns() - starting_time
+        execution_times["image_run_time"] = time.time_ns() - starting_time
 
         image_file = f"image_{image_idx}.out"
         self.get_image_directory().mkdir(exist_ok=True, parents=True)
