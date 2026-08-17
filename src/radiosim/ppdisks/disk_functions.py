@@ -38,6 +38,8 @@ def mass_function(
     )
 
 
+# For regular Keplerian motion
+# Can be derived from eq. 4 from https://doi.org/10.1088/1538-3873/ae05cb
 def orbital_period(
     mass: un.Quantity | float, radius: un.Quantity | float, G: un.Quantity | float
 ):
@@ -59,7 +61,9 @@ def disk_height(
     R0: float,
     interpolate_height: bool = True,
     interpolation_idx_extend: int = 10,
-    min_height: un.Quantity | float = (1 * un.AU),
+    min_height: un.Quantity | float = (
+        0.5 * un.AU
+    ),  # arbitrary choice to avoid too small values
 ) -> float | ArrayLike:
     val = (
         aspect_ratio(
@@ -108,7 +112,7 @@ def approximate_grain_size(
 
 
 def schmidt_number(stokes_number: float) -> float:
-    # Fitted values according to https://doi.org/10.1051/0004-6361/200811220
+    # Fitted values according to https://doi.org/10.1051/0004-6361/200811220 p. 607
     schmidt_numbers = np.array([0.03, 0.4, 1.5])
     stokes_scale = np.array([1e-4, 1e-3, 1e-2])
 
@@ -117,5 +121,7 @@ def schmidt_number(stokes_number: float) -> float:
     return s_m * stokes_number + s_b
 
 
+# Diffusion coefficient definition from
+# https://doi.org/10.1051/0004-6361/200811220 p. 600 eq. 20
 def diffusion_coefficient(stokes_number: float, alpha_viscosity: float) -> float:
     return alpha_viscosity / schmidt_number(stokes_number=stokes_number)

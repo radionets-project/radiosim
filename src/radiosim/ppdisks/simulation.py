@@ -228,7 +228,7 @@ class Simulation:
         parallel: bool = False,
         num_nodes: int = 1,
         num_mc_threads: int = 1,
-        override_samples: dict | None = None,
+        override_samples: dict | str | None = None,
         force_manual_mode: bool = False,
         show_progress: bool = True,
         record_execution_time: bool = True,
@@ -315,7 +315,20 @@ class Simulation:
                 samples = run.draw_samples(model_id=model._id)  # current new model id
                 run.save_rng(model_id=model._id)  # current new model id
             else:
-                samples = override_samples
+                if isinstance(override_samples, dict):
+                    samples = override_samples
+                else:
+                    manual_config = TOMLConfiguration(path=override_samples)
+                    if not manual_config.is_valid():
+                        raise FileNotFoundError(
+                            "The given sample config does not exist!"
+                        )
+                    samples = manual_config.as_dict()
+                    samples["run"] = run._sampling_config["run"]
+
+                run.save_rng(model_id=model._id)  # current new model id
+
+            samples["run"]["manual_mode"] = True
 
             # Dump samples to TOML file
 
@@ -1342,6 +1355,8 @@ class DiskModel:
         ).si  # kg / m^2
 
         # 2d -> 3d relations from https://www.aanda.org/articles/aa/pdf/2009/12/aa11220-08.pdf
+        # The conceptual process is partially based on the run_ppdisk_fargo3d_1 problem
+        # setup from the RADMC-3D examples in https://github.com/dullemond/radmc3d-2.0
 
         zs = grid.radii[None].T @ np.cos(grid.thetas.value)[None]
         height_ratios = (
@@ -1428,7 +1443,13 @@ class DiskModel:
         idx: int,
         fov: float | un.Quantity | None = None,
         intensity_cutoff: float = 1e-20,
-    ) -> un.Quantity | np.ndarray:
+        return_dim: bool = False,
+    ) -> (
+        un.Quantity
+        | np.ndarray
+        | tuple[un.Quantity, un.Quantity]
+        | tuple[np.ndarray, un.Quantity]
+    ):
         with open(self.get_image_directory() / f"image_{idx}.out") as file:
             img_data = file.readlines()
 
@@ -1437,7 +1458,12 @@ class DiskModel:
             if mod_data != "":
                 img_data[i] = mod_data
 
-        img_shape = np.array(img_data[1].split(), dtype=int).tolist()
+        img_shape = np.array(img_data[1].split(), dtype=int)
+        img_dim = np.array(img_data[3].split(), dtype=float) * img_shape
+        img_dim *= un.centimeter
+        img_dim = img_dim.to(un.AU)
+        img_shape = img_shape.tolist()
+
         img = np.array(img_data[6:-1], dtype=np.float64).reshape(img_shape)
 
         img[img < intensity_cutoff] = intensity_cutoff
@@ -1456,9 +1482,15 @@ class DiskModel:
             solid_angle = 4 * np.arcsin(np.sin(fov / 2) ** 2)
             solid_angle = solid_angle.value * un.steradian
 
-            return (img * flux_unit * solid_angle).to(un.jansky)
+            if not return_dim:
+                return (img * flux_unit * solid_angle).to(un.jansky)
+            else:
+                return (img * flux_unit * solid_angle).to(un.jansky), img_dim
         else:
-            return img
+            if not return_dim:
+                return img
+            else:
+                return img, img_dim
 
     def get_dust_temperature(self) -> np.ndarray:
         temperature = np.fromfile(
@@ -1860,7 +1892,7 @@ class DiskModel:
         rot_angle: float = 0.0,
         end_idx: int | None = None,
         xy_unit: un.Unit = un.AU,
-        save_args: dict = None,
+        save_args: dict | None = None,
         fps: int = 30,
         dpi: int | str = "figure",
         blit: bool = True,
@@ -1902,7 +1934,7 @@ class DiskModel:
             )
             data[i] = img
 
-        im, fig, ax = self.plot_dust_density(
+        im, fig, _ = self.plot_dust_density(
             grid_shape=grid_shape,
             extrapolation=extrapolation,
             r_scale=r_scale,
@@ -1958,12 +1990,14 @@ class DiskModel:
         xy_unit: un.Unit = un.AU,
         intensity_limits: ArrayLike | None = None,
         save_to: str | None = None,
-        save_args: dict = None,
+        save_args: dict | None = None,
         **kwargs,
     ) -> tuple[
         matplotlib.image.AxesImage, matplotlib.figure.Figure, matplotlib.axes.Axes
     ]:
-        img = self.get_image(idx=idx, fov=fov, intensity_cutoff=intensity_cutoff)
+        img, img_dim = self.get_image(
+            idx=idx, fov=fov, intensity_cutoff=intensity_cutoff, return_dim=True
+        )
 
         flux_unit = (
             un.erg
@@ -1973,13 +2007,14 @@ class DiskModel:
             * un.steradian ** (-1)
         )
 
-        r_max = (
-            self.get_grid(extrapolation=self.is_extrapolation_active())
-            .r_max.to(xy_unit)
-            .value
-        )
+        img_dim = img_dim.to(xy_unit).value
+        ax_max = img_dim / 2
 
-        xy_lims = xy_lims if xy_lims is not None else [[-r_max, r_max], [-r_max, r_max]]
+        xy_lims = (
+            xy_lims
+            if xy_lims is not None
+            else [[-ax_max[0], ax_max[0]], [-ax_max[1], ax_max[1]]]
+        )
 
         if isinstance(img, un.Quantity):
             flux_unit = img.unit
