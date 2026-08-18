@@ -25,7 +25,7 @@ def plot_image(
     fig_args: dict | None = None,
     plot_args: dict | None = None,
     save_to: str | None = None,
-    save_args: dict = None,
+    save_args: dict | None = None,
     fig: matplotlib.figure.Figure | None = None,
     ax: matplotlib.axes.Axes | None = None,
 ) -> tuple[matplotlib.image.AxesImage, matplotlib.figure.Figure, matplotlib.axes.Axes]:
@@ -33,7 +33,7 @@ def plot_image(
 
     save_args = {} if save_args is None else save_args
 
-    plot_args = {} if plot_args is None else plot_args
+    plot_args = {"interpolation": "none"} if plot_args is None else plot_args
     fig_args = {} if fig_args is None else fig_args
 
     intensity_limits = [None, None] if intensity_limits is None else intensity_limits
@@ -44,7 +44,6 @@ def plot_image(
         data,
         origin="lower",
         cmap=cmap,
-        interpolation="none",
         norm=get_norm(norm=norm, vmin=intensity_limits[0], vmax=intensity_limits[1]),
         extent=np.ravel(xy_lims) if xy_lims is not None else None,
         **plot_args,

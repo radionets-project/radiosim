@@ -1417,7 +1417,7 @@ class DiskModel:
         )
 
         grid = self.get_grid(extrapolation=extrapolation, r_scale=r_scale)
-        r_min, r_max = grid.r_min.value, grid.r_max.value
+        r_min, r_max = grid.r_min, grid.r_max
 
         rs, phis = grid.get_polar_grid(r_mode=r_scale)
 
@@ -1432,10 +1432,10 @@ class DiskModel:
                 alpha=rot_angle,
                 xy_lims=xy_lims
                 if xy_lims is not None
-                else [[-r_max, r_max], [-r_max, r_max]],
+                else [[-r_max.value, r_max.value], [-r_max.value, r_max.value]],
             ),
-            r_min,
-            r_max,
+            r_min.to(xy_unit).value,
+            r_max.to(xy_unit).value,
         )
 
     def get_image(
@@ -1841,7 +1841,7 @@ class DiskModel:
         xy_unit: un.Unit = un.AU,
         intensity_limits: ArrayLike | None = None,
         save_to: str | None = None,
-        save_args: dict = None,
+        save_args: dict | None = None,
         **kwargs,
     ) -> tuple[
         matplotlib.image.AxesImage, matplotlib.figure.Figure, matplotlib.axes.Axes
@@ -1870,6 +1870,7 @@ class DiskModel:
             intensity_label=f"Dust density / {dens_unit.to_string(format='latex')}",
             intensity_limits=intensity_limits,
             dtype=self._run.get_float_type(),
+            xy_unit=xy_unit,
             save_to=save_to,
             save_args=save_args,
             **kwargs,
