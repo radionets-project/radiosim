@@ -36,7 +36,7 @@ from .plotting.utils import configure_axes
 from .radmc3d import Grid, RADMCSetup
 from .setup import Setup
 
-__all__ = ["Simulation", "SimulationRun", "DiskModel"]
+__all__ = ["DiskModel", "Simulation", "SimulationRun"]
 
 
 def get_default_sampling_config():
