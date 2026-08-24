@@ -196,13 +196,16 @@ class FargoOptionConfig:
         return dump
 
     def disable_all(self):
-        for _category, category_dict in self._parameters.items():
-            for _key, value in category_dict.items():
+        for category_dict in self._parameters.values():
+            for value in category_dict.values():
                 value.disable()
 
     def save(self):
-        with open(self._path) as file:
-            old_content = file.read()
+        existed = False
+        if self._path.exists():
+            with open(self._path) as file:
+                old_content = file.read()
+            existed = True
 
         with open(self._path, "w") as file:
             try:
@@ -245,11 +248,13 @@ class FargoOptionConfig:
                 file.writelines(lines)
 
             except Exception as e:
-                warnings.warn(
-                    "An error occured while saving. Rolling back configuration files.",
-                    stacklevel=1,
-                )
-                file.write(old_content)
+                if existed:
+                    warnings.warn(
+                        "An error occured while saving. "
+                        "Rolling back configuration files.",
+                        stacklevel=1,
+                    )
+                    file.write(old_content)
                 raise e
 
     def load(self):
@@ -338,7 +343,7 @@ class FargoOptionConfig:
             case 1:
                 if isinstance(value, dict):
                     self._parameters[key_components[0]] = value
-                    return None
+                    return
                 else:
                     raise TypeError("Values at root level must either be a dict!")
             case 2:

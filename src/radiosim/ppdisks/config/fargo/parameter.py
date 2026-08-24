@@ -46,7 +46,7 @@ class FargoParameterConfig:
         self._path: Path = Variables.get("FARGO_ROOT") / f"setups/{setup}/{setup}.par"
         self._autosave: bool = autosave
 
-        if not self._path.exists():
+        if not self._path.parent.exists():
             raise NameError(f"The given setup '{setup}' does not exist!")
 
         self._parameters: dict[str, ParameterEntry] = {
@@ -158,7 +158,7 @@ class FargoParameterConfig:
                     current_category = (
                         line.removeprefix("### ").split("[")[1].split("]")[0]
                     )
-                    self._parameters[current_category] = dict()
+                    self._parameters[current_category] = {}
                     continue
 
                 components = line.split()
@@ -177,8 +177,12 @@ class FargoParameterConfig:
                     self._parameters[current_category][components[0]] = entry
 
     def save(self) -> None:
-        with open(self._path) as file:
-            old_content = file.read()
+        existed = False
+        if self._path.exists():
+            with open(self._path) as file:
+                old_content = file.read()
+            existed = True
+
         with open(self._path, "w") as file:
             try:
                 key_lens = []
@@ -219,11 +223,13 @@ class FargoParameterConfig:
 
                 file.writelines(lines)
             except Exception as e:
-                warnings.warn(
-                    "An error occured while saving. Rolling back configuration files.",
-                    stacklevel=1,
-                )
-                file.write(old_content)
+                if existed:
+                    warnings.warn(
+                        "An error occured while saving. "
+                        "Rolling back configuration files.",
+                        stacklevel=1,
+                    )
+                    file.write(old_content)
                 raise e
 
     def __repr__(self):
@@ -264,7 +270,7 @@ class FargoParameterConfig:
             case 1:
                 if isinstance(value, dict):
                     self._parameters[key_components[0]] = value
-                    return None
+                    return
                 if isinstance(value, ParameterEntry):
                     self._parameters[key_components[0]] = value
                 elif isinstance(self._parameters[key_components[0]], ParameterEntry):

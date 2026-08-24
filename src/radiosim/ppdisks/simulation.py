@@ -511,6 +511,13 @@ class Simulation:
         for dust_idx, invstokes in dust_parameters["invstokes"].items():
             param_config[f"dust_parameters.invstokes{dust_idx}"] = invstokes
 
+        # Update number of fluids
+        n_species = dust_parameters["invstokes"].items()
+        self._setup.set_num_species(num_species=n_species)
+
+        # Update OPT Configuration
+        option_config["fluids.NFLUIDS"] = n_species + 1
+
         ## Mesh Parameters
         mesh_parameters = samples["mesh_parameters"]
 
@@ -682,9 +689,9 @@ class Simulation:
     def new(
         cls,
         name: str,
-        setup: str,
         sampling_config: PathLike | dict | None,
         ref_freq: float | un.Quantity,
+        setup: str | None = None,
         parent_directory: PathLike | None = None,
         float_type: type = np.float64,
         polar_img_size: tuple[int] = (300, 800),
@@ -729,7 +736,10 @@ class Simulation:
 
         print(f"Created local sampling config at location {sampling_config.get_path()}")
 
-        setup = Setup(name=setup)
+        if setup is not None:
+            setup = Setup(name=setup)
+        else:
+            setup = Setup(name="radiosim_auto", create_if_not_exist=True)
 
         instance = cls(
             name=name,

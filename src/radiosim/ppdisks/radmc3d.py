@@ -385,7 +385,7 @@ class RADMCSetup:
                 3,  # lambda kappa_abs kappa_scat g
                 self.frequency_res,  # nlambda
             ]
-            for i in range(0, len(wavelengths)):
+            for i in range(len(wavelengths)):
                 output.append(
                     f"{wavelengths[i]} {opac['k_abs'][0, i]} "
                     f"{opac['k_sca'][0, i]} {opac['g'][0, i]}"

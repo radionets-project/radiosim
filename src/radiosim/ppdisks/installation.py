@@ -38,7 +38,7 @@ def install_fargo(
 
     print("Cloning FARGO3D repository ...")
 
-    subprocess.run(f"git clone {repository_url}", shell=True, cwd=root_dir)
+    subprocess.run(f"git clone {repository_url}", shell=True, cwd=root_dir, check=True)
     MetaConfig().get_config()["FARGO_ROOT"] = str(
         (root_dir / repository.split("/")[1]).absolute()
     )

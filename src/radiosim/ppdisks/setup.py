@@ -1,7 +1,9 @@
+import shutil
 import subprocess
 import time
 from pathlib import Path
 
+import numpy as np
 from tqdm.auto import tqdm
 
 from radiosim.ppdisks.config.fargo import (
@@ -11,17 +13,87 @@ from radiosim.ppdisks.config.fargo import (
 )
 from radiosim.ppdisks.config.variables import Variables
 
+BOUNDARIES_TEMPLATE_URL = "https://raw.githubusercontent.com/FARGO3D/fargo3d/8397dba90088a8e58fb25e5aff639c4e170876fd/setups/fargo_multifluid/boundaries.txt"
+BOUND_TEMPLATE_URL = "https://raw.githubusercontent.com/FARGO3D/fargo3d/8397dba90088a8e58fb25e5aff639c4e170876fd/setups/fargo_multifluid/fargo_multifluid.bound.0"
+CONDINIT_TEMPLATE_URL = "https://raw.githubusercontent.com/FARGO3D/fargo3d/8397dba90088a8e58fb25e5aff639c4e170876fd/setups/fargo_multifluid/condinit.c"
+
+
+def _get_dl_command() -> str:
+    command = None
+    try:
+        subprocess.run(
+            "curl --version",
+            shell=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=True,
+        )
+        command = "curl"
+    except subprocess.CalledProcessError:
+        try:
+            subprocess.run(
+                "wget --version",
+                shell=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=True,
+            )
+            command = "wget"
+        except subprocess.CalledProcessError:
+            raise OSError(
+                "Neither curl nor wget are installed. "
+                "Cannot download templates. "
+                "Install either of the commands or create the template manually."
+            ) from None
+    return command
+
+
+def _dl_file(url: str, command: str, cwd: Path):
+    file_path = cwd / url.split("/")[-1]
+    match command:
+        case "curl":
+            subprocess.run(
+                f"curl {url} > {file_path.name}",
+                shell=True,
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                cwd=cwd,
+            )
+        case "wget":
+            subprocess.run(
+                f"wget {url}",
+                shell=True,
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                cwd=cwd,
+            )
+
+    return file_path
+
 
 class Setup:
-    def __init__(
-        self,
-        name: str,
-    ):
+    def __init__(self, name: str, create_if_not_exist: bool = True):
         self._name: str = name
+
+        if not Variables.get("FARGO_ROOT").exists():
+            raise NotADirectoryError(
+                "The FARGO3D directory at "
+                f"{Variables.get('FARGO_ROOT')} does not exist. "
+                "Install FARGO3D at this location first or change "
+                f"the directory at {Path.home() / '.radiosim/config.toml'}."
+            )
+
         self._path: Path = Variables.get("FARGO_ROOT") / f"setups/{name}"
 
-        if not self._path.exists():
-            raise NotADirectoryError("The given setup does not exist.")
+        did_exist = True
+        if not self.exists():
+            if not create_if_not_exist:
+                raise NotADirectoryError("The given setup does not exist.")
+            else:
+                self._create()
+                did_exist = False
 
         self._option_config: FargoOptionConfig = FargoOptionConfig(
             setup=self._name, autosave=True
@@ -29,6 +101,104 @@ class Setup:
         self._param_config: FargoParameterConfig = FargoParameterConfig(
             setup=self._name, autosave=True
         )
+
+        # Update number of bound files and condinit.c based on num of species
+        if not did_exist:
+            num_species = 0
+            for key in self._param_config["dust_parameters"]:
+                if key.startswith("invstokes"):
+                    num_species += 1
+
+            self.set_num_species(num_species=num_species)
+            self._option_config["fluids.NFLUIDS"] = num_species + 1
+            self._option_config.save()
+
+    def exists(self) -> bool:
+        return self._path.exists()
+
+    def _create(self) -> None:
+        self._path.mkdir(exist_ok=True)
+
+        # Download template files
+        command = _get_dl_command()
+        for file in tqdm(
+            [BOUNDARIES_TEMPLATE_URL, BOUND_TEMPLATE_URL, CONDINIT_TEMPLATE_URL],
+            desc="Downloading templates",
+        ):
+            file_path = _dl_file(url=file, command=command, cwd=self._path)
+
+            if file == BOUND_TEMPLATE_URL:
+                file_path.rename(file_path.with_stem(f"{self._name}.bound"))
+
+        # Create empty units file
+        (self._path / f"{self._name}.units").touch()
+
+        # Create disclaimer file
+        (
+            self._path / "!WARNING! SETUP MANAGED BY RADIOSIM DO NOT EDIT MANUALLY!"
+        ).touch()
+
+        print(f"Created default setup @ {self._path}")
+
+    def set_num_species(self, num_species: int) -> None:
+        if num_species < 1:
+            raise ValueError("There has to be at least one dust species!")
+
+        # Create corresponding number of bound files
+
+        if not (self._path / f"{self._name}.bound.0").exists():
+            command = _get_dl_command()
+            file_path = _dl_file(
+                url=BOUND_TEMPLATE_URL, command=command, cwd=self._path
+            )
+            file_path.rename(file_path.with_stem(f"{self._name}.bound"))
+
+        files = [file for file in self._path.glob("*.bound.*")]
+        fluid_ids = np.array([int(file.suffix[1:]) for file in files])
+
+        template_file = self._path / f"{self._name}.bound.0"
+        for fluid_id in range(1, num_species + 1):
+            shutil.copy(
+                template_file, template_file.parent / f"{template_file.stem}.{fluid_id}"
+            )
+
+        for fluid_id in fluid_ids[fluid_ids > num_species]:
+            (self._path / f"{self._name}.bound.{fluid_id}").unlink()
+
+        # Edit condinit.c
+
+        with open(self._path / "condinit.c") as f:
+            lines = f.readlines()
+
+        def dustlines():
+            dust_lines = {}
+            for i in range(len(lines)):
+                if lines[i].strip().startswith("ColRate(INVSTOKES"):
+                    dust_id = int(
+                        lines[i].strip().removeprefix("ColRate(INVSTOKES").split(",")[0]
+                    )
+                    dust_lines[dust_id] = i
+            return dust_lines
+
+        num_spec = 2
+
+        present_dust_idx = np.array(list(dustlines().keys()))
+
+        for del_idx in present_dust_idx[present_dust_idx > num_spec]:
+            lines.pop(dustlines()[del_idx])
+
+        present_dust_idx = present_dust_idx[present_dust_idx <= num_spec]
+
+        for dust_idx in range(1, num_spec + 1):
+            if dust_idx not in present_dust_idx:
+                dust_lines = dustlines()
+                lines.insert(
+                    dust_lines[dust_idx - 1] + 1,
+                    f"  ColRate(INVSTOKES{dust_idx}, id_gas, {dust_idx}, feedback);\n",
+                )
+
+        with open(self._path / "condinit.c", "w") as f:
+            f.writelines(lines)
 
     def compile(
         self,
@@ -69,6 +239,7 @@ class Setup:
                 stdout=subprocess.DEVNULL if not show_fargo_output else None,
                 stderr=subprocess.DEVNULL if not show_fargo_output else None,
                 shell=True,
+                check=False,
             )
 
             if verbose:
@@ -90,6 +261,7 @@ class Setup:
                 stdout=subprocess.DEVNULL if not show_fargo_output else None,
                 stderr=subprocess.DEVNULL if not show_fargo_output else None,
                 shell=True,
+                check=False,
             )
 
             compile_time = time.time_ns() - starting_time
