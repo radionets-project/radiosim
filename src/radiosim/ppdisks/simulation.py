@@ -1233,6 +1233,17 @@ class DiskModel:
         self._directory: Path = run._directory / f"model_{id}"
         self._run: SimulationRun = run
 
+    def get_gas_density(
+        self,
+        output_idx: int = -1,
+    ) -> np.ndarray | tuple[np.ndarray, Grid]:
+        if output_idx < 0:
+            output_idx = np.arange(0, self.get_num_outputs())[output_idx]
+        return np.fromfile(
+            self.get_data_directory() / f"gasdens{output_idx}.dat",
+            dtype=self._run.get_float_type(),
+        ).reshape(self.get_polar_size(extrapolation=False))
+
     def get_dust_density(
         self,
         output_idx: int = -1,
@@ -1405,6 +1416,42 @@ class DiskModel:
         density_3d /= norm[:, None, None]
 
         return density_3d
+
+    def get_polar_gas_density(
+        self,
+        grid_shape: tuple[int],
+        output_idx: int = -1,
+        a_maj: float = 1.0,
+        b_min: float = 1.0,
+        rot_angle: float = 0.0,
+        xy_lims: ArrayLike | None = None,
+        xy_unit: un.Unit = un.AU,
+    ) -> tuple[np.ndarray, float, float]:
+        polar_intensities = self.get_gas_density(
+            output_idx=output_idx,
+        )
+
+        grid = self.get_grid(extrapolation=False, r_scale="linear")
+        r_min, r_max = grid.r_min, grid.r_max
+
+        rs, phis = grid.get_polar_grid(r_mode="linear")
+
+        return (
+            ellipse_img2cartesian_img(
+                r=rs.T,
+                phi=phis.T,
+                intensities=polar_intensities,
+                grid_shape=grid_shape,
+                a=a_maj,
+                b=b_min,
+                alpha=rot_angle,
+                xy_lims=xy_lims
+                if xy_lims is not None
+                else [[-r_max.value, r_max.value], [-r_max.value, r_max.value]],
+            ),
+            r_min.to(xy_unit).value,
+            r_max.to(xy_unit).value,
+        )
 
     def get_polar_dust_density(
         self,
@@ -1837,18 +1884,15 @@ class DiskModel:
 
         return fig, ax
 
-    def plot_dust_density(
+    def plot_gas_density(
         self,
-        grid_shape: tuple,
-        extrapolation: bool = False,
-        r_scale: str | None = None,
+        grid_shape: tuple | None,
         output_idx: int = -1,
-        dust_idx: int = 1,
         a_maj: float = 1.0,
         b_min: float = 1.0,
         rot_angle: float = 0.0,
         xy_lims: ArrayLike | None = None,
-        xy_unit: un.Unit = un.AU,
+        xy_unit: un.Unit | tuple[un.Unit] | None = None,
         intensity_limits: ArrayLike | None = None,
         save_to: str | None = None,
         save_args: dict | None = None,
@@ -1857,34 +1901,167 @@ class DiskModel:
         matplotlib.image.AxesImage, matplotlib.figure.Figure, matplotlib.axes.Axes
     ]:
         unit_system = self._run._sim._unit_system
-
-        polar_intensities, _, r_max = self.get_polar_dust_density(
-            grid_shape=grid_shape,
-            extrapolation=extrapolation,
-            output_idx=output_idx,
-            dust_idx=dust_idx,
-            a_maj=a_maj,
-            b_min=b_min,
-            rot_angle=rot_angle,
-            xy_lims=xy_lims,
-            xy_unit=xy_unit,
-            r_scale=r_scale,
-        )
-
-        xy_lims = xy_lims if xy_lims is not None else [[-r_max, r_max], [-r_max, r_max]]
         dens_unit = unit_system.mass / unit_system.length**2
 
-        return plot_image(
-            data=polar_intensities,
-            xy_lims=xy_lims,
-            intensity_label=f"Dust density / {dens_unit.to_string(format='latex')}",
-            intensity_limits=intensity_limits,
-            dtype=self._run.get_float_type(),
-            xy_unit=xy_unit,
-            save_to=save_to,
-            save_args=save_args,
-            **kwargs,
-        )
+        if grid_shape is not None:
+            xy_unit = un.AU if xy_unit is None else xy_unit
+
+            polar_intensities, _, r_max = self.get_polar_gas_density(
+                grid_shape=grid_shape,
+                output_idx=output_idx,
+                a_maj=a_maj,
+                b_min=b_min,
+                rot_angle=rot_angle,
+                xy_lims=xy_lims,
+                xy_unit=xy_unit,
+            )
+            xy_lims = (
+                xy_lims if xy_lims is not None else [[-r_max, r_max], [-r_max, r_max]]
+            )
+
+            return plot_image(
+                data=polar_intensities,
+                xy_lims=xy_lims,
+                intensity_label=f"Gas Density / {dens_unit.to_string(format='latex')}",
+                intensity_limits=intensity_limits,
+                xy_unit=xy_unit,
+                save_to=save_to,
+                save_args=save_args,
+                **kwargs,
+            )
+        else:
+            xy_unit = (un.degree, un.AU) if xy_unit is None else xy_unit
+
+            intensities = self.get_gas_density(
+                output_idx=output_idx,
+            )
+
+            grid = self.get_grid(extrapolation=False, r_scale="linear")
+
+            r_max, r_min = (
+                grid.r_max.to(xy_unit[1]).value,
+                grid.r_min.to(xy_unit[1]).value,
+            )
+            phi_max, phi_min = (
+                grid.phis.to(xy_unit[0]).max().value,
+                grid.phis.to(xy_unit[0]).min().value,
+            )
+
+            xy_lims = (
+                xy_lims if xy_lims is not None else [[phi_min, phi_max], [r_min, r_max]]
+            )
+
+            im, fig, ax = plot_image(
+                data=intensities,
+                xy_lims=xy_lims,
+                intensity_label=f"Gas Density / {dens_unit.to_string(format='latex')}",
+                intensity_limits=intensity_limits,
+                xy_unit=xy_unit,
+                save_to=save_to,
+                save_args=save_args,
+                **kwargs,
+            )
+
+            ax.set_aspect("auto")
+            return im, fig, ax
+
+    def plot_dust_density(
+        self,
+        grid_shape: tuple | None,
+        extrapolation: bool = False,
+        r_scale: str | None = None,
+        output_idx: int = -1,
+        dust_idx: int = 1,
+        a_maj: float = 1.0,
+        b_min: float = 1.0,
+        rot_angle: float = 0.0,
+        xy_lims: ArrayLike | None = None,
+        xy_unit: un.Unit | tuple[un.Unit] | None = None,
+        intensity_limits: ArrayLike | None = None,
+        save_to: str | None = None,
+        save_args: dict | None = None,
+        **kwargs,
+    ) -> tuple[
+        matplotlib.image.AxesImage, matplotlib.figure.Figure, matplotlib.axes.Axes
+    ]:
+        unit_system = self._run._sim._unit_system
+        dens_unit = unit_system.mass / unit_system.length**2
+
+        if grid_shape is not None:
+            xy_unit = un.AU if xy_unit is None else xy_unit
+
+            polar_intensities, _, r_max = self.get_polar_dust_density(
+                grid_shape=grid_shape,
+                extrapolation=extrapolation,
+                output_idx=output_idx,
+                dust_idx=dust_idx,
+                a_maj=a_maj,
+                b_min=b_min,
+                rot_angle=rot_angle,
+                xy_lims=xy_lims,
+                xy_unit=xy_unit,
+                r_scale=r_scale,
+            )
+            xy_lims = (
+                xy_lims if xy_lims is not None else [[-r_max, r_max], [-r_max, r_max]]
+            )
+
+            return plot_image(
+                data=polar_intensities,
+                xy_lims=xy_lims,
+                intensity_label=f"Dust Density / {dens_unit.to_string(format='latex')}",
+                intensity_limits=intensity_limits,
+                xy_unit=xy_unit,
+                save_to=save_to,
+                save_args=save_args,
+                **kwargs,
+            )
+        else:
+            xy_unit = (un.degree, un.AU) if xy_unit is None else xy_unit
+
+            intensities, grid = self.get_dust_density(
+                output_idx=output_idx,
+                dust_idx=dust_idx,
+                extrapolation=extrapolation,
+                r_scale=r_scale,
+                return_grid=True,
+            )
+
+            r_max, r_min = (
+                grid.r_max.to(xy_unit[1]).value,
+                grid.r_min.to(xy_unit[1]).value,
+            )
+            phi_max, phi_min = (
+                grid.phis.to(xy_unit[0]).max().value,
+                grid.phis.to(xy_unit[0]).min().value,
+            )
+
+            xy_lims = (
+                xy_lims if xy_lims is not None else [[phi_min, phi_max], [r_min, r_max]]
+            )
+
+            im, fig, ax = plot_image(
+                data=intensities,
+                xy_lims=xy_lims,
+                intensity_label=f"Dust Density / {dens_unit.to_string(format='latex')}",
+                intensity_limits=intensity_limits,
+                xy_unit=xy_unit,
+                xy_labels=["Polar Angle $\\phi$", "Radius $r$"],
+                save_to=save_to,
+                save_args=save_args,
+                plot_args={"origin": "lower"},
+                **kwargs,
+            )
+
+            if grid.r_scale == "log":
+                tick_div = grid.radii.to("AU").value.size // 10
+                log_ticks = grid.radii.to("AU").value[::tick_div]
+                tick_pos = grid._radii.linear.to("AU").value[::tick_div]
+
+                ax.set_yticks(tick_pos, np.round(log_ticks, 1))
+
+            ax.set_aspect("auto")
+            return im, fig, ax
 
     def animate_dust_density(
         self,
