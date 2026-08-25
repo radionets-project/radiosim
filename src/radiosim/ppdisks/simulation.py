@@ -48,6 +48,7 @@ def get_default_sampling_config():
             "sigma_slope": [0.1, 0.3],  # Exponent of the density profile
             "flaring_index": [0.5, 2.0],
             "alpha": [0.001, 0.01],  # Shakura-Sunyaev viscosity parameter
+            "distance": [30.0, 130.0],  # Distance to Earth in parsec
         },
         "dust_parameters": {
             "invstokes": {
@@ -1495,18 +1496,7 @@ class DiskModel:
             r_max.to(xy_unit).value,
         )
 
-    def get_image(
-        self,
-        idx: int,
-        fov: float | un.Quantity | None = None,
-        intensity_cutoff: float = 1e-20,
-        return_dim: bool = False,
-    ) -> (
-        un.Quantity
-        | np.ndarray
-        | tuple[un.Quantity, un.Quantity]
-        | tuple[np.ndarray, un.Quantity]
-    ):
+    def _parse_image(self, idx: int) -> np.ndarray:
         with open(self.get_image_directory() / f"image_{idx}.out") as file:
             img_data = file.readlines()
 
@@ -1515,11 +1505,23 @@ class DiskModel:
             if mod_data != "":
                 img_data[i] = mod_data
 
-        img_shape = np.array(img_data[1].split(), dtype=int)
-        img_dim = np.array(img_data[3].split(), dtype=float) * img_shape
-        img_dim *= un.centimeter
-        img_dim = img_dim.to(un.AU)
-        img_shape = img_shape.tolist()
+        return img_data
+
+    def get_image(
+        self,
+        idx: int,
+        fov: float | un.Quantity | str | None = "auto",
+        extend_to_physical_size: bool = True,
+        intensity_cutoff: float = 1e-20,
+    ) -> (
+        un.Quantity
+        | np.ndarray
+        | tuple[un.Quantity, un.Quantity]
+        | tuple[np.ndarray, un.Quantity]
+    ):
+        img_data = self._parse_image(idx=idx)
+
+        img_shape = np.array(img_data[1].split(), dtype=int).tolist()
 
         img = np.array(img_data[6:-1], dtype=np.float64).reshape(img_shape)
 
@@ -1534,28 +1536,59 @@ class DiskModel:
                 * un.steradian ** (-1)
             )
 
-            fov = fov if isinstance(fov, un.Quantity) else fov * un.arcsecond
+            if fov == "auto":
+                fov = self.get_image_fov(idx=idx)
+            else:
+                fov = fov if isinstance(fov, un.Quantity) else fov * un.arcsecond
+
+                # Extend image according to provided FoV
+                if extend_to_physical_size and fov != self.get_image_fov(idx=idx):
+                    cell_size = self.get_image_fov(idx=idx) / img_shape[0]
+                    pix_target = int(fov / cell_size)
+
+                    img_full = (
+                        np.ones(
+                            (pix_target, pix_target), dtype=self._run.get_float_type()
+                        )
+                        * img.min()
+                    )
+                    target_loc = np.array(img_full.shape) // 2 + (
+                        -img.shape[0] // 2,
+                        img.shape[0] // 2,
+                    )
+                    img_full[
+                        target_loc[0] : target_loc[1], target_loc[0] : target_loc[1]
+                    ] = img
+
+                    img = img_full
 
             solid_angle = 4 * np.arcsin(np.sin(fov / 2) ** 2)
             solid_angle = solid_angle.value * un.steradian
 
-            if not return_dim:
-                return (img * flux_unit * solid_angle).to(un.jansky)
-            else:
-                return (img * flux_unit * solid_angle).to(un.jansky), img_dim
+            return (img * flux_unit * solid_angle).to(un.jansky)
         else:
-            if not return_dim:
-                return img
-            else:
-                return img, img_dim
+            return img
 
-    def get_dust_temperature(self) -> np.ndarray:
+    def get_image_dims(self, idx: int) -> un.Quantity:
+        img_data = self._parse_image(idx=idx)
+        img_shape = np.array(img_data[1].split(), dtype=int)
+        img_dim = np.array(img_data[3].split(), dtype=float) * img_shape
+        img_dim *= un.centimeter
+        img_dim = img_dim.to(un.AU)
+        return img_dim
+
+    def get_dust_temperature(self) -> un.Quantity:
         temperature = np.fromfile(
             self.get_data_directory().parent / "radmc3d/dust_temperature.dat", sep="\n"
         )[3:]
         grid = self.get_grid(extrapolation=self.is_extrapolation_active())
         temperature = temperature.reshape((grid.N_phi, grid.N_theta, grid.N_r)).T
         return temperature * un.Kelvin
+
+    def get_image_fov(self, idx: int) -> un.Quantity:
+        diameter = self.get_image_dims(idx=idx)[0]
+        distance = self.get_sample_config()["disk_parameters.distance"] * un.parsec
+        return 2 * np.atan(diameter / (2 * distance))
 
     def get_cumulative_mass(
         self, radius: float | ArrayLike | un.Quantity
@@ -2183,9 +2216,8 @@ class DiskModel:
     ) -> tuple[
         matplotlib.image.AxesImage, matplotlib.figure.Figure, matplotlib.axes.Axes
     ]:
-        img, img_dim = self.get_image(
-            idx=idx, fov=fov, intensity_cutoff=intensity_cutoff, return_dim=True
-        )
+        img = self.get_image(idx=idx, fov=fov, intensity_cutoff=intensity_cutoff)
+        img_dim = self.get_image_dims(idx=idx)
 
         flux_unit = (
             un.erg
@@ -2213,7 +2245,6 @@ class DiskModel:
             xy_lims=xy_lims,
             intensity_label=f"Flux density / {flux_unit.to_string(format='latex')}",
             intensity_limits=intensity_limits,
-            dtype=self._run.get_float_type(),
             save_to=save_to,
             save_args=save_args,
             **kwargs,
