@@ -7,11 +7,11 @@ from time import time
 
 import dsharp_opac as opacities
 import matplotlib
-import matplotlib.animation as animation
 import numpy as np
 from astropy import constants as const
 from astropy import units as un
 from astropy.time import Time
+from matplotlib import animation
 from numpy.typing import ArrayLike
 from scipy import integrate
 from scipy.interpolate import PchipInterpolator
@@ -64,11 +64,13 @@ def get_default_sampling_config():
             "stellar_temperature": [3000.0, 6000.0],  # Kelvin
             "num_planets": [1, 3],
             "planet_mass": [1.0e-6, 5.0e-3],  # Solar Masses
-            "planet_orbit_radius": [6.0, 15.0],  # Astronomical Units
+            "planet_orbit_radius": [6.0, 30.0],  # Astronomical Units
             "planet_exclusion_factor": 0.2,
             # short: PEF -> no other planets allowed closer than R_orbit * PEF
             "planet_exclusion_max_iter": 100,  # max iterations to determine valid orbit
             "eccentricity": [0.0, 0.1],  # 0 = Circle, 0 < e < 1 = Ellipse
+            "feels_disk": False,
+            "feels_planets": False,
         },
         "mesh_parameters": {
             "y_min": [4.0, 5.0],  # Astronomical Units
@@ -81,10 +83,10 @@ def get_default_sampling_config():
                 0.7,
                 3.0,
             ],  # multiple of value @ smallest radius
-            "r_rim_maxium_factor": [
+            "r_rim_maximum_factor": [
                 0.3,
-                0.7,
-            ],  # factor of position of inner rim maximum
+                0.8,
+            ],  # position of extrapol. maximum factor of position of inner rim maximum
             "r_min": [0.1, 1.0],  # minimal radius in AU
         },
         "output_parameters": {
@@ -233,6 +235,7 @@ class Simulation:
         force_manual_mode: bool = False,
         show_progress: bool = True,
         record_execution_time: bool = True,
+        record_output_times: bool = False,
         verbose: bool = False,
         overwrite: bool = False,
     ) -> None:
@@ -302,7 +305,7 @@ class Simulation:
                 np.all(
                     [
                         (model.get_image_directory() / f"image_{j}.out").exists()
-                        for j in range(0, model.get_num_images())
+                        for j in range(model.get_num_images())
                     ]
                 )
             )
@@ -362,6 +365,7 @@ class Simulation:
                     parallel=parallel,
                     show_progress=show_progress,
                     verbose=verbose,
+                    record_output_times=record_output_times,
                     return_execution_time=record_execution_time,
                     num_nodes=num_nodes,
                     cuda_device_id=cuda_device_id,
@@ -376,6 +380,7 @@ class Simulation:
                     samples=samples,
                     show_progress=show_progress,
                     verbose=verbose,
+                    record_output_times=record_output_times,
                     return_execution_time=record_execution_time,
                     num_mc_threads=num_mc_threads,
                 )
@@ -470,8 +475,8 @@ class Simulation:
                     distance=planet_parameters["planet_orbit_radius"][planet_idx]
                     * un.AU,
                     mass=planet_parameters["planet_mass"][planet_idx] * const.M_sun,
-                    feels_disk=False,
-                    feels_others=False,
+                    feels_disk=planet_parameters["feels_disk"],
+                    feels_others=planet_parameters["feels_planets"],
                     unit_system=self._unit_system,
                 )
             )
@@ -513,7 +518,7 @@ class Simulation:
             param_config[f"dust_parameters.invstokes{dust_idx}"] = invstokes
 
         # Update number of fluids
-        n_species = dust_parameters["invstokes"].items()
+        n_species = len(dust_parameters["invstokes"].items())
         self._setup.set_num_species(num_species=n_species)
 
         # Update OPT Configuration
@@ -614,6 +619,7 @@ class Simulation:
             show_progress=kwargs["show_progress"],
             cuda_device_id=kwargs["cuda_device_id"],
             verbose=kwargs["verbose"],
+            record_output_times=kwargs["record_output_times"],
             return_execution_time=kwargs["return_execution_time"],
         )
 
@@ -666,18 +672,20 @@ class Simulation:
 
         mctherm_runtime = radmc_setup.run_mctherm(
             show_progress=kwargs["show_progress"],
+            record_output_times=kwargs["record_output_times"],
             return_execution_time=kwargs["return_execution_time"],
             verbose=kwargs["verbose"],
         )
 
         runtimes = runtimes | mctherm_runtime
 
-        for i in range(0, model.get_num_images()):
+        for i in range(model.get_num_images()):
             image_runtime = radmc_setup.run_image(
                 image_idx=i,
                 incl=samples["imaging_parameters"]["incl"][i],
                 phi=samples["imaging_parameters"]["phi"][i],
                 posang=samples["imaging_parameters"]["posang"][i],
+                record_output_times=kwargs["record_output_times"],
                 return_execution_time=kwargs["return_execution_time"],
                 show_progress=kwargs["show_progress"],
                 verbose=kwargs["verbose"],
@@ -1124,6 +1132,9 @@ class SimulationRun:
             high=planet_sampling["eccentricity"][1],
         )
 
+        planet_parameters["feels_disk"] = planet_sampling["feels_disk"]
+        planet_parameters["feels_planets"] = planet_sampling["feels_planets"]
+
         mesh_parameters = sample_dict(sampling_config["mesh_parameters"])
 
         if sampling_config["extrapolation_parameters"][
@@ -1137,7 +1148,7 @@ class SimulationRun:
             )
 
         if (
-            np.max(sampling_config["extrapolation_parameters"]["r_rim_maxium_factor"])
+            np.max(sampling_config["extrapolation_parameters"]["r_rim_maximum_factor"])
             > 1
         ):
             raise ValueError(
@@ -1281,7 +1292,7 @@ class DiskModel:
                     grid.r_min
                     - (samples["mesh_parameters"]["y_min"] * un.AU).to(un.meter)
                 )
-                * samples["extrapolation_parameters"]["r_rim_maxium_factor"]
+                * samples["extrapolation_parameters"]["r_rim_maximum_factor"]
                 + grid.r_min
             ).to(un.meter)
             N_r_extrapolated, N_phi = self.get_polar_size(extrapolation=True)

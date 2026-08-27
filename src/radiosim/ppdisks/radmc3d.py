@@ -398,10 +398,10 @@ class RADMCSetup:
     def run_mctherm(
         self,
         show_progress: bool = True,
+        record_output_times: bool = False,
         return_execution_time: bool = True,
         verbose: bool = False,
     ) -> dict | None:
-        pass
         total_steps = self.nphot_therm
         model_desc = f" | Model {self.model._id}"
 
@@ -437,9 +437,10 @@ class RADMCSetup:
                 if "photon nr:" not in line.lower():
                     continue
 
-                execution_times["mctherm_output_time"].append(
-                    time.time_ns() - starting_time
-                )
+                if record_output_times:
+                    execution_times["mctherm_output_time"].append(
+                        time.time_ns() - starting_time
+                    )
                 progress.n = int(line.lower().split("photon nr:")[-1].strip())
                 progress.refresh()
         # <<< END
@@ -461,6 +462,7 @@ class RADMCSetup:
         image_idx: int | None = None,
         preserve_output_files: bool = False,
         show_progress: bool = True,
+        record_output_times: bool = False,
         return_execution_time: bool = True,
         verbose: bool = False,
     ) -> dict | None:
@@ -507,9 +509,10 @@ class RADMCSetup:
                     if "photon nr:" not in line.lower():
                         continue
 
-                    execution_times["image_output_time"].append(
-                        time.time_ns() - starting_time
-                    )
+                    if record_output_times:
+                        execution_times["image_output_time"].append(
+                            time.time_ns() - starting_time
+                        )
                     progress.n = int(line.lower().split("photon nr:")[-1].strip())
                     progress.refresh()
             # <<< END
@@ -520,6 +523,7 @@ class RADMCSetup:
                 stderr=subprocess.DEVNULL if not verbose else None,
                 shell=True,
                 cwd=self.get_file_directory(),
+                check=False,
             )
 
         execution_times["image_run_time"] = time.time_ns() - starting_time

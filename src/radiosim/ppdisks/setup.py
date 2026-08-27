@@ -180,16 +180,14 @@ class Setup:
                     dust_lines[dust_id] = i
             return dust_lines
 
-        num_spec = 2
-
         present_dust_idx = np.array(list(dustlines().keys()))
 
-        for del_idx in present_dust_idx[present_dust_idx > num_spec]:
+        for del_idx in present_dust_idx[present_dust_idx > num_species]:
             lines.pop(dustlines()[del_idx])
 
-        present_dust_idx = present_dust_idx[present_dust_idx <= num_spec]
+        present_dust_idx = present_dust_idx[present_dust_idx <= num_species]
 
-        for dust_idx in range(1, num_spec + 1):
+        for dust_idx in range(1, num_species + 1):
             if dust_idx not in present_dust_idx:
                 dust_lines = dustlines()
                 lines.insert(
@@ -285,6 +283,7 @@ class Setup:
         parallel: bool = False,
         num_nodes: int = 1,
         cuda_device_id: int = 0,
+        record_output_times: bool = False,
         return_execution_time: bool = False,
         verbose: bool = False,
     ) -> tuple[float, list[float]] | None:
@@ -300,8 +299,10 @@ class Setup:
 
         processes.extend(
             [
-                f"./fargo3d -D {cuda_device_id} "
-                f"setups/{self._name}/{self._param_config._path.name}"
+                (
+                    f"./fargo3d -D {cuda_device_id} "
+                    f"setups/{self._name}/{self._param_config._path.name}"
+                )
             ]
         )
 
@@ -332,7 +333,8 @@ class Setup:
                 if not line.startswith("OUTPUT"):
                     continue
 
-                output_times.append(time.time_ns() - starting_time)
+                if record_output_times:
+                    output_times.append(time.time_ns() - starting_time)
                 progress.update(n=steps_between_outputs)
         # <<< END
 
