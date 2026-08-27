@@ -46,15 +46,15 @@ def get_default_sampling_config():
             "disk_mass_ref_radius": 150,  # Reference radius R_ref in AU
             "disk_mass": [0.01, 0.03],  # Cumulative disk mask in M_sun @ r=R_ref
             "sigma_slope": [0.1, 0.3],  # Exponent of the density profile
-            "flaring_index": [0.5, 2.0],
+            "flaring_index": [0.1, 0.4],  # Flaring index for vertical profile
             "alpha": [0.001, 0.01],  # Shakura-Sunyaev viscosity parameter
             "distance": [30.0, 130.0],  # Distance to Earth in parsec
         },
         "dust_parameters": {
             "invstokes": {
-                "1": [10.0, 20.0],
+                "1": [10.0, 20.0],  # Inverse Stokes number of dust species 1
             },
-            "epsilon": [0.05, 0.2],  # dust-to-gas ratio,
+            "epsilon": [0.05, 0.2],  # Dust-to-Gas ratio,
         },
         "planet_parameters": {
             "binary_ratio": 0.0,  # Ratio of binary systems to single systems
@@ -62,15 +62,15 @@ def get_default_sampling_config():
             "binary_eccentricity": [0.0, 0.2],  # 0 = Circle, 0 < e < 1 = Ellipse
             "stellar_mass": [0.5, 2.0],  # Solar Masses
             "stellar_temperature": [3000.0, 6000.0],  # Kelvin
-            "num_planets": [1, 3],
+            "num_planets": [1, 3],  # Number of Planets
             "planet_mass": [1.0e-6, 5.0e-3],  # Solar Masses
             "planet_orbit_radius": [6.0, 30.0],  # Astronomical Units
             "planet_exclusion_factor": 0.2,
             # short: PEF -> no other planets allowed closer than R_orbit * PEF
             "planet_exclusion_max_iter": 100,  # max iterations to determine valid orbit
             "eccentricity": [0.0, 0.1],  # 0 = Circle, 0 < e < 1 = Ellipse
-            "feels_disk": False,
-            "feels_planets": False,
+            "feels_disk": False,  # If planets feel the disks gravitational pull
+            "feels_planets": False,  # If planets feel other planet's graviational pull
         },
         "mesh_parameters": {
             "y_min": [4.0, 5.0],  # Astronomical Units
@@ -86,17 +86,20 @@ def get_default_sampling_config():
             "r_rim_maximum_factor": [
                 0.3,
                 0.8,
-            ],  # position of extrapol. maximum factor of position of inner rim maximum
+            ],  # position of extrapol. maximum; factor of position of inner rim maximum
             "r_min": [0.1, 1.0],  # minimal radius in AU
         },
         "output_parameters": {
-            "num_largest_orbits": [100, 200],
+            "num_largest_orbits": [
+                100,
+                200,
+            ],  # Sim. time as multiple of period of furthest planet
         },
         "grid_parameters": {
-            "r_scale": "log",
-            "theta_scale": "log",
-            "theta_steps": 500,
-            "theta_log_exp": -1.5,
+            "r_scale": "log",  # Scaling of the r-axis for radmc3d simulation
+            "theta_scale": "log",  # Scaling of the theta-axis for radmc3d simulation
+            "theta_steps": 500,  # Number of theta cells
+            "theta_log_exp": -1.5,  # Exponent for scaling function of theta r-axis
             "theta_tol": 0.1,
         },
         "thermal_mc_parameters": {
@@ -333,6 +336,7 @@ class Simulation:
                 run.save_rng(model_id=model._id)  # current new model id
 
             samples["run"]["manual_mode"] = True
+            samples["run"]["model_idx"] = model._id
 
             # Dump samples to TOML file
 
