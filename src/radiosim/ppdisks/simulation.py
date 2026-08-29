@@ -49,6 +49,8 @@ def get_default_sampling_config():
             "flaring_index": [0.1, 0.4],  # Flaring index for vertical profile
             "alpha": [0.001, 0.01],  # Shakura-Sunyaev viscosity parameter
             "distance": [30.0, 130.0],  # Distance to Earth in parsec
+            "src_ra": [0.0, 360.0],  # Right Ascension in deg
+            "src_dec": [-90.0, 90.0],  # Declination in deg
         },
         "dust_parameters": {
             "invstokes": {
@@ -69,8 +71,8 @@ def get_default_sampling_config():
             # short: PEF -> no other planets allowed closer than R_orbit * PEF
             "planet_exclusion_max_iter": 100,  # max iterations to determine valid orbit
             "eccentricity": [0.0, 0.1],  # 0 = Circle, 0 < e < 1 = Ellipse
-            "feels_disk": False,  # If planets feel the disks gravitational pull
-            "feels_planets": False,  # If planets feel other planet's graviational pull
+            "feels_disk": False,  # Whether planets feel the disks gravitational pull
+            "feels_planets": False,  # Whether planets feel other planet's gravit. pull
         },
         "mesh_parameters": {
             "y_min": [4.0, 5.0],  # Astronomical Units
