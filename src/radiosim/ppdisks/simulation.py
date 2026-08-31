@@ -1027,7 +1027,7 @@ class SimulationRun:
         )  # get RNG from previous model
 
         def sample_dict(read_dict):
-            write_dict = dict()
+            write_dict = {}
             for key, value in read_dict.items():
                 if isinstance(value, dict):
                     write_dict[key] = sample_dict(read_dict=value)
@@ -1250,6 +1250,15 @@ class DiskModel:
         self._id: int = id
         self._directory: Path = run._directory / f"model_{id}"
         self._run: SimulationRun = run
+
+    def get_source_pos(self) -> un.Quantity:
+        samples = self.get_sample_config()
+        return (
+            np.array(
+                [samples["disk_parameters.src_ra"], samples["disk_parameters.src_dec"]]
+            )
+            * un.degree
+        )
 
     def get_gas_density(
         self,
@@ -1530,12 +1539,7 @@ class DiskModel:
         fov: float | un.Quantity | str | None = "auto",
         extend_to_physical_size: bool = True,
         intensity_cutoff: float = 1e-20,
-    ) -> (
-        un.Quantity
-        | np.ndarray
-        | tuple[un.Quantity, un.Quantity]
-        | tuple[np.ndarray, un.Quantity]
-    ):
+    ) -> un.Quantity:
         img_data = self._parse_image(idx=idx)
 
         img_shape = np.array(img_data[1].split(), dtype=int).tolist()
@@ -1544,15 +1548,15 @@ class DiskModel:
 
         img[img < intensity_cutoff] = intensity_cutoff
 
-        if fov is not None:
-            flux_unit = (
-                un.erg
-                * un.centimeter ** (-2)
-                * un.hertz ** (-1)
-                * un.second ** (-1)
-                * un.steradian ** (-1)
-            )
+        brightness_unit = (
+            un.erg
+            * un.centimeter ** (-2)
+            * un.hertz ** (-1)
+            * un.second ** (-1)
+            * un.steradian ** (-1)
+        )
 
+        if fov is not None:
             if fov == "auto":
                 fov = self.get_image_fov(idx=idx)
             else:
@@ -1579,12 +1583,12 @@ class DiskModel:
 
                     img = img_full
 
-            solid_angle = 4 * np.arcsin(np.sin(fov / 2) ** 2)
-            solid_angle = solid_angle.value * un.steradian
-
-            return (img * flux_unit * solid_angle).to(un.jansky)
+            # See http://dx.doi.org/10.1007/978-3-642-39950-3 p. 9f
+            # and image.py in radmc3dPy (https://github.com/dullemond/radmc3d-2.0)
+            solid_angle = ((fov / img.shape[0]) ** 2).to(un.steradian) / un.pixel
+            return (img * brightness_unit * solid_angle).to(un.jansky / un.pixel)
         else:
-            return img
+            return img * brightness_unit
 
     def get_image_dims(self, idx: int) -> un.Quantity:
         img_data = self._parse_image(idx=idx)
@@ -2226,6 +2230,7 @@ class DiskModel:
         intensity_cutoff: float = 1e-20,
         xy_lims: ArrayLike | None = None,
         xy_unit: un.Unit = un.AU,
+        use_relative_scale: bool = True,
         intensity_limits: ArrayLike | None = None,
         save_to: str | None = None,
         save_args: dict | None = None,
@@ -2236,31 +2241,69 @@ class DiskModel:
         img = self.get_image(idx=idx, fov=fov, intensity_cutoff=intensity_cutoff)
         img_dim = self.get_image_dims(idx=idx)
 
-        flux_unit = (
-            un.erg
-            * un.centimeter ** (-2)
-            * un.hertz ** (-1)
-            * un.second ** (-1)
-            * un.steradian ** (-1)
-        )
+        if img.unit == un.Jansky / un.pix:
+            intensity_label = "Flux Density"
+        else:
+            intensity_label = "Brightness"
 
-        img_dim = img_dim.to(xy_unit).value
-        ax_max = img_dim / 2
+        xy_unit = un.Unit(xy_unit) if not isinstance(xy_unit, un.Quantity) else xy_unit
 
-        xy_lims = (
-            xy_lims
-            if xy_lims is not None
-            else [[-ax_max[0], ax_max[0]], [-ax_max[1], ax_max[1]]]
-        )
+        if xy_unit.physical_type == "length":
+            img_dim = img_dim.to(xy_unit).value
+            ax_max = img_dim / 2
 
-        if isinstance(img, un.Quantity):
-            flux_unit = img.unit
-            img = img.value
+            xy_lims = (
+                xy_lims
+                if xy_lims is not None
+                else [[-ax_max[0], ax_max[0]], [-ax_max[1], ax_max[1]]]
+            )
+            xy_labels = ("$x$", "$y$")
+        elif xy_unit.physical_type == "angle":
+            if fov is None:
+                raise ValueError(
+                    "If you want to display the axes in angular units, "
+                    "the fov may not be set to `None`!"
+                )
+            if isinstance(fov, str) and fov == "auto":
+                fov = self.get_image_fov(idx=idx)
+            elif isinstance(fov, un.Quantity):
+                if fov.unit.physical_type != "angle":
+                    raise ValueError("The fov must be an angle.")
+            else:
+                fov = fov * un.arcsecond
+
+            fov = fov.to(xy_unit)
+
+            xy_lims = (
+                xy_lims
+                if xy_lims is not None
+                else [[-fov.value / 2, fov.value / 2], [-fov.value / 2, fov.value / 2]]
+            )
+
+            if not use_relative_scale:
+                print(xy_lims)
+                xy_lims = (
+                    np.array(xy_lims)
+                    + np.tile(self.get_source_pos().to(xy_unit).value, 2)
+                    .reshape((2, 2))
+                    .T
+                ).tolist()
+                print(xy_lims)
+                xy_labels = ("Relative Right Ascension", "Relative Declination")
+            else:
+                xy_labels = ("Right Ascension", "Declination")
+
+        else:
+            raise ValueError(
+                "The x/y unit must either be a length unit or angular unit."
+            )
 
         return plot_image(
-            data=img,
+            data=img.value,
+            xy_labels=xy_labels,
+            xy_unit=xy_unit,
             xy_lims=xy_lims,
-            intensity_label=f"Flux density / {flux_unit.to_string(format='latex')}",
+            intensity_label=f"{intensity_label} / {img.unit.to_string(format='latex')}",
             intensity_limits=intensity_limits,
             save_to=save_to,
             save_args=save_args,
@@ -2351,7 +2394,7 @@ class DiskModel:
             if not extrapolation
             else sample_config["extrapolation_parameters.r_min"]
         )
-        r_max = (
+        r_max = float(
             np.max(sample_config["planet_parameters.planet_orbit_radius"])
             * sample_config["mesh_parameters.y_max_ratio"]
         )
