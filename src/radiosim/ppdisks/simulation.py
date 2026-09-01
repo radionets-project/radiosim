@@ -48,9 +48,6 @@ def get_default_sampling_config():
             "sigma_slope": [0.1, 0.3],  # Exponent of the density profile
             "flaring_index": [0.1, 0.4],  # Flaring index for vertical profile
             "alpha": [0.001, 0.01],  # Shakura-Sunyaev viscosity parameter
-            "distance": [30.0, 130.0],  # Distance to Earth in parsec
-            "src_ra": [0.0, 360.0],  # Right Ascension in deg
-            "src_dec": [-90.0, 90.0],  # Declination in deg
         },
         "dust_parameters": {
             "invstokes": {
@@ -124,6 +121,11 @@ def get_default_sampling_config():
                 0.0,
                 45.0,
             ],  # position angle of the camera relative to image plane
+        },
+        "position_parameters": {
+            "distance": [30.0, 130.0],  # Distance to Earth in parsec
+            "src_ra": [0.0, 360.0],  # Right Ascension in deg
+            "src_dec": [-90.0, 90.0],  # Declination in deg
         },
     }
 
@@ -1255,7 +1257,10 @@ class DiskModel:
         samples = self.get_sample_config()
         return (
             np.array(
-                [samples["disk_parameters.src_ra"], samples["disk_parameters.src_dec"]]
+                [
+                    samples["position_parameters.src_ra"],
+                    samples["position_parameters.src_dec"],
+                ]
             )
             * un.degree
         )
@@ -1608,7 +1613,7 @@ class DiskModel:
 
     def get_image_fov(self, idx: int) -> un.Quantity:
         diameter = self.get_image_dims(idx=idx)[0]
-        distance = self.get_sample_config()["disk_parameters.distance"] * un.parsec
+        distance = self.get_sample_config()["position_parameters.distance"] * un.parsec
         return 2 * np.atan(diameter / (2 * distance))
 
     def get_cumulative_mass(
