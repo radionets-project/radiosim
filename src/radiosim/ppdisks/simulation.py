@@ -59,7 +59,7 @@ def get_default_sampling_config():
             "binary_ratio": 0.0,  # Ratio of binary systems to single systems
             "binary_period": [6.04800e5, 3e7],  # Seconds (logarithmic sampling)
             "binary_eccentricity": [0.0, 0.2],  # 0 = Circle, 0 < e < 1 = Ellipse
-            "stellar_mass": [0.5, 2.0],  # Solar Masses
+            "stellar_mass": [0.2, 1.0],  # Solar Masses
             "stellar_temperature": [3000.0, 6000.0],  # Kelvin
             "num_planets": [1, 3],  # Number of Planets
             "planet_mass": [1.0e-6, 5.0e-3],  # Solar Masses
