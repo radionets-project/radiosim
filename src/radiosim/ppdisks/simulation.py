@@ -923,7 +923,7 @@ class SimulationRun:
                 [
                     f"Average: ({np.round(times.mean().value, 2)} ± "
                     f"{np.round(times.std().value, 2)}) "
-                    f"{times.unit.to_string(format='latex')}",
+                    f"{times.unit.to_string(format='latex_inline')}",
                     f"Minimum: {np.round(times.min(), 2)}",
                     f"Maximum: {np.round(times.max(), 2)}",
                 ]
@@ -942,7 +942,7 @@ class SimulationRun:
         ax.scatter(model_ids, times.value, color=color, **plot_args)
 
         ax.set_xlabel("Model ID")
-        ax.set_ylabel(f"{ylabel} / {time_unit.to_string(format='latex')}")
+        ax.set_ylabel(f"{ylabel} / {time_unit.to_string(format='latex_inline')}")
 
         if save_to is not None:
             fig.savefig(save_to, **save_args)
@@ -1771,8 +1771,8 @@ class DiskModel:
             alpha=0.4,
             label="Outer Simulation Radius",
         )
-        ax.set_xlabel(f"Radius $R$ / {r_unit.to_string(format='latex')}")
-        ax.set_ylabel(f"Height H(R) / {r_unit.to_string(format='latex')}")
+        ax.set_xlabel(f"Radius $R$ / {r_unit.to_string(format='latex_inline')}")
+        ax.set_ylabel(f"Height H(R) / {r_unit.to_string(format='latex_inline')}")
 
         if x_norm is not None:
             ax.set_xscale(x_norm)
@@ -1839,7 +1839,7 @@ class DiskModel:
             alpha=0.4,
             label="Outer Simulation Radius",
         )
-        ax.set_xlabel(f"Radius $R$ / {r_unit.to_string(format='latex')}")
+        ax.set_xlabel(f"Radius $R$ / {r_unit.to_string(format='latex_inline')}")
         ax.set_ylabel("Cumulative Disk Mass $M(<R)$ / $M_{\\text{sun}}$")
 
         if x_norm is not None:
@@ -1925,9 +1925,10 @@ class DiskModel:
             alpha=0.4,
             label="Outer Simulation Radius",
         )
-        ax.set_xlabel(f"Radius $R$ / {r_unit.to_string(format='latex')}")
+        ax.set_xlabel(f"Radius $R$ / {r_unit.to_string(format='latex_inline')}")
         ax.set_ylabel(
-            f"Density Profile $\\Sigma$ / {density_unit.to_string(format='latex')}"
+            f"Density Profile $\\Sigma$ / "
+            f"{density_unit.to_string(format='latex_inline')}"
         )
 
         if x_norm is not None:
@@ -1978,10 +1979,14 @@ class DiskModel:
                 xy_lims if xy_lims is not None else [[-r_max, r_max], [-r_max, r_max]]
             )
 
+            intensity_label = (
+                f"Gas Density / {dens_unit.to_string(format='latex_inline')}"
+            )
+
             return plot_image(
                 data=polar_intensities,
                 xy_lims=xy_lims,
-                intensity_label=f"Gas Density / {dens_unit.to_string(format='latex')}",
+                intensity_label=intensity_label,
                 intensity_limits=intensity_limits,
                 xy_unit=xy_unit,
                 save_to=save_to,
@@ -2010,10 +2015,14 @@ class DiskModel:
                 xy_lims if xy_lims is not None else [[phi_min, phi_max], [r_min, r_max]]
             )
 
+            intensity_label = (
+                f"Gas Density / {dens_unit.to_string(format='latex_inline')}"
+            )
+
             im, fig, ax = plot_image(
                 data=intensities,
                 xy_lims=xy_lims,
-                intensity_label=f"Gas Density / {dens_unit.to_string(format='latex')}",
+                intensity_label=intensity_label,
                 intensity_limits=intensity_limits,
                 xy_unit=xy_unit,
                 save_to=save_to,
@@ -2065,10 +2074,14 @@ class DiskModel:
                 xy_lims if xy_lims is not None else [[-r_max, r_max], [-r_max, r_max]]
             )
 
+            intensity_label = (
+                f"Dust Density / {dens_unit.to_string(format='latex_inline')}"
+            )
+
             return plot_image(
                 data=polar_intensities,
                 xy_lims=xy_lims,
-                intensity_label=f"Dust Density / {dens_unit.to_string(format='latex')}",
+                intensity_label=intensity_label,
                 intensity_limits=intensity_limits,
                 xy_unit=xy_unit,
                 save_to=save_to,
@@ -2099,10 +2112,14 @@ class DiskModel:
                 xy_lims if xy_lims is not None else [[phi_min, phi_max], [r_min, r_max]]
             )
 
+            intensity_label = (
+                f"Dust Density / {dens_unit.to_string(format='latex_inline')}"
+            )
+
             im, fig, ax = plot_image(
                 data=intensities,
                 xy_lims=xy_lims,
-                intensity_label=f"Dust Density / {dens_unit.to_string(format='latex')}",
+                intensity_label=intensity_label,
                 intensity_limits=intensity_limits,
                 xy_unit=xy_unit,
                 xy_labels=["Polar Angle $\\phi$", "Radius $r$"],
@@ -2303,12 +2320,16 @@ class DiskModel:
                 "The x/y unit must either be a length unit or angular unit."
             )
 
+        intensity_label = (
+            f"{intensity_label} / {img.unit.to_string(format='latex_inline')}"
+        )
+
         return plot_image(
             data=img.value,
             xy_labels=xy_labels,
             xy_unit=xy_unit,
             xy_lims=xy_lims,
-            intensity_label=f"{intensity_label} / {img.unit.to_string(format='latex')}",
+            intensity_label=intensity_label,
             intensity_limits=intensity_limits,
             save_to=save_to,
             save_args=save_args,
