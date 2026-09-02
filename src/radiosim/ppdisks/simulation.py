@@ -7,6 +7,7 @@ from time import time
 
 import dsharp_opac as opacities
 import matplotlib
+import matplotlib.pyplot as plt
 import numpy as np
 from astropy import constants as const
 from astropy import units as un
@@ -46,7 +47,7 @@ def get_default_sampling_config():
             "disk_mass_ref_radius": 150,  # Reference radius R_ref in AU
             "disk_mass": [0.01, 0.03],  # Cumulative disk mask in M_sun @ r=R_ref
             "sigma_slope": [0.1, 0.3],  # Exponent of the density profile
-            "flaring_index": [0.1, 0.4],  # Flaring index for vertical profile
+            "flaring_index": [0.1, 0.2],  # Flaring index for vertical profile
             "alpha": [0.001, 0.01],  # Shakura-Sunyaev viscosity parameter
         },
         "dust_parameters": {
@@ -1200,6 +1201,8 @@ class SimulationRun:
             size=int(imaging_parameters["num_versions"]),
         )
 
+        position_parameters = sample_dict(sampling_config["position_parameters"])
+
         samples = {
             "run": sampling_config["run"],
             "disk_parameters": disk_parameters,
@@ -1211,6 +1214,7 @@ class SimulationRun:
             "grid_parameters": grid_parameters,
             "thermal_mc_parameters": thermal_mc_parameters,
             "imaging_parameters": imaging_parameters,
+            "position_parameters": position_parameters,
         }
 
         self._rng = rng
@@ -1901,7 +1905,7 @@ class DiskModel:
             sigma_slope=sample_config["disk_parameters.sigma_slope"],
         ) * (unit_system.mass / unit_system.length**2).to(density_unit)
 
-        fig, ax = configure_axes(fig=fig, ax=ax)
+        fig, ax = configure_axes(fig=fig, ax=ax, fig_args=fig_args)
 
         ax.plot(
             (radii * un.AU).to(r_unit).value,
@@ -1941,6 +1945,104 @@ class DiskModel:
 
         if save_to is not None:
             fig.savefig(save_to, **save_args)
+
+        return fig, ax
+
+    def plot_planet_orbits(
+        self,
+        show_exclusion_zones: bool = True,
+        show_star: bool = True,
+        exclusion_zone_hatches: str = "//",
+        exclusion_zone_alpha: float = 0.3,
+        ax_unit: un.Unit = un.AU,
+        ax_extension_factor: float = 1.2,
+        cmap: str = "inferno",
+        legend_loc: str = "best",
+        fig: matplotlib.figure.Figure | None = None,
+        fig_args: dict | None = None,
+        ax: matplotlib.axes.Axes | None = None,
+    ) -> tuple[matplotlib.axes.Axes, matplotlib.figure.Figure]:
+        fig_args = {} if fig_args is None else fig_args
+
+        samples = self.get_sample_config()
+
+        fig, ax = configure_axes(fig=fig, ax=ax, fig_args=fig_args)
+
+        phis = np.linspace(0, 2 * np.pi, 300)
+
+        exclusion_factor = self._run._sampling_config[
+            "planet_parameters.planet_exclusion_factor"
+        ]
+
+        num_planets = samples["planet_parameters.num_planets"]
+        radii = (np.array(samples["planet_parameters.planet_orbit_radius"]) * un.AU).to(
+            ax_unit
+        )
+        max_radius = (np.max(radii) * (1 + exclusion_factor)).value
+
+        colors = plt.colormaps.get_cmap(cmap)(np.linspace(0.2, 0.8, num_planets))[::-1]
+
+        for i in range(num_planets):
+            radius = radii[i]
+
+            unit_coords = np.array([np.cos(phis), np.sin(phis)])
+
+            x, y = radius * unit_coords
+            ax.plot(
+                x,
+                y,
+                color=colors[i],
+                label=np.round(radius, 2).to_string(format="latex_inline"),
+            )
+
+            r_inner = radius.value * (1 - exclusion_factor)
+            r_outer = radius.value * (1 + exclusion_factor)
+
+            grid_res = 200
+
+            # Idea of contour plot from https://stackoverflow.com/a/53948581
+            # Posted by Quang Hoang, modified by community.
+            # Retrieved 2026-09-02, License - CC BY-SA 4.0
+
+            x_grid, y_grid = np.meshgrid(
+                np.linspace(-max_radius, max_radius, grid_res),
+                np.linspace(-max_radius, max_radius, grid_res),
+            )
+            grid_height = x_grid**2 + y_grid**2
+
+            if show_exclusion_zones:
+                cf = ax.contourf(
+                    x_grid,
+                    y_grid,
+                    grid_height,
+                    colors=colors[i],
+                    levels=[r_inner**2, r_outer**2],
+                    alpha=exclusion_zone_alpha,
+                    hatches=[exclusion_zone_hatches],
+                )
+                cf._hatch_linewidth = 0.1
+
+        if show_exclusion_zones:
+            ax.fill_between(
+                [0],
+                [0],
+                color="gray",
+                alpha=0.3,
+                hatch=exclusion_zone_hatches,
+                label="Exclusion Zone",
+            )
+
+        ax.set_xlim(-max_radius * ax_extension_factor, max_radius * ax_extension_factor)
+        ax.set_ylim(-max_radius * ax_extension_factor, max_radius * ax_extension_factor)
+
+        ax.set_xlabel(f"$x$ / {ax_unit.to_string('latex_inline')}")
+        ax.set_ylabel(f"$y$ / {ax_unit.to_string('latex_inline')}")
+
+        if show_star:
+            ax.scatter(0, 0, marker="*", color="black")
+
+        ax.legend(loc=legend_loc)
+        ax.set_aspect("equal")
 
         return fig, ax
 
