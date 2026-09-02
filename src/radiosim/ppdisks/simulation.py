@@ -1953,6 +1953,7 @@ class DiskModel:
         show_exclusion_zones: bool = True,
         show_star: bool = True,
         exclusion_zone_hatches: str = "//",
+        exclusion_zone_hatch_lw: float = 0.1,
         exclusion_zone_alpha: float = 0.3,
         ax_unit: un.Unit = un.AU,
         ax_extension_factor: float = 1.2,
@@ -2020,10 +2021,10 @@ class DiskModel:
                     alpha=exclusion_zone_alpha,
                     hatches=[exclusion_zone_hatches],
                 )
-                cf._hatch_linewidth = 0.1
+                cf._hatch_linewidth = exclusion_zone_hatch_lw
 
         if show_exclusion_zones:
-            ax.fill_between(
+            lin = ax.fill_between(
                 [0],
                 [0],
                 color="gray",
@@ -2031,6 +2032,7 @@ class DiskModel:
                 hatch=exclusion_zone_hatches,
                 label="Exclusion Zone",
             )
+            lin._hatch_linewidth = exclusion_zone_hatch_lw
 
         ax.set_xlim(-max_radius * ax_extension_factor, max_radius * ax_extension_factor)
         ax.set_ylim(-max_radius * ax_extension_factor, max_radius * ax_extension_factor)
