@@ -45,7 +45,7 @@ def get_default_sampling_config():
         "disk_parameters": {
             "aspect_ratio": [0.01, 0.1],  # Disk aspect ratio @ r=R0 (default R0 = 1AU)
             "disk_mass_ref_radius": 150,  # Reference radius R_ref in AU
-            "disk_mass": [0.01, 0.03],  # Cumulative disk mask in M_sun @ r=R_ref
+            "disk_mass": [0.001, 0.003],  # Cumulative disk mask in M_sun @ r=R_ref
             "sigma_slope": [0.1, 0.3],  # Exponent of the density profile
             "flaring_index": [0.1, 0.2],  # Flaring index for vertical profile
             "alpha": [0.001, 0.01],  # Shakura-Sunyaev viscosity parameter
@@ -287,7 +287,7 @@ class Simulation:
         elif resume and resume_model_id is not None:
             start_idx = (
                 resume_model_id
-                if resume_model_id > 0
+                if resume_model_id >= 0
                 else run.get_models()[resume_model_id]._id
             )
         else:
@@ -1242,6 +1242,7 @@ class SimulationRun:
         instance._sampling_config["run.num_images"] = num_images
         instance._sampling_config["run.seed"] = seed
         instance._sampling_config["run.polar_img_size"] = sim._polar_img_size
+        instance._sampling_config["run.output_img_size"] = sim._output_img_size
         instance._sampling_config["run.steps_per_orbit"] = steps_per_orbit
         instance._sampling_config["run.num_outputs"] = num_outputs
         instance._sampling_config["run.float_type"] = (
@@ -1731,6 +1732,9 @@ class DiskModel:
         flaring_index: None | float = None,
         save_to: str | PathLike | None = None,
         save_args: dict | None = None,
+        cmap: str = "inferno",
+        radius_alpha: float = 0.5,
+        flaring_index_decimals: int = 3,
         r_unit: un.Unit = un.AU,
         r_min: float | None = None,
         r_max: float | None = None,
@@ -1755,24 +1759,32 @@ class DiskModel:
         fig, ax = configure_axes(fig=fig, ax=ax)
         sample_config = self.get_sample_config()
 
+        colors = plt.colormaps.get_cmap(cmap)(np.linspace(0.2, 0.8, 4))
+
+        fl_idx_print = np.round(
+            sample_config["disk_parameters.flaring_index"],
+            flaring_index_decimals,
+        )
+
         ax.plot(
             (radii * un.AU).to(r_unit).value,
             height.to(r_unit).value,
-            label=f"Flaring Index = {sample_config['disk_parameters.flaring_index']}",
+            label=(f"Flaring Index = {fl_idx_print}"),
+            color=colors[0],
         )
 
         ax.axvline(
             (self.get_radius_lims()[0] * un.AU).to(r_unit).value,
             ls="dashed",
-            color="maroon",
-            alpha=0.4,
+            color=colors[1],
+            alpha=radius_alpha,
             label="Inner Simulation Radius",
         )
         ax.axvline(
             (self.get_radius_lims()[1] * un.AU).to(r_unit).value,
             ls="dashed",
-            color="green",
-            alpha=0.4,
+            color=colors[2],
+            alpha=radius_alpha,
             label="Outer Simulation Radius",
         )
         ax.set_xlabel(f"Radius $R$ / {r_unit.to_string(format='latex_inline')}")
@@ -1795,8 +1807,10 @@ class DiskModel:
         self,
         save_to: str | PathLike | None = None,
         save_args: dict | None = None,
-        r_unit: un.Unit = un.AU,
         show_formula: bool = False,
+        cmap: str = "inferno",
+        radius_alpha: float = 0.5,
+        r_unit: un.Unit = un.AU,
         r_min: float | None = None,
         r_max: float | None = None,
         x_norm: str | None = None,
@@ -1816,6 +1830,8 @@ class DiskModel:
         radii = np.linspace(r_min, r_max, 10000)
         disk_mass = self.get_cumulative_mass(radius=radii * un.AU) / const.M_sun
 
+        colors = plt.colormaps.get_cmap(cmap)(np.linspace(0.2, 0.8, 4))
+
         fig, ax = configure_axes(fig=fig, ax=ax)
 
         ax.plot(
@@ -1827,22 +1843,35 @@ class DiskModel:
             )
             if show_formula
             else None,
+            color=colors[0],
             **plot_args,
         )
         ax.axvline(
             (self.get_radius_lims()[0] * un.AU).to(r_unit).value,
             ls="dashed",
-            color="maroon",
-            alpha=0.4,
+            color=colors[1],
+            alpha=radius_alpha,
             label="Inner Simulation Radius",
         )
         ax.axvline(
             (self.get_radius_lims()[1] * un.AU).to(r_unit).value,
             ls="dashed",
-            color="green",
-            alpha=0.4,
+            color=colors[2],
+            alpha=radius_alpha,
             label="Outer Simulation Radius",
         )
+        r_ref = (
+            self.get_sample_config()["disk_parameters.disk_mass_ref_radius"] * un.AU
+        ).to(r_unit)
+        if r_ref <= r_max * un.AU:
+            ax.axvline(
+                r_ref.value,
+                ls="dashed",
+                color=colors[3],
+                alpha=radius_alpha,
+                label="Mass Reference Radius",
+            )
+
         ax.set_xlabel(f"Radius $R$ / {r_unit.to_string(format='latex_inline')}")
         ax.set_ylabel("Cumulative Disk Mass $M(<R)$ / $M_{\\text{sun}}$")
 
@@ -1863,9 +1892,11 @@ class DiskModel:
         self,
         save_to: str | PathLike | None = None,
         save_args: dict | None = None,
-        r_unit: un.Unit = un.AU,
+        cmap: str = "inferno",
+        radius_alpha: float = 0.5,
         density_unit: un.Unit = un.kilogram / un.meter**2,
         show_formula: bool = False,
+        r_unit: un.Unit = un.AU,
         r_min: float | None = None,
         r_max: float | None = None,
         x_norm: str | None = None,
@@ -1905,6 +1936,8 @@ class DiskModel:
             sigma_slope=sample_config["disk_parameters.sigma_slope"],
         ) * (unit_system.mass / unit_system.length**2).to(density_unit)
 
+        colors = plt.colormaps.get_cmap(cmap)(np.linspace(0.2, 0.8, 4))
+
         fig, ax = configure_axes(fig=fig, ax=ax, fig_args=fig_args)
 
         ax.plot(
@@ -1913,20 +1946,21 @@ class DiskModel:
             label="$\\Sigma(R)=\\Sigma_0 \\cdot (\\frac{R}{R_0})^{-p}$"
             if show_formula
             else None,
+            color=colors[0],
             **plot_args,
         )
         ax.axvline(
             (self.get_radius_lims()[0] * un.AU).to(r_unit).value,
             ls="dashed",
-            color="maroon",
-            alpha=0.4,
+            color=colors[1],
+            alpha=radius_alpha,
             label="Inner Simulation Radius",
         )
         ax.axvline(
             (self.get_radius_lims()[1] * un.AU).to(r_unit).value,
             ls="dashed",
-            color="green",
-            alpha=0.4,
+            color=colors[2],
+            alpha=radius_alpha,
             label="Outer Simulation Radius",
         )
         ax.set_xlabel(f"Radius $R$ / {r_unit.to_string(format='latex_inline')}")
