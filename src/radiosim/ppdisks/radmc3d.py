@@ -192,6 +192,7 @@ class RADMCSetup:
         nphot_therm: int,
         nphot_scat: int,
         num_threads: int,
+        second_order_raytracing: bool = True,
         fast_mode: int = 0,
         modified_random_walk: bool = True,
         scattering_mode: int = 1,
@@ -213,6 +214,7 @@ class RADMCSetup:
         self.num_threads: int = num_threads
         self.fast_mode: int = fast_mode
         self.modified_random_walk: bool = modified_random_walk
+        self.second_order_raytracing: bool = second_order_raytracing
         self.scattering_mode: int = scattering_mode
         self.seed: int = self.model.get_rng().integers(
             low=-(max_seed - 1), high=max_seed - 1, dtype=np.int32
@@ -477,6 +479,9 @@ class RADMCSetup:
             f"incl {incl} phi {phi} posang {posang} "
             f"npixx {x_pix} npixy {y_pix}"
         )
+
+        if self.second_order_raytracing:
+            cmd += " secondorder"
 
         if verbose:
             print(f"CMD @ {self.get_file_directory()}  $ {cmd}")

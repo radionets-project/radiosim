@@ -43,11 +43,11 @@ __all__ = ["DiskModel", "Simulation", "SimulationRun"]
 def get_default_sampling_config():
     return {
         "disk_parameters": {
-            "aspect_ratio": [0.01, 0.1],  # Disk aspect ratio @ r=R0 (default R0 = 1AU)
+            "aspect_ratio": [0.01, 0.1],  # Disk aspect ratio @ r=R0 (default R0 = 1 AU)
             "disk_mass_ref_radius": 150,  # Reference radius R_ref in AU
-            "disk_mass": [0.001, 0.003],  # Cumulative disk mask in M_sun @ r=R_ref
+            "disk_mass": [0.01, 0.03],  # Cumulative disk mask in M_sun @ r=R_ref
             "sigma_slope": [0.1, 0.3],  # Exponent of the density profile
-            "flaring_index": [0.1, 0.2],  # Flaring index for vertical profile
+            "flaring_index": [0.01, 0.2],  # Flaring index for vertical profile
             "alpha": [0.001, 0.01],  # Shakura-Sunyaev viscosity parameter
         },
         "dust_parameters": {
@@ -90,16 +90,17 @@ def get_default_sampling_config():
             "r_min": [0.1, 1.0],  # minimal radius in AU
         },
         "output_parameters": {
+            "steps_per_orbit": 20,  # Num of time steps per orbit of outermost planet
             "num_largest_orbits": [
                 100,
-                200,
-            ],  # Sim. time as multiple of period of furthest planet
+                150,
+            ],  # Sim. time as multiple of period of outermost planet
         },
         "grid_parameters": {
             "r_scale": "log",  # Scaling of the r-axis for radmc3d simulation
             "theta_scale": "log",  # Scaling of the theta-axis for radmc3d simulation
-            "theta_steps": 500,  # Number of theta cells
-            "theta_log_exp": -1.5,  # Exponent for scaling function of theta r-axis
+            "theta_steps": 200,  # Number of theta cells
+            "theta_log_exp": -1.5,  # Exponent for scaling function of theta theta-axis
             "theta_tol": 0.1,
         },
         "thermal_mc_parameters": {
@@ -110,14 +111,15 @@ def get_default_sampling_config():
             # 3 - 5 --> see radmc3d manual
             "fast_mode": 0,  # Whether to use 'fast mode'
             "modified_random_walk": True,  # Whether to use MRW
-            "freq_res": 1000,  # num of frequencies tested for the MC run
+            "freq_res": 200,  # num of frequencies for the MC run
             "nphot_therm": 1_000_000_000,  # num of thermal photon packages for MC run
         },
         "imaging_parameters": {
             "nphot_scat": 0,  # num of scattering photon packages for the imaging run
+            "second_order_raytracing": True,  # Whether to perform 2nd order ray tracing
             "num_versions": [1, 2],  # max uses of the same dust distribution
             "incl": [0.0, 30.0],  # inclination of the camera relative to image plane
-            "phi": [0.0, 45.0],  # polar angle of the camera relative to image plane
+            "phi": [0.0, 0.0],  # polar angle of the camera relative to image plane
             "posang": [
                 0.0,
                 45.0,
@@ -660,6 +662,9 @@ class Simulation:
             nphot_therm=samples["thermal_mc_parameters"]["nphot_therm"],
             nphot_scat=samples["imaging_parameters"]["nphot_scat"],
             num_threads=num_mc_threads,
+            second_order_raytracing=samples["imaging_parameters"][
+                "second_order_raytracing"
+            ],
             fast_mode=samples["thermal_mc_parameters"]["fast_mode"],
             modified_random_walk=samples["thermal_mc_parameters"][
                 "modified_random_walk"
@@ -1176,6 +1181,7 @@ class SimulationRun:
         imaging_sampling = sampling_config["imaging_parameters"]
         imaging_parameters = {
             "nphot_scat": imaging_sampling["nphot_scat"],
+            "second_order_raytracing": imaging_sampling["second_order_raytracing"],
             "num_versions": rng.integers(
                 low=imaging_sampling["num_versions"][0],
                 high=imaging_sampling["num_versions"][1],
