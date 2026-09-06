@@ -101,7 +101,9 @@ def get_default_sampling_config():
             "theta_scale": "log",  # Scaling of the theta-axis for radmc3d simulation
             "theta_steps": 200,  # Number of theta cells
             "theta_log_exp": -1.5,  # Exponent for scaling function of theta theta-axis
-            "theta_tol": 0.1,
+            "theta_tol": 0.0,  # Percentile offset for upper and lower theta
+            "min_height": 0.25,  # Minimum disk height in AU
+            "height_interpolate_idx_extend": 5,  # Num indices to extend interpolation
         },
         "thermal_mc_parameters": {
             "scattering_mode": 1,  # Scattering mode:
@@ -232,7 +234,6 @@ class Simulation:
         num_images: int,
         seed: int,
         num_outputs: int | None = None,
-        steps_per_orbit: int | None = None,
         run_id: int | None = None,
         resume: bool = True,
         resume_model_id: int | None = None,
@@ -269,7 +270,6 @@ class Simulation:
         if run_id is None:
             run = SimulationRun.new(
                 num_images=num_images,
-                steps_per_orbit=steps_per_orbit,
                 num_outputs=num_outputs,
                 seed=seed,
                 sim=self,
@@ -564,6 +564,7 @@ class Simulation:
         output_parameters = samples["output_parameters"]
 
         num_orbits = output_parameters["num_largest_orbits"]
+        steps_per_orbit = output_parameters["steps_per_orbit"]
 
         def orbital_period(mass, radius, G):
             return np.sqrt((4 * np.pi**2 * radius**3) / (mass * G))
@@ -575,7 +576,7 @@ class Simulation:
         )
 
         total_time = num_orbits * period
-        step_size = period / run.get_steps_per_orbit()
+        step_size = period / steps_per_orbit
 
         N_tot = int(total_time / step_size)
         N_interm = int(N_tot / run.get_num_outputs())
@@ -962,7 +963,7 @@ class SimulationRun:
         return self._sampling_config["run.num_outputs"]
 
     def get_steps_per_orbit(self) -> int:
-        return self._sampling_config["run.steps_per_orbit"]
+        return self._sampling_config["output_parameters.steps_per_orbit"]
 
     def get_float_type(self) -> type:
         return (
@@ -1230,7 +1231,6 @@ class SimulationRun:
     def new(
         cls,
         num_images: int,
-        steps_per_orbit: int,
         num_outputs: int,
         seed: int,
         sim: Simulation,
@@ -1249,7 +1249,6 @@ class SimulationRun:
         instance._sampling_config["run.seed"] = seed
         instance._sampling_config["run.polar_img_size"] = sim._polar_img_size
         instance._sampling_config["run.output_img_size"] = sim._output_img_size
-        instance._sampling_config["run.steps_per_orbit"] = steps_per_orbit
         instance._sampling_config["run.num_outputs"] = num_outputs
         instance._sampling_config["run.float_type"] = (
             "FLOAT64" if sim._float_type == np.float64 else "FLOAT32"
@@ -1663,6 +1662,7 @@ class DiskModel:
         self,
         radius: float | ArrayLike | un.Quantity,
         flaring_index: None | float = None,
+        interpolation_idx_extend: int | None = None,
     ) -> un.Quantity:
         sample_config = self.get_sample_config()
         unit_system = self._run._sim._unit_system
@@ -1675,12 +1675,19 @@ class DiskModel:
         if flaring_index is None:
             flaring_index = sample_config["disk_parameters.flaring_index"]
 
+        if interpolation_idx_extend is None:
+            interpolation_idx_extend = sample_config[
+                "grid_parameters.height_interpolate_idx_extend"
+            ]
+
         return (
             disk_height(
                 radius=radius.value,
                 ref_aspect_ratio=sample_config["disk_parameters.aspect_ratio"],
                 flaring_index=flaring_index,
                 R0=self._run._sim._constants["R0"].value,
+                min_height=sample_config["grid_parameters.min_height"] * un.AU,
+                interpolation_idx_extend=interpolation_idx_extend,
             )
             * unit_system.length
         )
@@ -1736,6 +1743,7 @@ class DiskModel:
     def plot_height_profile(
         self,
         flaring_index: None | float = None,
+        interpolation_idx_extend: int | None = None,
         save_to: str | PathLike | None = None,
         save_args: dict | None = None,
         cmap: str = "inferno",
@@ -1758,9 +1766,13 @@ class DiskModel:
         r_min = r_min if r_min is not None else self.get_radius_lims()[0]
         r_max = r_max if r_max is not None else self.get_radius_lims()[1]
 
-        radii = np.linspace(r_min, r_max, 10000)
+        radii = self.get_grid(extrapolation=False)._radii.linear.to(un.AU)
 
-        height = self.get_height(radius=radii * un.AU, flaring_index=flaring_index)
+        height = self.get_height(
+            radius=radii,
+            flaring_index=flaring_index,
+            interpolation_idx_extend=interpolation_idx_extend,
+        )
 
         fig, ax = configure_axes(fig=fig, ax=ax)
         sample_config = self.get_sample_config()
@@ -1773,7 +1785,7 @@ class DiskModel:
         )
 
         ax.plot(
-            (radii * un.AU).to(r_unit).value,
+            radii.to(r_unit).value,
             height.to(r_unit).value,
             label=(f"Flaring Index = {fl_idx_print}"),
             color=colors[0],
@@ -2531,6 +2543,7 @@ class DiskModel:
         distances = np.array(planet_parameters["planet_orbit_radius"]) * un.AU
 
         num_orbits = sample_config["output_parameters.num_largest_orbits"]
+        steps_per_orbit = sample_config["output_parameters.steps_per_orbit"]
 
         period = orbital_period(
             mass=np.sum(planet_parameters["stellar_mass"]) * const.M_sun,
@@ -2541,7 +2554,7 @@ class DiskModel:
         total_time = num_orbits * period
 
         return (
-            period / self._run.get_steps_per_orbit(),
+            period / steps_per_orbit,
             total_time / self.get_num_outputs(),
         )
 

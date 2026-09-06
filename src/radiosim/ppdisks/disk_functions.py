@@ -39,7 +39,8 @@ def mass_function(
 
 
 # For regular Keplerian motion
-# Can be derived from eq. 4 from https://doi.org/10.1088/1538-3873/ae05cb
+# Can be derived from Keplerian angular velocity
+# (https://doi.org/10.1088/1538-3873/ae05cb, p. 2)
 def orbital_period(
     mass: un.Quantity | float, radius: un.Quantity | float, G: un.Quantity | float
 ):
@@ -61,9 +62,7 @@ def disk_height(
     R0: float,
     interpolate_height: bool = True,
     interpolation_idx_extend: int = 10,
-    min_height: un.Quantity | float = (
-        0.5 * un.AU
-    ),  # arbitrary choice to avoid too small values
+    min_height: un.Quantity | float = 0.0 * un.AU,
 ) -> float | ArrayLike:
     val = (
         aspect_ratio(
