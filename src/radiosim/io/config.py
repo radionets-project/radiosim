@@ -9,13 +9,13 @@ from ._ppdisks_config import PPDataSetConfig, PPMetdaDataConfig
 
 __all__ = [
     "Config",
+    "DataSetConfig",
     "GeneralConfig",
-    "PathConfig",
-    "SurveyConfig",
     "JetConfig",
     "MojaveConfig",
     "PPDiskConfig",
-    "DataSetConfig",
+    "PathConfig",
+    "SurveyConfig",
 ]
 
 
