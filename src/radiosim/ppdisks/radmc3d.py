@@ -182,6 +182,17 @@ class Grid:
         phis = self.phis if phi_mode is None else self._phis.get_scale(mode=phi_mode)
         return np.meshgrid(radii.value, phis.value)
 
+    def get_azimuthal_grid(
+        self, r_mode: str | None = None, theta_mode: str | None = None
+    ) -> tuple[np.ndarray, np.ndarray]:
+        radii = self.radii if r_mode is None else self._radii.get_scale(mode=r_mode)
+        thetas = (
+            self.thetas
+            if theta_mode is None
+            else self._thetas.get_scale(mode=theta_mode)
+        )
+        return np.meshgrid(radii.value, thetas.value)
+
 
 class RADMCSetup:
     def __init__(

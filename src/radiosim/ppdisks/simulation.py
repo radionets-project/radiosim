@@ -1292,6 +1292,7 @@ class DiskModel:
         dust_idx: int = 1,
         extrapolation: bool = False,
         r_scale: str | None = None,
+        theta_scale: str | None = None,
         grid: Grid | None = None,
         return_grid: bool = False,
     ) -> np.ndarray | tuple[np.ndarray, Grid]:
@@ -1313,7 +1314,9 @@ class DiskModel:
         )
 
         if grid is None:
-            grid = self.get_grid(extrapolation=extrapolation, r_scale=r_scale)
+            grid = self.get_grid(
+                extrapolation=extrapolation, r_scale=r_scale, theta_scale=theta_scale
+            )
 
         if extrapolation and grid is not None:
             samples = self.get_sample_config().as_dict()
@@ -1400,8 +1403,10 @@ class DiskModel:
         output_idx: int,
         r_scale: str | None,
         extrapolation: bool,
+        theta_scale: str | None = None,
         grid: Grid | None = None,
         dust_idx: int = 1,
+        return_grid: bool = False,
     ) -> np.ndarray:
         unit_system = self._run._sim._unit_system
 
@@ -1409,6 +1414,7 @@ class DiskModel:
             output_idx=output_idx,
             dust_idx=dust_idx,
             r_scale=r_scale,
+            theta_scale=theta_scale,
             grid=grid,
             extrapolation=extrapolation,
             return_grid=True,
@@ -1457,7 +1463,10 @@ class DiskModel:
 
         density_3d /= norm[:, None, None]
 
-        return density_3d
+        if return_grid:
+            return density_3d, grid
+        else:
+            return density_3d
 
     def get_polar_gas_density(
         self,
@@ -2231,7 +2240,7 @@ class DiskModel:
             )
 
             intensity_label = (
-                f"Dust Density / {dens_unit.to_string(format='latex_inline')}"
+                f"Dust Surface Density / {dens_unit.to_string(format='latex_inline')}"
             )
 
             return plot_image(
@@ -2269,7 +2278,7 @@ class DiskModel:
             )
 
             intensity_label = (
-                f"Dust Density / {dens_unit.to_string(format='latex_inline')}"
+                f"Dust Surface Density / {dens_unit.to_string(format='latex_inline')}"
             )
 
             im, fig, ax = plot_image(
