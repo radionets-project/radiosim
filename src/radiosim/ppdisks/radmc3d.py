@@ -310,7 +310,7 @@ class RADMCSetup:
 
         self.save_input_file(name="dust_density", data=dust_density_output)
 
-    def _get_wavelenghts(self) -> list[float]:
+    def _get_wavelengths(self) -> list[float]:
         star_temps = self.model.get_sample_config()[
             "planet_parameters.stellar_temperature"
         ]
@@ -322,7 +322,7 @@ class RADMCSetup:
 
     def create_wavelength_micron_input(self) -> None:
         output = [self.frequency_res]
-        output.extend(self._get_wavelenghts())
+        output.extend(self._get_wavelengths())
 
         self.save_input_file(name="wavelength_micron", data=output)
 
@@ -363,7 +363,7 @@ class RADMCSetup:
             y_star = 0
 
         output.append(f"{R_star} {m_star} {x_star} {y_star} {0}")
-        output.extend(self._get_wavelenghts())
+        output.extend(self._get_wavelengths())
         output.extend(
             (-np.array(sample_config["planet_parameters.stellar_temperature"])).tolist()
         )  # black body temperatures -> negative sign
@@ -387,7 +387,7 @@ class RADMCSetup:
         self.save_input_file(name="dustopac", data=output)
 
     def create_dustkappa_input(self) -> None:
-        wavelengths = self._get_wavelenghts()
+        wavelengths = self._get_wavelengths()
 
         for ispec in range(1, self.model.get_num_species() + 1):
             opac = self.model.get_opacities(

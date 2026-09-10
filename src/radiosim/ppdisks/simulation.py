@@ -111,10 +111,10 @@ def get_default_sampling_config():
             # 1: isotropic scattering
             # 2: anisotropic scattering
             # 3 - 5 --> see radmc3d manual
-            "fast_mode": 0,  # Whether to use 'fast mode'
+            "fast_mode": 1,  # Whether to use 'fast mode'
             "modified_random_walk": True,  # Whether to use MRW
             "freq_res": 200,  # num of frequencies for the MC run
-            "nphot_therm": 1_000_000_000,  # num of thermal photon packages for MC run
+            "nphot_therm": 10_000_000_000,  # num of thermal photon packages for MC run
         },
         "imaging_parameters": {
             "nphot_scat": 0,  # num of scattering photon packages for the imaging run
@@ -656,22 +656,7 @@ class Simulation:
         num_mc_threads: int,
         **kwargs,
     ) -> None:
-        radmc_setup = RADMCSetup(
-            model=model,
-            ref_frequency=run._sim._ref_freq,
-            frequency_res=samples["thermal_mc_parameters"]["freq_res"],
-            nphot_therm=samples["thermal_mc_parameters"]["nphot_therm"],
-            nphot_scat=samples["imaging_parameters"]["nphot_scat"],
-            num_threads=num_mc_threads,
-            second_order_raytracing=samples["imaging_parameters"][
-                "second_order_raytracing"
-            ],
-            fast_mode=samples["thermal_mc_parameters"]["fast_mode"],
-            modified_random_walk=samples["thermal_mc_parameters"][
-                "modified_random_walk"
-            ],
-            scattering_mode=samples["thermal_mc_parameters"]["scattering_mode"],
-        )
+        radmc_setup = self.get_radmc_setup(num_mc_threads=num_mc_threads)
 
         # Create input files
         radmc_setup.create_radmc3d_input()
@@ -1517,14 +1502,14 @@ class DiskModel:
         xy_lims: ArrayLike | None = None,
         xy_unit: un.Unit = un.AU,
     ) -> tuple[np.ndarray, float, float]:
-        polar_intensities = self.get_dust_density(
+        polar_intensities, grid = self.get_dust_density(
             output_idx=output_idx,
             dust_idx=dust_idx,
             extrapolation=extrapolation,
             r_scale=r_scale,
+            return_grid=True,
         )
 
-        grid = self.get_grid(extrapolation=extrapolation, r_scale=r_scale)
         r_min, r_max = grid.r_min, grid.r_max
 
         rs, phis = grid.get_polar_grid(r_mode=r_scale)
@@ -1701,6 +1686,25 @@ class DiskModel:
             * unit_system.length
         )
 
+    def get_radmc_setup(self, num_mc_threads: int) -> RADMCSetup:
+        samples = self.get_sample_config().as_dict()
+        return RADMCSetup(
+            model=self,
+            ref_frequency=self._run._sim._ref_freq,
+            frequency_res=samples["thermal_mc_parameters"]["freq_res"],
+            nphot_therm=samples["thermal_mc_parameters"]["nphot_therm"],
+            nphot_scat=samples["imaging_parameters"]["nphot_scat"],
+            num_threads=num_mc_threads,
+            second_order_raytracing=samples["imaging_parameters"][
+                "second_order_raytracing"
+            ],
+            fast_mode=samples["thermal_mc_parameters"]["fast_mode"],
+            modified_random_walk=samples["thermal_mc_parameters"][
+                "modified_random_walk"
+            ],
+            scattering_mode=samples["thermal_mc_parameters"]["scattering_mode"],
+        )
+
     def get_approximate_grain_size(
         self, dust_idx: int, output_idx: int = -1
     ) -> un.Quantity:
@@ -1736,7 +1740,7 @@ class DiskModel:
 
         wavelengths = (
             wavelengths * un.micrometer
-            if isinstance(wavelengths, np.ndarray)
+            if not isinstance(wavelengths, un.Quantity)
             else wavelengths
         )
 
@@ -1814,8 +1818,8 @@ class DiskModel:
             alpha=radius_alpha,
             label="Outer Simulation Radius",
         )
-        ax.set_xlabel(f"Radius $R$ / {r_unit.to_string(format='latex_inline')}")
-        ax.set_ylabel(f"Height H(R) / {r_unit.to_string(format='latex_inline')}")
+        ax.set_xlabel(f"Radius $r$ / {r_unit.to_string(format='latex_inline')}")
+        ax.set_ylabel(f"Height $H(r)$ / {r_unit.to_string(format='latex_inline')}")
 
         if x_norm is not None:
             ax.set_xscale(x_norm)
@@ -1865,8 +1869,8 @@ class DiskModel:
             (radii * un.AU).to(r_unit).value,
             disk_mass,
             label=(
-                "$M(<R) = \\frac{2\\pi}{2-p}\\Sigma_0 R_0^2 \\cdot"
-                "\\left[\\left(\\frac{R}{R_0}\\right)^{2-p}-1\\right]$"
+                "$M(<r) = \\frac{2\\pi}{2-p}\\Sigma_0 R_0^2 \\cdot"
+                "\\left[\\left(\\frac{r}{R_0}\\right)^{2-p}-1\\right]$"
             )
             if show_formula
             else None,
@@ -1899,8 +1903,8 @@ class DiskModel:
                 label="Mass Reference Radius",
             )
 
-        ax.set_xlabel(f"Radius $R$ / {r_unit.to_string(format='latex_inline')}")
-        ax.set_ylabel("Cumulative Disk Mass $M(<R)$ / $M_{\\text{sun}}$")
+        ax.set_xlabel(f"Radius $r$ / {r_unit.to_string(format='latex_inline')}")
+        ax.set_ylabel("Cumulative Disk Mass $M(<r)$ / $M_{\\text{sun}}$")
 
         if x_norm is not None:
             ax.set_xscale(x_norm)
@@ -1990,7 +1994,7 @@ class DiskModel:
             alpha=radius_alpha,
             label="Outer Simulation Radius",
         )
-        ax.set_xlabel(f"Radius $R$ / {r_unit.to_string(format='latex_inline')}")
+        ax.set_xlabel(f"Radius $r$ / {r_unit.to_string(format='latex_inline')}")
         ax.set_ylabel(
             f"Density Profile $\\Sigma$ / "
             f"{density_unit.to_string(format='latex_inline')}"
@@ -2040,6 +2044,7 @@ class DiskModel:
         radii = (np.array(samples["planet_parameters.planet_orbit_radius"]) * un.AU).to(
             ax_unit
         )
+        radii = np.sort(radii)
         max_radius = (np.max(radii) * (1 + exclusion_factor)).value
 
         colors = plt.colormaps.get_cmap(cmap)(np.linspace(0.2, 0.8, num_planets))[::-1]
@@ -2062,7 +2067,7 @@ class DiskModel:
 
             grid_res = 200
 
-            # Idea of contour plot from https://stackoverflow.com/a/53948581
+            # Idea for contour plot from https://stackoverflow.com/a/53948581
             # Posted by Quang Hoang, modified by community.
             # Retrieved 2026-09-02, License - CC BY-SA 4.0
 
@@ -2290,7 +2295,6 @@ class DiskModel:
                 xy_labels=["Polar Angle $\\phi$", "Radius $r$"],
                 save_to=save_to,
                 save_args=save_args,
-                plot_args={"origin": "lower"},
                 **kwargs,
             )
 
