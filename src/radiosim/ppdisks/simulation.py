@@ -54,7 +54,7 @@ def get_default_sampling_config():
             "invstokes": {
                 "1": [10.0, 20.0],  # Inverse Stokes number of dust species 1
             },
-            "epsilon": [0.01, 0.1],  # Dust-to-Gas ratio,
+            "epsilon": [0.01, 0.05],  # Dust-to-Gas ratio,
         },
         "planet_parameters": {
             "binary_ratio": 0.0,  # Ratio of binary systems to single systems

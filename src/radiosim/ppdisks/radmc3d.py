@@ -151,28 +151,31 @@ class Grid:
             )
 
         # Transform from cyclindrical coordinate system to spherical coordinate system
+        # See: https://en.wikipedia.org/wiki/Spherical_coordinate_system
+        # Inclination = pi/2 - elevation
         theta_max = np.abs(np.atan(self.heights[-1] / self.radii[-1]).value)
 
+        # Invert theta axis since it needs to be increasing
         self._thetas: CoordinateScale = CoordinateScale(
             linear=np.linspace(
-                np.pi / 2 + theta_max * (1 + theta_tol),
                 np.pi / 2 - theta_max * (1 + theta_tol),
+                np.pi / 2 + theta_max * (1 + theta_tol),
                 self.N_theta,
             )
             * un.radian,
-            log=(np.pi / 2 - symlog * theta_max) * un.radian
+            log=(np.pi / 2 + symlog * theta_max) * un.radian
             if self.N_theta > 1
             else None,
         )
         self.thetas: un.Quantity = self._thetas.get_scale(mode=theta_scale)
         self._theta_edges: CoordinateScale = CoordinateScale(
             linear=np.linspace(
-                np.pi / 2 + theta_max * (1 + theta_tol),
                 np.pi / 2 - theta_max * (1 + theta_tol),
+                np.pi / 2 + theta_max * (1 + theta_tol),
                 self.N_theta + 1,
             )
             * un.radian,
-            log=(np.pi / 2 - symlog_edges * theta_max) * un.radian
+            log=(np.pi / 2 + symlog_edges * theta_max) * un.radian
             if self.N_theta > 1
             else None,
         )
