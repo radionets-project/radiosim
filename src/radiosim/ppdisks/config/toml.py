@@ -135,6 +135,9 @@ class TOMLConfiguration:
             return False
         return True
 
+    def __repr__(self) -> str:
+        return repr(self.as_dict())
+
     def create(self, create_parents: bool = True) -> None:
         if create_parents:
             self._path.parent.mkdir(exist_ok=True, parents=True)

@@ -45,8 +45,8 @@ def get_default_sampling_config():
         "disk_parameters": {
             "aspect_ratio": [0.01, 0.1],  # Disk aspect ratio @ r=R0 (default R0 = 1 AU)
             "disk_mass_ref_radius": 150,  # Reference radius R_ref in AU
-            "disk_mass": [0.01, 0.03],  # Cumulative disk mask in M_sun @ r=R_ref
-            "sigma_slope": [0.1, 0.3],  # Exponent of the density profile
+            "disk_mass": [0.001, 0.005],  # Cumulative disk mask in M_sun @ r=R_ref
+            "sigma_slope": [0.1, 0.7],  # Exponent of the density profile
             "flaring_index": [0.01, 0.2],  # Flaring index for vertical profile
             "alpha": [0.001, 0.01],  # Shakura-Sunyaev viscosity parameter
         },
@@ -54,17 +54,17 @@ def get_default_sampling_config():
             "invstokes": {
                 "1": [10.0, 20.0],  # Inverse Stokes number of dust species 1
             },
-            "epsilon": [0.05, 0.2],  # Dust-to-Gas ratio,
+            "epsilon": [0.01, 0.1],  # Dust-to-Gas ratio,
         },
         "planet_parameters": {
             "binary_ratio": 0.0,  # Ratio of binary systems to single systems
             "binary_period": [6.04800e5, 3e7],  # Seconds (logarithmic sampling)
             "binary_eccentricity": [0.0, 0.2],  # 0 = Circle, 0 < e < 1 = Ellipse
             "stellar_mass": [0.2, 2.0],  # Solar Masses
-            "stellar_temperature": [3000.0, 6000.0],  # Kelvin
+            "stellar_temperature": [4000.0, 8000.0],  # Kelvin
             "num_planets": [1, 3],  # Number of Planets
             "planet_mass": [1.0e-6, 5.0e-3],  # Solar Masses
-            "planet_orbit_radius": [6.0, 30.0],  # Astronomical Units
+            "planet_orbit_radius": [8.0, 30.0],  # Astronomical Units
             "planet_exclusion_factor": 0.2,
             # short: PEF -> no other planets allowed closer than R_orbit * PEF
             "planet_exclusion_max_iter": 100,  # max iterations to determine valid orbit
@@ -74,7 +74,7 @@ def get_default_sampling_config():
         },
         "mesh_parameters": {
             "y_min": [4.0, 5.0],  # Astronomical Units
-            "y_max_ratio": [1.5, 3.0],  # Multiple of max(orbital_radius)
+            "y_max_ratio": [5.0, 8.0],  # Multiple of max(orbital_radius)
         },
         "extrapolation_parameters": {
             "extrapolation_active": True,  # whether to extrapolate the dustdens
@@ -92,8 +92,8 @@ def get_default_sampling_config():
         "output_parameters": {
             "steps_per_orbit": 20,  # Num of time steps per orbit of outermost planet
             "num_largest_orbits": [
+                50,
                 100,
-                150,
             ],  # Sim. time as multiple of period of outermost planet
         },
         "grid_parameters": {
@@ -106,18 +106,18 @@ def get_default_sampling_config():
             "height_interpolate_idx_extend": 5,  # Num indices to extend interpolation
         },
         "thermal_mc_parameters": {
-            "scattering_mode": 1,  # Scattering mode:
+            "scattering_mode": 2,  # Scattering mode:
             # 0: no scattering
             # 1: isotropic scattering
             # 2: anisotropic scattering
             # 3 - 5 --> see radmc3d manual
             "fast_mode": 1,  # Whether to use 'fast mode'
             "modified_random_walk": True,  # Whether to use MRW
-            "freq_res": 200,  # num of frequencies for the MC run
-            "nphot_therm": 10_000_000_000,  # num of thermal photon packages for MC run
+            "freq_res": 300,  # num of frequencies for the MC run
+            "nphot_therm": 5_000_000_000,  # num of thermal photon packages for MC run
         },
         "imaging_parameters": {
-            "nphot_scat": 0,  # num of scattering photon packages for the imaging run
+            "nphot_scat": 10_000_000,  # num of scattering photon packages for image run
             "second_order_raytracing": True,  # Whether to perform 2nd order ray tracing
             "num_versions": [1, 2],  # max uses of the same dust distribution
             "incl": [0.0, 30.0],  # inclination of the camera relative to image plane
@@ -224,6 +224,8 @@ class Simulation:
             return []
 
         run_ids = [int(str(d.name).removeprefix("run_")) for d in dirs]
+        run_ids.sort()
+
         return [SimulationRun(id=run_id, sim=self) for run_id in run_ids]
 
     def get_run(self, run_id: int) -> "SimulationRun":
@@ -284,9 +286,10 @@ class Simulation:
             print("----- ! MANUAL MODE ACTIVE ! -----")
 
         num_current_images = run.get_num_current_images()
-        if not resume or num_current_images == 0:
+        if not resume and num_current_images == 0:
             start_idx = 0
         elif resume and resume_model_id is not None:
+            # FIXME: The start_idx has to be the number of images not the model id
             start_idx = (
                 resume_model_id
                 if resume_model_id >= 0
@@ -295,7 +298,11 @@ class Simulation:
         else:
             start_idx = num_current_images
 
+        # FIXME: Currently, still the number of models is configured,
+        # not the number of images!
         for i in np.arange(start_idx, num_images):
+            print(f"-> Simulating Model {i}")
+
             skip_fargo = False
             skip_radmc = False
 
@@ -656,7 +663,7 @@ class Simulation:
         num_mc_threads: int,
         **kwargs,
     ) -> None:
-        radmc_setup = self.get_radmc_setup(num_mc_threads=num_mc_threads)
+        radmc_setup = model.get_radmc_setup(num_mc_threads=num_mc_threads)
 
         # Create input files
         radmc_setup.create_radmc3d_input()
@@ -978,11 +985,13 @@ class SimulationRun:
         return self._sampling_config["run.seed"]
 
     def get_models(self) -> list["DiskModel"]:
-        return [
+        models = [
             DiskModel(id=int(str(d.name).removeprefix("model_")), run=self)
             for d in self._directory.glob("model_*")
             if d.is_dir()
         ]
+        models.sort(key=lambda model: model._id)
+        return models
 
     def get_model(self, id: int) -> "DiskModel":
         for model in self.get_models():
@@ -2195,6 +2204,7 @@ class DiskModel:
                 intensity_label=intensity_label,
                 intensity_limits=intensity_limits,
                 xy_unit=xy_unit,
+                xy_labels=["Azimuth Angle $\\phi$", "Radius $r$"],
                 save_to=save_to,
                 save_args=save_args,
                 **kwargs,
@@ -2292,7 +2302,7 @@ class DiskModel:
                 intensity_label=intensity_label,
                 intensity_limits=intensity_limits,
                 xy_unit=xy_unit,
-                xy_labels=["Polar Angle $\\phi$", "Radius $r$"],
+                xy_labels=["Azimuth Angle $\\phi$", "Radius $r$"],
                 save_to=save_to,
                 save_args=save_args,
                 **kwargs,

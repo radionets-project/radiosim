@@ -150,28 +150,31 @@ class Grid:
                 / 10
             )
 
-        theta_max = np.abs(
-            np.arccos(self.heights[-1] / self.radii[-1]).value - np.pi / 2
-        )
+        # Transform from cyclindrical coordinate system to spherical coordinate system
+        theta_max = np.abs(np.atan(self.heights[-1] / self.radii[-1]).value)
 
         self._thetas: CoordinateScale = CoordinateScale(
             linear=np.linspace(
-                np.pi / 2 - theta_max * (1 + theta_tol),
                 np.pi / 2 + theta_max * (1 + theta_tol),
+                np.pi / 2 - theta_max * (1 + theta_tol),
                 self.N_theta,
             )
             * un.radian,
-            log=(symlog + np.pi / 2) * un.radian if self.N_theta > 1 else None,
+            log=(np.pi / 2 - symlog * theta_max) * un.radian
+            if self.N_theta > 1
+            else None,
         )
         self.thetas: un.Quantity = self._thetas.get_scale(mode=theta_scale)
         self._theta_edges: CoordinateScale = CoordinateScale(
             linear=np.linspace(
-                np.pi / 2 - theta_max * (1 + theta_tol),
                 np.pi / 2 + theta_max * (1 + theta_tol),
+                np.pi / 2 - theta_max * (1 + theta_tol),
                 self.N_theta + 1,
             )
             * un.radian,
-            log=(symlog_edges + np.pi / 2) * un.radian if self.N_theta > 1 else None,
+            log=(np.pi / 2 - symlog_edges * theta_max) * un.radian
+            if self.N_theta > 1
+            else None,
         )
         self.theta_edges: un.Quantity = self._theta_edges.get_scale(mode=theta_scale)
 
@@ -310,19 +313,27 @@ class RADMCSetup:
 
         self.save_input_file(name="dust_density", data=dust_density_output)
 
-    def _get_wavelengths(self) -> list[float]:
+    def get_wavelengths(self) -> list[float]:
         star_temps = self.model.get_sample_config()[
             "planet_parameters.stellar_temperature"
         ]
-        return np.logspace(
-            -0.95 if np.max(star_temps) <= 10000 else -1.5,
-            np.log10(self.ref_wavelength.to(un.micrometer).value),
-            self.frequency_res,
-        ).tolist()
+        ref_wavelength = self.model._run._sim._ref_wavelength.to(un.micrometer)
+
+        wavelengths = (
+            np.logspace(
+                -0.95 if np.max(star_temps) <= 10000 else -1.5,
+                3,
+                self.frequency_res,
+            )
+            * un.micrometer
+        )
+
+        wavelengths[np.argmin(np.abs(wavelengths - ref_wavelength))] = ref_wavelength
+        return wavelengths
 
     def create_wavelength_micron_input(self) -> None:
         output = [self.frequency_res]
-        output.extend(self._get_wavelengths())
+        output.extend(self.get_wavelengths().value.tolist())
 
         self.save_input_file(name="wavelength_micron", data=output)
 
@@ -363,7 +374,7 @@ class RADMCSetup:
             y_star = 0
 
         output.append(f"{R_star} {m_star} {x_star} {y_star} {0}")
-        output.extend(self._get_wavelengths())
+        output.extend(self.get_wavelengths().value.tolist())
         output.extend(
             (-np.array(sample_config["planet_parameters.stellar_temperature"])).tolist()
         )  # black body temperatures -> negative sign
@@ -387,7 +398,7 @@ class RADMCSetup:
         self.save_input_file(name="dustopac", data=output)
 
     def create_dustkappa_input(self) -> None:
-        wavelengths = self._get_wavelengths()
+        wavelengths = self.get_wavelengths().value.tolist()
 
         for ispec in range(1, self.model.get_num_species() + 1):
             opac = self.model.get_opacities(
