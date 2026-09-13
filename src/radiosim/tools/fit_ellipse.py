@@ -28,7 +28,7 @@ def fit_ellipse(
 
     cut_ratio: float, optional
         The multiple of the maximum image value which will be used to select the
-        pixels to consider for the analysis. The higher the value, the more pixels
+        pixels to consider for the analysis. The lower the value, the more pixels
         will we selected and thus the analysis will become more complex.
         This should be chosen depending on the input image. Depending on the intensity
         gradients it might be necessary to select more values to clearly identify the
@@ -122,6 +122,8 @@ def plot_ellipse_fit(
     show_ellipse: bool = True,
     legend_loc: str = "best",
     patch_parameters: dict | None = None,
+    scatter_args: dict | None = None,
+    imshow_args: dict | None = None,
     arrow_args: dict | None = None,
     show_legend: bool = True,
     fig: matplotlib.figure.Figure | None = None,
@@ -137,6 +139,8 @@ def plot_ellipse_fit(
         if patch_parameters is None
         else patch_parameters
     )
+    scatter_args = {} if scatter_args is None else scatter_args
+    imshow_args = {} if imshow_args is None else imshow_args
 
     colors = plt.colormaps.get_cmap(line_cmap)(np.linspace(0.2, 0.8, 2))
     fig, ax = configure_axes(fig=fig, ax=ax, fig_args=fig_args)
@@ -204,6 +208,7 @@ def plot_ellipse_fit(
                 label="Semi-Major axis",
                 head_width=0,
                 head_length=0,
+                **arrow_args,
             )
             ax.arrow(
                 x=center[1],
@@ -215,11 +220,18 @@ def plot_ellipse_fit(
                 label="Semi-Minor axis",
                 head_width=0,
                 head_length=0,
+                **arrow_args,
             )
 
         X = pca_output["X"]
         if show_points:
-            ax.scatter(X[:, 1], X[:, 0], s=point_size, color=point_color)
+            ax.scatter(
+                X[:, 1],
+                X[:, 0],
+                s=point_size,
+                color=point_color,
+                **scatter_args,
+            )
 
         if show_image:
             im = ax.imshow(
@@ -227,8 +239,9 @@ def plot_ellipse_fit(
                 origin="lower",
                 norm=get_norm(norm=image_norm),
                 cmap=image_cmap,
+                **imshow_args,
             )
-            configure_colorbar(mappable=im, ax=ax, fig=fig, label="Points / Pixel")
+            configure_colorbar(mappable=im, ax=ax, fig=fig, label="Points per pixel")
 
         ax.set_xlim(X[:, 1].min(), X[:, 1].max())
         ax.set_ylim(X[:, 0].min(), X[:, 0].max())
