@@ -1579,7 +1579,6 @@ class DiskModel:
                 fov = self.get_image_fov(idx=idx)
             else:
                 fov = fov if isinstance(fov, un.Quantity) else fov * un.arcsecond
-
                 # Extend image according to provided FoV
                 if extend_to_physical_size and fov != self.get_image_fov(idx=idx):
                     cell_size = self.get_image_fov(idx=idx) / img_shape[0]
@@ -2490,9 +2489,9 @@ class DiskModel:
                     .T
                 ).tolist()
                 print(xy_lims)
-                xy_labels = ("Relative Right Ascension", "Relative Declination")
-            else:
                 xy_labels = ("Right Ascension", "Declination")
+            else:
+                xy_labels = ("Relative RA", "Relative DEC")
 
         else:
             raise ValueError(

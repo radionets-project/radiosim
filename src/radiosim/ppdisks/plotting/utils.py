@@ -162,11 +162,13 @@ def configure_colorbar(
     label: str | None,
     show_ticks: bool = True,
     fontsize: str = "medium",
+    cbar_kwargs: dict | None = None,
 ) -> matplotlib.colorbar.Colorbar:
+    cbar_kwargs = {} if cbar_kwargs is None else cbar_kwargs
     # >>> BEGIN
     divider = make_axes_locatable(ax)
     cax = divider.append_axes("right", size="5%", pad=0.05)
-    cbar = fig.colorbar(mappable, cax=cax)
+    cbar = fig.colorbar(mappable, cax=cax, **cbar_kwargs)
     cbar.set_label(label, fontsize=fontsize)
 
     if not show_ticks:
