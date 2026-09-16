@@ -841,6 +841,8 @@ class SimulationRun:
         time_unit: un.Unit = un.second,
         show_total_time: bool = True,
         show_metrics: bool = True,
+        metric_pos: tuple[float] = (0.6, 0.95),
+        exclude_idx: list[int] | None = None,
         save_to: str | PathLike | None = None,
         save_args: dict | None = None,
         color: str = "maroon",
@@ -852,6 +854,8 @@ class SimulationRun:
         fig_args = {} if fig_args is None else fig_args
         plot_args = {} if plot_args is None else plot_args
         save_args = {"bbox_inches": "tight"} if save_args is None else save_args
+
+        exclude_idx = [] if exclude_idx is None else exclude_idx
 
         fig, ax = configure_axes(fig=fig, ax=ax, fig_args=fig_args)
 
@@ -871,6 +875,10 @@ class SimulationRun:
 
         times = np.empty(len(models))
         for i, model in enumerate(models):
+            if i in exclude_idx:
+                times[i] = np.nan
+                continue
+
             execution_times = model.get_execution_times()
 
             if mode != "total":
@@ -900,6 +908,8 @@ class SimulationRun:
         times *= un.nanosecond
         times = times.to(time_unit)
 
+        times_analysis = np.delete(times, exclude_idx)
+
         if mode != "total":
             match stage:
                 case "run":
@@ -911,27 +921,27 @@ class SimulationRun:
         else:
             stage_label = "Run Time"
 
-        ylabel = f"{mode if mode != 'total' else 'Total'} {stage_label}"
+        ylabel = f"{mode.upper() if mode != 'total' else 'Total'} {stage_label}"
 
         box_lines = []
         if show_total_time:
-            box_lines.append(f"Total: {np.round(times.sum(), 2)}")
+            box_lines.append(f"Total: {np.round(times_analysis.sum(), 2)}")
 
         if show_metrics:
             box_lines.extend(
                 [
-                    f"Average: ({np.round(times.mean().value, 2)} ± "
-                    f"{np.round(times.std().value, 2)}) "
-                    f"{times.unit.to_string(format='latex_inline')}",
-                    f"Minimum: {np.round(times.min(), 2)}",
-                    f"Maximum: {np.round(times.max(), 2)}",
+                    f"Average: ({np.round(times_analysis.mean().value, 2)} ± "
+                    f"{np.round(times_analysis.std().value, 2)}) "
+                    f"{times_analysis.unit.to_string(format='latex_inline')}",
+                    f"Minimum: {np.round(times_analysis.min(), 2)}",
+                    f"Maximum: {np.round(times_analysis.max(), 2)}",
                 ]
             )
 
         if len(box_lines) > 0:
             ax.annotate(
                 "\n".join(box_lines),
-                (0.65, 0.95),
+                metric_pos,
                 xycoords=ax.get_window_extent(),
                 va="top",
                 bbox={"facecolor": "lightgray", "alpha": 0.8, "edgecolor": "black"},
@@ -1912,7 +1922,7 @@ class DiskModel:
             )
 
         ax.set_xlabel(f"Radius $r$ / {r_unit.to_string(format='latex_inline')}")
-        ax.set_ylabel("Cumulative Disk Mass $M(<r)$ / $M_{\\text{sun}}$")
+        ax.set_ylabel("Cumulative Disk Mass $M(<r)$ / $M_{\\odot}$")
 
         if x_norm is not None:
             ax.set_xscale(x_norm)
