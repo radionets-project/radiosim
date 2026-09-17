@@ -99,7 +99,7 @@ def get_default_sampling_config():
         "grid_parameters": {
             "r_scale": "log",  # Scaling of the r-axis for radmc3d simulation
             "theta_scale": "log",  # Scaling of the theta-axis for radmc3d simulation
-            "theta_steps": 200,  # Number of theta cells
+            "theta_steps": 50,  # Number of theta cells
             "theta_log_exp": -1.5,  # Exponent for scaling function of theta theta-axis
             "theta_tol": 0.0,  # Percentile offset for upper and lower theta
             "min_height": 0.25,  # Minimum disk height in AU
@@ -114,7 +114,7 @@ def get_default_sampling_config():
             "fast_mode": 1,  # Whether to use 'fast mode'
             "modified_random_walk": True,  # Whether to use MRW
             "freq_res": 300,  # num of frequencies for the MC run
-            "nphot_therm": 5_000_000_000,  # num of thermal photon packages for MC run
+            "nphot_therm": 1_000_000_000,  # num of thermal photon packages for MC run
         },
         "imaging_parameters": {
             "nphot_scat": 10_000_000,  # num of scattering photon packages for image run
