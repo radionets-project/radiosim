@@ -11,11 +11,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 from astropy import constants as const
 from astropy import units as un
+from astropy.convolution import Gaussian2DKernel
 from astropy.time import Time
 from matplotlib import animation
 from numpy.typing import ArrayLike
 from scipy import integrate
 from scipy.interpolate import PchipInterpolator
+from scipy.ndimage import shift
+from scipy.signal import fftconvolve
 from tqdm.auto import tqdm
 
 from radiosim.ppdisks.config import TOMLConfiguration
@@ -113,11 +116,11 @@ def get_default_sampling_config():
             # 3 - 5 --> see radmc3d manual
             "fast_mode": 1,  # Whether to use 'fast mode'
             "modified_random_walk": True,  # Whether to use MRW
-            "freq_res": 300,  # num of frequencies for the MC run
+            "freq_res": 1000,  # num of frequencies for the MC run
             "nphot_therm": 1_000_000_000,  # num of thermal photon packages for MC run
         },
         "imaging_parameters": {
-            "nphot_scat": 10_000_000,  # num of scattering photon packages for image run
+            "nphot_scat": 0,  # num of scattering photon packages for image run
             "second_order_raytracing": True,  # Whether to perform 2nd order ray tracing
             "num_versions": [1, 2],  # max uses of the same dust distribution
             "incl": [0.0, 30.0],  # inclination of the camera relative to image plane
@@ -1565,8 +1568,12 @@ class DiskModel:
         self,
         idx: int,
         fov: float | un.Quantity | str | None = "auto",
+        target_max_pos: tuple[float] | None = None,
         extend_to_physical_size: bool = True,
+        force_even_img_size: bool = False,
         intensity_cutoff: float = 1e-20,
+        smooth: bool = False,
+        smooth_kernel_std: float | ArrayLike = (0.5, 0.5),
     ) -> un.Quantity:
         img_data = self._parse_image(idx=idx)
 
@@ -1593,6 +1600,8 @@ class DiskModel:
                 if extend_to_physical_size and fov != self.get_image_fov(idx=idx):
                     cell_size = self.get_image_fov(idx=idx) / img_shape[0]
                     pix_target = int(fov / cell_size)
+                    if pix_target % 2 != 0 and force_even_img_size:
+                        pix_target += 1
 
                     img_full = (
                         np.ones(
@@ -1613,9 +1622,37 @@ class DiskModel:
             # See http://dx.doi.org/10.1007/978-3-642-39950-3 p. 9f
             # and image.py in radmc3dPy (https://github.com/dullemond/radmc3d-2.0)
             solid_angle = ((fov / img.shape[0]) ** 2).to(un.steradian) / un.pixel
-            return (img * brightness_unit * solid_angle).to(un.jansky / un.pixel)
+            image = (img * brightness_unit * solid_angle).to(un.jansky / un.pixel)
         else:
-            return img * brightness_unit
+            image = img * brightness_unit
+
+        if target_max_pos is not None:
+            max_pos = np.array(np.unravel_index(img.argmax(), image.shape))
+            max_pos_diff = np.floor(
+                np.array(target_max_pos) * image.shape[0] - max_pos
+            ).astype(int)
+            image = (
+                shift(image.value, max_pos_diff, cval=image.min().value) * image.unit
+            )
+
+        if not smooth:
+            return image
+
+        kernel = Gaussian2DKernel(
+            x_stddev=smooth_kernel_std[0], y_stddev=smooth_kernel_std[1]
+        )
+
+        original_shape = image.shape
+        image_smooth = fftconvolve(image.value, kernel)
+        image_smooth = image_smooth[
+            image_smooth.shape[0] // 2 - original_shape[0] // 2 : image_smooth.shape[0]
+            // 2
+            + original_shape[0] // 2 :,
+            image_smooth.shape[1] // 2 - original_shape[1] // 2 : image_smooth.shape[1]
+            // 2
+            + original_shape[1] // 2 :,
+        ]
+        return image_smooth * image.unit
 
     def get_image_dims(self, idx: int) -> un.Quantity:
         img_data = self._parse_image(idx=idx)
@@ -2437,7 +2474,12 @@ class DiskModel:
         self,
         idx: int,
         fov: float | un.Quantity | None = None,
+        target_max_pos: tuple[float] | None = None,
+        extend_to_physical_size: bool = True,
+        force_even_img_size: bool = False,
         intensity_cutoff: float = 1e-20,
+        smooth: bool = False,
+        smooth_kernel_std: float | ArrayLike = (0.5, 0.5),
         xy_lims: ArrayLike | None = None,
         xy_unit: un.Unit = un.AU,
         use_relative_scale: bool = True,
@@ -2448,7 +2490,16 @@ class DiskModel:
     ) -> tuple[
         matplotlib.image.AxesImage, matplotlib.figure.Figure, matplotlib.axes.Axes
     ]:
-        img = self.get_image(idx=idx, fov=fov, intensity_cutoff=intensity_cutoff)
+        img = self.get_image(
+            idx=idx,
+            fov=fov,
+            target_max_pos=target_max_pos,
+            extend_to_physical_size=extend_to_physical_size,
+            force_even_img_size=force_even_img_size,
+            intensity_cutoff=intensity_cutoff,
+            smooth=smooth,
+            smooth_kernel_std=smooth_kernel_std,
+        )
         img_dim = self.get_image_dims(idx=idx)
 
         if img.unit == un.Jansky / un.pix:
