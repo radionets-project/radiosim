@@ -61,7 +61,10 @@ def get_default_sampling_config():
         },
         "planet_parameters": {
             "binary_ratio": 0.0,  # Ratio of binary systems to single systems
-            "binary_period": [6.04800e5, 3e7],  # Seconds (logarithmic sampling)
+            "binary_period": [
+                1_210_000.0,
+                15_550_000.0,
+            ],  # Seconds (logarithmic sampling)
             "binary_eccentricity": [0.0, 0.2],  # 0 = Circle, 0 < e < 1 = Ellipse
             "stellar_mass": [0.2, 2.0],  # Solar Masses
             "stellar_temperature": [4000.0, 8000.0],  # Kelvin
@@ -90,7 +93,7 @@ def get_default_sampling_config():
                 0.3,
                 0.8,
             ],  # position of extrapol. maximum; factor of position of inner rim maximum
-            "r_min": [0.1, 1.0],  # minimal radius in AU
+            "r_min": [0.5, 2.0],  # minimal radius in AU
         },
         "output_parameters": {
             "steps_per_orbit": 20,  # Num of time steps per orbit of outermost planet
@@ -253,6 +256,7 @@ class Simulation:
         record_execution_time: bool = True,
         record_output_times: bool = False,
         verbose: bool = False,
+        show_fargo_output: bool = False,
         overwrite: bool = False,
     ) -> None:
         manual_run = False
@@ -389,6 +393,7 @@ class Simulation:
                     record_output_times=record_output_times,
                     return_execution_time=record_execution_time,
                     num_nodes=num_nodes,
+                    show_fargo_output=show_fargo_output,
                     cuda_device_id=cuda_device_id,
                 )
 
@@ -629,8 +634,7 @@ class Simulation:
             model_id=model._id,
             show_progress=kwargs["show_progress"],
             verbose=kwargs["verbose"],
-            # show_fargo_output=kwargs["verbose"],
-            show_fargo_output=False,
+            show_fargo_output=kwargs["show_fargo_output"],
             return_execution_time=kwargs["return_execution_time"],
         )
 
